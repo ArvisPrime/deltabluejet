@@ -98,7 +98,7 @@ const LandingHome: React.FC<LandingHomeProps> = ({
                Redefining Global Transit
             </div>
             <h1 className="text-6xl md:text-8xl lg:text-9xl font-black text-white leading-[0.8] tracking-tighter uppercase drop-shadow-2xl">
-              Unrivaled <br/><span className="text-primary">Horizons</span>
+              Unrivaled <br/><span className="text-primary">Horizons..</span>
             </h1>
           </div>
 
