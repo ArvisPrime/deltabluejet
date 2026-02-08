@@ -1,0 +1,5 @@
+{
+  "name": "AeroJet Operations Console",
+  "description": "A comprehensive internal management platform for AeroJet staff, featuring real-time flight tracking, ticket reissuance, seat map configuration, and AI-powered operational assistance.",
+  "requestFramePermissions": []
+}
