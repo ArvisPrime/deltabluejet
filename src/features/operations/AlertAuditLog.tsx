@@ -9,7 +9,7 @@ import {
 import type { AuditLogDoc, AuditSeverity } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
 
-const MODULES = ['all', 'Bookings', 'Payments', 'Flights', 'Auth', 'Admin'];
+const MODULES = ['all', 'bookings', 'payments', 'flights', 'auth', 'admin', 'fleet', 'routes', 'cms'];
 const SEVERITIES: Array<AuditSeverity | 'all'> = ['all', 'info', 'warning', 'error', 'critical'];
 
 const AlertAuditLog: React.FC = () => {
@@ -28,7 +28,16 @@ const AlertAuditLog: React.FC = () => {
          ]);
          setLogs(logData);
          setStats(statsData);
-      } catch (err) { console.error(err); useToastStore.getState().addToast(err instanceof Error ? err.message : "An unexpected error occurred", "error"); }
+      } catch (err: any) {
+         console.error('Audit log load error:', err);
+         const msg = err?.message || 'Failed to load audit logs';
+         // Check for Firestore index error and show a cleaner message
+         if (msg.includes('index') || msg.includes('requires an index')) {
+            useToastStore.getState().addToast('Firestore index is building. Please refresh in a minute.', 'warning');
+         } else {
+            useToastStore.getState().addToast(msg, 'error');
+         }
+      }
       finally { setLoading(false); }
    }, [filters]);
 
@@ -143,7 +152,7 @@ const AlertAuditLog: React.FC = () => {
                            onChange={e => handleModuleChange(e.target.value)}
                            className="w-full h-14 pl-14 pr-10 bg-navy-50 border-none rounded-3xl text-sm font-black text-navy-950 uppercase focus:ring-8 focus:ring-primary/5 transition-all appearance-none shadow-inner"
                         >
-                           {MODULES.map(m => <option key={m} value={m}>{m === 'all' ? 'All Modules' : m}</option>)}
+                           {MODULES.map(m => <option key={m} value={m}>{m === 'all' ? 'All Modules' : m.charAt(0).toUpperCase() + m.slice(1)}</option>)}
                         </select>
                      </div>
                   </div>

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Timestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Timestamp, collection, onSnapshot, query, orderBy, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../config/firebase.config';
 import type { RouteDoc, AircraftDoc } from '../../types/firestore';
 import { subscribeToRoutes, subscribeToAircraft, createSchedule, checkAircraftConflict } from '../../services/firestore';
 import { generateFlights, publishFlights, type GeneratedFlight } from '../../services/flightGenerator';
@@ -7,6 +8,31 @@ import WizardStepper from '../../components/scheduling/WizardStepper';
 import FlightPreviewTable from '../../components/scheduling/FlightPreviewTable';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuth } from '../../hooks/useAuth';
+
+interface ScheduleDoc {
+   id: string;
+   routeId: string;
+   aircraftId: string;
+   flightNumberPrefix: string;
+   daysOfWeek: number[];
+   departureTime: string;
+   arrivalTime: string;
+   effectiveFrom: any;
+   effectiveTo: any;
+   status: 'draft' | 'active' | 'published' | 'cancelled';
+   publishedFlightCount: number;
+   createdBy: string;
+   createdAt?: any;
+   cancelledAt?: any;
+}
+
+const DAY_NAMES: Record<number, string> = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun' };
+
+function formatScheduleDate(ts: any): string {
+   if (!ts) return '—';
+   const d = ts.toDate ? ts.toDate() : new Date(ts);
+   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 const STEPS = ['Route', 'Aircraft', 'Schedule', 'Preview', 'Publish'];
 const DAYS = [
@@ -21,7 +47,18 @@ const DAYS = [
 
 const FlightScheduling: React.FC = () => {
    const { user } = useAuth();
+   const addToast = useToastStore((s) => s.addToast);
+
+   // View mode: 'list' = schedule list, 'wizard' = create wizard
+   const [viewMode, setViewMode] = useState<'list' | 'wizard'>('list');
    const [step, setStep] = useState(1);
+
+   // Schedule list state
+   const [schedules, setSchedules] = useState<ScheduleDoc[]>([]);
+   const [schedulesLoading, setSchedulesLoading] = useState(true);
+   const [statusTab, setStatusTab] = useState<'all' | 'active' | 'published' | 'draft' | 'cancelled'>('all');
+   const [confirmDeleteSchedule, setConfirmDeleteSchedule] = useState<ScheduleDoc | null>(null);
+   const [scheduleActionLoading, setScheduleActionLoading] = useState(false);
 
    // Data sources
    const [routes, setRoutes] = useState<RouteDoc[]>([]);
@@ -54,6 +91,66 @@ const FlightScheduling: React.FC = () => {
       const unsub2 = subscribeToAircraft((data) => setAircraft(data.filter((a) => a.status === 'active')));
       return () => { unsub1(); unsub2(); };
    }, []);
+
+   // Subscribe to schedules
+   useEffect(() => {
+      const q = query(collection(db, 'schedules'), orderBy('createdAt', 'desc'));
+      const unsub = onSnapshot(q, (snap) => {
+         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }) as ScheduleDoc);
+         setSchedules(data);
+         setSchedulesLoading(false);
+      }, (err) => {
+         console.error('[FlightScheduling] Schedule subscription error:', err);
+         setSchedulesLoading(false);
+      });
+      return unsub;
+   }, []);
+
+   const filteredSchedules = useMemo(() => {
+      if (statusTab === 'all') return schedules;
+      return schedules.filter(s => s.status === statusTab || (statusTab === 'active' && s.status === 'published'));
+   }, [schedules, statusTab]);
+
+   // Schedule management actions
+   const handleCancelSchedule = useCallback(async (s: ScheduleDoc) => {
+      setScheduleActionLoading(true);
+      try {
+         await updateDoc(doc(db, 'schedules', s.id), {
+            status: 'cancelled',
+            cancelledAt: serverTimestamp(),
+         });
+         addToast('Schedule cancelled', 'success');
+      } catch (err) {
+         console.error('Cancel schedule error:', err);
+         addToast('Failed to cancel schedule', 'error');
+      } finally {
+         setScheduleActionLoading(false);
+      }
+   }, [addToast]);
+
+   const handleDeleteSchedule = useCallback(async (s: ScheduleDoc) => {
+      setScheduleActionLoading(true);
+      try {
+         await deleteDoc(doc(db, 'schedules', s.id));
+         setConfirmDeleteSchedule(null);
+         addToast('Schedule deleted', 'success');
+      } catch (err) {
+         console.error('Delete schedule error:', err);
+         addToast('Failed to delete schedule', 'error');
+      } finally {
+         setScheduleActionLoading(false);
+      }
+   }, [addToast]);
+
+   const getRouteName = useCallback((routeId: string) => {
+      const route = routes.find(r => r.id === routeId);
+      return route ? `${route.origin.code} → ${route.destination.code}` : routeId;
+   }, [routes]);
+
+   const getAircraftName = useCallback((aircraftId: string) => {
+      const ac = aircraft.find(a => a.id === aircraftId);
+      return ac ? ac.registration : aircraftId;
+   }, [aircraft]);
 
    const selectedRoute = useMemo(() => routes.find((r) => r.id === selectedRouteId), [routes, selectedRouteId]);
    const compatibleAircraft = useMemo(() => {
@@ -184,16 +281,175 @@ const FlightScheduling: React.FC = () => {
       setConflictWarning('');
    };
 
+   const handleBackToList = () => {
+      handleReset();
+      setViewMode('list');
+   };
+
    return (
       <div className="space-y-8">
          {/* Header */}
-         <div>
-            <h1 className="text-3xl font-black text-navy-950 tracking-tight uppercase">Schedule Publisher</h1>
-            <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest mt-1">
-               Generate & Publish Flight Inventory
-            </p>
+         <div className="flex items-end justify-between">
+            <div>
+               <h1 className="text-3xl font-black text-navy-950 tracking-tight uppercase">
+                  {viewMode === 'list' ? 'Flight Schedules' : 'Schedule Publisher'}
+               </h1>
+               <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest mt-1">
+                  {viewMode === 'list' ? 'Manage Published & Draft Schedules' : 'Generate & Publish Flight Inventory'}
+               </p>
+            </div>
+            {viewMode === 'list' ? (
+               <button
+                  onClick={() => setViewMode('wizard')}
+                  className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-primary/20"
+               >
+                  <span className="material-symbols-outlined text-sm">add</span> New Schedule
+               </button>
+            ) : (
+               <button
+                  onClick={handleBackToList}
+                  className="flex items-center gap-2 px-6 py-3 bg-white border border-navy-100 rounded-2xl font-black text-[10px] uppercase tracking-widest text-navy-500 hover:bg-navy-50 transition-all"
+               >
+                  <span className="material-symbols-outlined text-sm">arrow_back</span> Back to Schedules
+               </button>
+            )}
          </div>
 
+         {/* ═══ SCHEDULES LIST VIEW ═══ */}
+         {viewMode === 'list' && (
+            <div className="space-y-6">
+               {/* Status Tabs */}
+               <div className="flex gap-2 flex-wrap">
+                  {(['all', 'active', 'draft', 'cancelled'] as const).map((tab) => (
+                     <button
+                        key={tab}
+                        onClick={() => setStatusTab(tab)}
+                        className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                           statusTab === tab
+                              ? 'bg-primary text-white border-primary shadow-md'
+                              : 'bg-white text-navy-400 border-navy-100 hover:border-primary/30'
+                        }`}
+                     >
+                        {tab === 'all' ? `All (${schedules.length})` : `${tab} (${schedules.filter(s => tab === 'active' ? (s.status === 'active' || s.status === 'published') : s.status === tab).length})`}
+                     </button>
+                  ))}
+               </div>
+
+               {/* Schedule Table */}
+               <div className="bg-white rounded-3xl border border-navy-100 overflow-hidden">
+                  {schedulesLoading ? (
+                     <div className="p-16 flex flex-col items-center gap-4">
+                        <div className="w-8 h-8 rounded-full border-3 border-navy-100 border-t-primary animate-spin" />
+                        <p className="text-sm font-bold text-navy-400">Loading schedules…</p>
+                     </div>
+                  ) : filteredSchedules.length === 0 ? (
+                     <div className="p-16 text-center">
+                        <span className="material-symbols-outlined text-5xl text-navy-200 block mb-3">event_busy</span>
+                        <p className="font-bold text-navy-400">No schedules found</p>
+                        <p className="text-xs text-navy-300 mt-1">Create a new schedule to get started.</p>
+                     </div>
+                  ) : (
+                     <div className="overflow-x-auto">
+                        <table className="w-full text-left min-w-[800px]">
+                           <thead>
+                              <tr className="bg-navy-50/50 border-b border-navy-50 text-[10px] font-black text-navy-300 uppercase tracking-[0.25em]">
+                                 <th className="px-8 py-5">Route</th>
+                                 <th className="px-6 py-5">Aircraft</th>
+                                 <th className="px-6 py-5">Flight #</th>
+                                 <th className="px-6 py-5">Days</th>
+                                 <th className="px-6 py-5">Dates</th>
+                                 <th className="px-6 py-5">Status</th>
+                                 <th className="px-6 py-5">Flights</th>
+                                 <th className="px-8 py-5 text-right">Actions</th>
+                              </tr>
+                           </thead>
+                           <tbody className="divide-y divide-navy-50">
+                              {filteredSchedules.map((s) => (
+                                 <tr key={s.id} className="hover:bg-navy-50/50 transition-colors">
+                                    <td className="px-8 py-5 text-sm font-black text-navy-950">{getRouteName(s.routeId)}</td>
+                                    <td className="px-6 py-5 text-xs font-bold text-navy-700">{getAircraftName(s.aircraftId)}</td>
+                                    <td className="px-6 py-5 text-xs font-bold text-navy-700 font-mono">{s.flightNumberPrefix}</td>
+                                    <td className="px-6 py-5 text-[10px] font-bold text-navy-500">
+                                       {s.daysOfWeek?.map(d => DAY_NAMES[d]).join(', ')}
+                                    </td>
+                                    <td className="px-6 py-5 text-[10px] font-bold text-navy-500">
+                                       {formatScheduleDate(s.effectiveFrom)} — {formatScheduleDate(s.effectiveTo)}
+                                    </td>
+                                    <td className="px-6 py-5">
+                                       <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
+                                          s.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-100'
+                                          : (s.status === 'active' || s.status === 'published') ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                          : 'bg-amber-50 text-amber-700 border-amber-100'
+                                       }`}>
+                                          {s.status === 'published' ? 'Active' : s.status}
+                                       </span>
+                                    </td>
+                                    <td className="px-6 py-5 text-xs font-black text-navy-700">{s.publishedFlightCount || 0}</td>
+                                    <td className="px-8 py-5 text-right">
+                                       <div className="flex justify-end gap-1">
+                                          {s.status !== 'cancelled' && (
+                                             <button
+                                                onClick={() => handleCancelSchedule(s)}
+                                                disabled={scheduleActionLoading}
+                                                className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                                                title="Cancel Schedule"
+                                             >
+                                                <span className="material-symbols-outlined text-sm">cancel</span>
+                                             </button>
+                                          )}
+                                          <button
+                                             onClick={() => setConfirmDeleteSchedule(s)}
+                                             disabled={scheduleActionLoading}
+                                             className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                             title="Delete Schedule"
+                                          >
+                                             <span className="material-symbols-outlined text-sm">delete</span>
+                                          </button>
+                                       </div>
+                                    </td>
+                                 </tr>
+                              ))}
+                           </tbody>
+                        </table>
+                     </div>
+                  )}
+               </div>
+
+               {/* Delete Confirm Modal */}
+               {confirmDeleteSchedule && (
+                  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                     <div className="bg-white rounded-3xl border border-navy-100 shadow-2xl w-full max-w-md p-8 space-y-6 animate-in zoom-in-95 duration-300">
+                        <div className="flex flex-col items-center gap-4">
+                           <div className="size-16 rounded-full bg-red-50 flex items-center justify-center">
+                              <span className="material-symbols-outlined text-3xl text-red-500">delete_forever</span>
+                           </div>
+                           <div className="text-center space-y-2">
+                              <h3 className="text-xl font-black text-navy-950 tracking-tight">Delete Schedule</h3>
+                              <p className="text-sm text-navy-500">
+                                 Permanently delete schedule <strong>{confirmDeleteSchedule.flightNumberPrefix}</strong>
+                                 ({getRouteName(confirmDeleteSchedule.routeId)})? This cannot be undone.
+                              </p>
+                           </div>
+                        </div>
+                        <div className="flex gap-3">
+                           <button onClick={() => setConfirmDeleteSchedule(null)} className="flex-1 h-12 bg-white border border-navy-200 text-navy-700 font-black rounded-xl hover:bg-navy-50 transition-all">Cancel</button>
+                           <button
+                              onClick={() => handleDeleteSchedule(confirmDeleteSchedule)}
+                              disabled={scheduleActionLoading}
+                              className="flex-1 h-12 bg-red-500 text-white font-black rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                           >
+                              {scheduleActionLoading ? (<><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Deleting…</>) : 'Delete'}
+                           </button>
+                        </div>
+                     </div>
+                  </div>
+               )}
+            </div>
+         )}
+
+         {/* ═══ WIZARD VIEW ═══ */}
+         {viewMode === 'wizard' && (
+         <>
          {/* Stepper */}
          <div className="bg-white rounded-2xl border border-navy-100 px-8 py-5">
             <WizardStepper steps={STEPS} currentStep={step} />
@@ -457,13 +713,22 @@ const FlightScheduling: React.FC = () => {
                         <p className="text-lg font-black text-navy-800">{publishResult.count * (selectedAc?.totalSeats || 0)}</p>
                      </div>
                   </div>
-                  <button
-                     onClick={handleReset}
-                     className="px-8 py-3 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-primary/20"
-                  >
-                     <span className="material-symbols-outlined text-sm mr-2 align-middle">add</span>
-                     Publish Another Schedule
-                  </button>
+                  <div className="flex gap-4 justify-center">
+                     <button
+                        onClick={handleBackToList}
+                        className="px-8 py-3 bg-white border border-navy-100 rounded-2xl font-black text-[10px] uppercase tracking-widest text-navy-500 hover:bg-navy-50 transition-all"
+                     >
+                        <span className="material-symbols-outlined text-sm mr-2 align-middle">list</span>
+                        View All Schedules
+                     </button>
+                     <button
+                        onClick={handleReset}
+                        className="px-8 py-3 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-primary/20"
+                     >
+                        <span className="material-symbols-outlined text-sm mr-2 align-middle">add</span>
+                        Publish Another Schedule
+                     </button>
+                  </div>
                </div>
             )}
          </div>
@@ -508,6 +773,8 @@ const FlightScheduling: React.FC = () => {
                   </button>
                )}
             </div>
+         )}
+         </>
          )}
       </div>
    );

@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import type { RouteDoc, AircraftDoc } from '../../types/firestore';
 import { Timestamp } from 'firebase/firestore';
-import { subscribeToAircraft, updateRoute } from '../../services/firestore';
+import { subscribeToAircraft, updateRoute, deleteRoute } from '../../services/firestore';
 import { useToastStore } from '../../stores/toastStore';
 
 interface RouteDetailPanelProps {
     route: RouteDoc;
     onEdit: () => void;
     onClose: () => void;
+    onDelete?: () => void;
 }
 
 const DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-const RouteDetailPanel: React.FC<RouteDetailPanelProps> = ({ route, onEdit, onClose }) => {
+const RouteDetailPanel: React.FC<RouteDetailPanelProps> = ({ route, onEdit, onClose, onDelete }) => {
     const [aircraft, setAircraft] = useState<AircraftDoc[]>([]);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     // Subscribe to aircraft to compute compatibility
     useEffect(() => {
@@ -181,6 +184,13 @@ const RouteDetailPanel: React.FC<RouteDetailPanelProps> = ({ route, onEdit, onCl
                     Edit
                 </button>
                 <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-50 border border-red-100 text-red-500 font-black text-[10px] uppercase tracking-widest hover:bg-red-100 transition-all"
+                >
+                    <span className="material-symbols-outlined text-sm">delete</span>
+                    Delete
+                </button>
+                <button
                     onClick={handleToggleActive}
                     className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ml-auto ${route.isActive
                             ? 'bg-red-50 border border-red-100 text-red-500 hover:bg-red-100'
@@ -191,6 +201,49 @@ const RouteDetailPanel: React.FC<RouteDetailPanelProps> = ({ route, onEdit, onCl
                     {route.isActive ? 'Deactivate' : 'Activate'}
                 </button>
             </div>
+
+            {/* Delete Confirmation */}
+            {confirmDelete && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl border border-navy-100 shadow-2xl w-full max-w-md p-8 space-y-6 animate-in zoom-in-95 duration-300">
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="size-16 rounded-full bg-red-50 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-3xl text-red-500">delete_forever</span>
+                            </div>
+                            <div className="text-center space-y-2">
+                                <h3 className="text-xl font-black text-navy-950 tracking-tight">Delete Route</h3>
+                                <p className="text-sm text-navy-500">
+                                    Permanently delete <strong>{route.origin.code} → {route.destination.code}</strong>?
+                                    This cannot be undone.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setConfirmDelete(false)} className="flex-1 h-12 bg-white border border-navy-200 text-navy-700 font-black rounded-xl hover:bg-navy-50 transition-all">Cancel</button>
+                            <button
+                                onClick={async () => {
+                                    setDeleting(true);
+                                    try {
+                                        await deleteRoute(route.id);
+                                        useToastStore.getState().addToast('Route deleted', 'success');
+                                        onDelete?.();
+                                    } catch (err) {
+                                        console.error('Delete route error:', err);
+                                        useToastStore.getState().addToast('Failed to delete route', 'error');
+                                    } finally {
+                                        setDeleting(false);
+                                        setConfirmDelete(false);
+                                    }
+                                }}
+                                disabled={deleting}
+                                className="flex-1 h-12 bg-red-500 text-white font-black rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {deleting ? (<><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Deleting…</>) : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

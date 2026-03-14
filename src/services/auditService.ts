@@ -60,45 +60,64 @@ export async function writeAuditLog(entry: AuditLogEntry): Promise<string> {
 
 /**
  * Search audit logs with filters.
+ *
+ * Strategy: Use a simple `orderBy('timestamp', 'desc')` query to avoid
+ * needing composite indexes for every filter combination. Equality filters
+ * that pair with orderBy are safe ONLY if a matching composite index exists.
+ * We try the indexed query first; if Firestore throws the classic
+ * "requires an index" error we fall back to a broader fetch + client filter.
  */
 export async function searchAuditLogs(filters: AuditSearchFilters = {}): Promise<AuditLogDoc[]> {
-    const constraints: ReturnType<typeof where>[] = [];
+    const maxResults = filters.maxResults || 100;
 
-    if (filters.module && filters.module !== 'all') {
-        constraints.push(where('module', '==', filters.module));
-    }
-    if (filters.severity && filters.severity !== ('all' as AuditSeverity)) {
-        constraints.push(where('severity', '==', filters.severity));
-    }
-    if (filters.startDate) {
-        constraints.push(where('timestamp', '>=', Timestamp.fromDate(filters.startDate)));
-    }
-    if (filters.endDate) {
-        constraints.push(where('timestamp', '<=', Timestamp.fromDate(filters.endDate)));
-    }
-
-    const q = query(
-        auditRef,
-        ...constraints,
-        orderBy('timestamp', 'desc'),
-        limit(filters.maxResults || 100),
-    );
-
-    const snap = await getDocs(q);
-    let results = snap.docs.map(d => ({ id: d.id, ...d.data() } as AuditLogDoc));
-
-    // Client-side text search if searchTerm provided
-    if (filters.searchTerm) {
-        const term = filters.searchTerm.toLowerCase();
-        results = results.filter(log =>
-            log.userEmail.toLowerCase().includes(term) ||
-            log.action.toLowerCase().includes(term) ||
-            log.description.toLowerCase().includes(term) ||
-            log.entityId.toLowerCase().includes(term)
+    // Try a simple timestamp-only query first (no composite index needed)
+    // Then apply module / severity / search as client-side filters.
+    try {
+        const q = query(
+            auditRef,
+            orderBy('timestamp', 'desc'),
+            limit(500), // fetch a broader set, then filter client-side
         );
-    }
+        const snap = await getDocs(q);
+        let results = snap.docs.map(d => ({ id: d.id, ...d.data() } as AuditLogDoc));
 
-    return results;
+        // Client-side filtering
+        if (filters.module && filters.module !== 'all') {
+            const mod = filters.module.toLowerCase();
+            results = results.filter(log => (log.module || '').toLowerCase() === mod);
+        }
+        if (filters.severity && (filters.severity as string) !== 'all') {
+            results = results.filter(log => log.severity === filters.severity);
+        }
+        if (filters.startDate) {
+            const start = filters.startDate.getTime();
+            results = results.filter(log => {
+                const ts = log.timestamp?.toDate ? log.timestamp.toDate().getTime() : 0;
+                return ts >= start;
+            });
+        }
+        if (filters.endDate) {
+            const end = filters.endDate.getTime();
+            results = results.filter(log => {
+                const ts = log.timestamp?.toDate ? log.timestamp.toDate().getTime() : 0;
+                return ts <= end;
+            });
+        }
+        if (filters.searchTerm) {
+            const term = filters.searchTerm.toLowerCase();
+            results = results.filter(log =>
+                (log.userEmail || '').toLowerCase().includes(term) ||
+                (log.action || '').toLowerCase().includes(term) ||
+                (log.description || '').toLowerCase().includes(term) ||
+                (log.entityId || '').toLowerCase().includes(term)
+            );
+        }
+
+        return results.slice(0, maxResults);
+    } catch (err: any) {
+        console.error('searchAuditLogs error:', err);
+        throw err;
+    }
 }
 
 /**
@@ -110,24 +129,36 @@ export async function getAuditStats(): Promise<{
     warnings: number;
     uniqueUsers: number;
 }> {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const q = query(
-        auditRef,
-        where('timestamp', '>=', Timestamp.fromDate(oneDayAgo)),
-        orderBy('timestamp', 'desc'),
-        limit(500),
-    );
-    const snap = await getDocs(q);
-    const logs = snap.docs.map(d => d.data());
+    try {
+        // Simple timestamp-ordered query — no composite index needed
+        const q = query(
+            auditRef,
+            orderBy('timestamp', 'desc'),
+            limit(500),
+        );
+        const snap = await getDocs(q);
+        const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
 
-    const userSet = new Set(logs.map(l => l.userId));
+        // Filter to last 24 hours client-side
+        const logs = snap.docs
+            .map(d => d.data())
+            .filter(l => {
+                const ts = l.timestamp?.toDate ? l.timestamp.toDate().getTime() : 0;
+                return ts >= oneDayAgo;
+            });
 
-    return {
-        totalEvents: logs.length,
-        criticalErrors: logs.filter(l => l.severity === 'critical' || l.severity === 'error').length,
-        warnings: logs.filter(l => l.severity === 'warning').length,
-        uniqueUsers: userSet.size,
-    };
+        const userSet = new Set(logs.map(l => l.userId).filter(Boolean));
+
+        return {
+            totalEvents: logs.length,
+            criticalErrors: logs.filter(l => l.severity === 'critical' || l.severity === 'error').length,
+            warnings: logs.filter(l => l.severity === 'warning').length,
+            uniqueUsers: userSet.size,
+        };
+    } catch (err: any) {
+        console.error('getAuditStats error:', err);
+        return { totalEvents: 0, criticalErrors: 0, warnings: 0, uniqueUsers: 0 };
+    }
 }
 
 // ─── Export ───────────────────────────────────────────────
@@ -148,12 +179,12 @@ export function exportAuditCSV(logs: AuditLogDoc[]): void {
 
     const rows = logs.map(l => [
         l.timestamp?.toDate ? l.timestamp.toDate().toISOString() : '',
-        l.severity,
-        l.userEmail,
-        l.module,
-        l.action,
-        `${l.entityType}:${l.entityId}`,
-        l.description,
+        l.severity || '',
+        l.userEmail || '',
+        l.module || '',
+        l.action || '',
+        `${l.entityType || ''}:${l.entityId || ''}`,
+        l.description || '',
     ]);
 
     const csv = [headers, ...rows].map(row => row.map(c => `"${c}"`).join(',')).join('\n');

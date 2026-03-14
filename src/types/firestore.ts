@@ -261,18 +261,7 @@ export interface CheckinDoc {
     checkedInAt: Timestamp;
 }
 
-// ─── Audit Logs ────────────────────────────────────────────
-
-export interface AuditLogDoc {
-    id: string;
-    action: string;
-    entityType: string;
-    entityId: string;
-    userId: string;
-    userEmail: string;
-    details: Record<string, any>;
-    timestamp: Timestamp;
-}
+// ─── Audit Logs (see canonical AuditLogDoc below near line 665) ──────
 
 // ─── Users ─────────────────────────────────────────────────
 

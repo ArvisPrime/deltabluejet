@@ -72,6 +72,7 @@ export const ROUTES = {
     ALERT_AUDIT_LOG: '/admin/alerts',
     SEAT_MAP_CMS: '/admin/seat-map',
     ROUTE_MANAGEMENT: '/admin/routes',
+    AIRPORT_MANAGEMENT: '/admin/airports',
 
     // Admin — Users
     USER_MANAGEMENT: '/admin/users',
@@ -80,6 +81,7 @@ export const ROUTES = {
 
     // Admin — Bookings
     BOOKINGS: '/admin/bookings',
+    BOOKING_DETAIL_ADMIN: '/admin/bookings/:id',
     TICKET_REISSUE: '/admin/ticket-reissue',
 
     // Admin — CMS

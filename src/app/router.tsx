@@ -61,6 +61,7 @@ const ReviewFlightChange = lazyRetry(() => import('../features/booking/ReviewFli
 const FlightChangeSuccess = lazyRetry(() => import('../features/booking/FlightChangeSuccess'));
 const Bookings = lazyRetry(() => import('../features/booking/Bookings'));
 const TicketReissue = lazyRetry(() => import('../features/booking/TicketReissue'));
+const BookingDetailAdmin = lazyRetry(() => import('../features/booking/BookingDetailAdmin'));
 const MultiCitySearch = lazyRetry(() => import('../features/booking/MultiCitySearch'));
 
 // --- Check-in ---
@@ -101,6 +102,7 @@ const OperationalTriggers = lazyRetry(() => import('../features/operations/Opera
 const AlertAuditLog = lazyRetry(() => import('../features/operations/AlertAuditLog'));
 const SeatMapCMS = lazyRetry(() => import('../features/operations/SeatMapCMS'));
 const RouteManagement = lazyRetry(() => import('../features/operations/RouteManagement'));
+const AirportManagement = lazyRetry(() => import('../features/operations/AirportManagement'));
 
 // --- Users ---
 const UserManagement = lazyRetry(() => import('../features/users/UserManagement'));
@@ -264,6 +266,7 @@ export const router = createBrowserRouter([
             { path: ROUTES.ALERT_AUDIT_LOG, element: withSuspense(AlertAuditLog) },
             { path: ROUTES.SEAT_MAP_CMS, element: withSuspense(SeatMapCMS) },
             { path: ROUTES.ROUTE_MANAGEMENT, element: withSuspense(RouteManagement) },
+            { path: ROUTES.AIRPORT_MANAGEMENT, element: withSuspense(AirportManagement) },
 
             // --- User & Account Management ---
             { path: ROUTES.USER_MANAGEMENT, element: withSuspense(UserManagement) },
@@ -272,6 +275,7 @@ export const router = createBrowserRouter([
 
             // --- Bookings Management ---
             { path: ROUTES.BOOKINGS, element: withSuspense(Bookings) },
+            { path: ROUTES.BOOKING_DETAIL_ADMIN, element: withSuspense(BookingDetailAdmin) },
             { path: ROUTES.TICKET_REISSUE, element: withSuspense(TicketReissue) },
 
             // --- CMS ---

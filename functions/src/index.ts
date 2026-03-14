@@ -5,7 +5,7 @@
  * Firebase reads this file to discover deployable functions.
  */
 
-export { setUserRole, onUserCreated } from './users';
+export { setUserRole, onUserCreated, createUserAccount, disableUserAccount, deleteUserAccount } from './users';
 export { updateFlightStatus, assignGate, swapAircraft } from './flights';
 export { getDashboardStats } from './dashboard';
 export { createPaymentIntent, processRefund, sendBookingConfirmation } from './payments';

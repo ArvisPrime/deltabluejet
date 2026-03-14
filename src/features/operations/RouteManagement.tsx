@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { RouteDoc } from '../../types/firestore';
 import { subscribeToRoutes } from '../../services/firestore';
 import RouteDetailPanel from '../../components/routes/RouteDetailPanel';
@@ -11,7 +11,7 @@ const RouteManagement: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedRoute, setSelectedRoute] = useState<RouteDoc | null>(null);
+    const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
     const [editRoute, setEditRoute] = useState<RouteDoc | null>(null);
 
@@ -40,16 +40,22 @@ const RouteManagement: React.FC = () => {
         return result;
     }, [routes, statusFilter, searchQuery]);
 
+    // Derive selected route from live data so it always reflects real-time updates
+    const selectedRoute = useMemo(
+        () => (selectedRouteId ? routes.find((r) => r.id === selectedRouteId) || null : null),
+        [routes, selectedRouteId]
+    );
+
     const stats = useMemo(() => ({
         total: routes.length,
         active: routes.filter((r) => r.isActive).length,
         inactive: routes.filter((r) => !r.isActive).length,
     }), [routes]);
 
-    const handleSaved = () => {
+    const handleSaved = useCallback(() => {
         setShowAddModal(false);
         setEditRoute(null);
-    };
+    }, []);
 
     const formatDuration = (min: number) => {
         if (!min) return '—';
@@ -160,7 +166,7 @@ const RouteManagement: React.FC = () => {
                                     return (
                                         <tr
                                             key={rt.id}
-                                            onClick={() => setSelectedRoute(isSelected ? null : rt)}
+                                            onClick={() => setSelectedRouteId(isSelected ? null : rt.id)}
                                             className={`border-b border-navy-50 cursor-pointer transition-all ${isSelected
                                                     ? 'bg-primary/5 border-l-4 border-l-primary'
                                                     : 'hover:bg-navy-50/50'
@@ -229,7 +235,8 @@ const RouteManagement: React.FC = () => {
                     <RouteDetailPanel
                         route={selectedRoute}
                         onEdit={() => setEditRoute(selectedRoute)}
-                        onClose={() => setSelectedRoute(null)}
+                        onClose={() => setSelectedRouteId(null)}
+                        onDelete={() => setSelectedRouteId(null)}
                     />
                 )}
             </div>

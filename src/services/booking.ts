@@ -16,10 +16,13 @@ import {
     where,
     orderBy,
     limit,
+    startAfter,
     serverTimestamp,
     writeBatch,
     increment,
     Timestamp,
+    type QueryDocumentSnapshot,
+    type DocumentData,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase.config';
@@ -299,3 +302,89 @@ export const sendBookingConfirmation = httpsCallable<
     { bookingId: string; email: string },
     { success: boolean }
 >(functions, 'sendBookingConfirmation');
+
+// ─── Admin: Paginated Booking List ─────────────────────────
+
+const ADMIN_PAGE_SIZE = 20;
+
+export interface BookingPage {
+    bookings: BookingDoc[];
+    lastDoc: QueryDocumentSnapshot<DocumentData> | null;
+    hasMore: boolean;
+}
+
+export async function getAllBookings(
+    statusFilter?: string,
+    cursor?: QueryDocumentSnapshot<DocumentData> | null,
+): Promise<BookingPage> {
+    const constraints: any[] = [orderBy('createdAt', 'desc'), limit(ADMIN_PAGE_SIZE + 1)];
+
+    if (statusFilter && statusFilter !== 'all') {
+        constraints.unshift(where('status', '==', statusFilter));
+    }
+    if (cursor) {
+        constraints.push(startAfter(cursor));
+    }
+
+    const q = query(collection(db, 'bookings'), ...constraints);
+    const snap = await getDocs(q);
+    const docs = snap.docs;
+    const hasMore = docs.length > ADMIN_PAGE_SIZE;
+    const trimmed = hasMore ? docs.slice(0, ADMIN_PAGE_SIZE) : docs;
+
+    return {
+        bookings: trimmed.map(d => ({ id: d.id, ...d.data() }) as BookingDoc),
+        lastDoc: trimmed.length > 0 ? trimmed[trimmed.length - 1] : null,
+        hasMore,
+    };
+}
+
+// ─── Admin: Search Bookings ────────────────────────────────
+
+export async function searchBookings(term: string): Promise<BookingDoc[]> {
+    const clean = term.trim();
+    if (!clean) return [];
+
+    // Try PNR exact match first
+    const pnrSnap = await getDocs(
+        query(collection(db, 'bookings'), where('pnr', '==', clean.toUpperCase()), limit(10)),
+    );
+    if (!pnrSnap.empty) {
+        return pnrSnap.docs.map(d => ({ id: d.id, ...d.data() }) as BookingDoc);
+    }
+
+    // Fallback: search by contact email
+    const emailSnap = await getDocs(
+        query(collection(db, 'bookings'), where('contactEmail', '==', clean.toLowerCase()), limit(20)),
+    );
+    return emailSnap.docs.map(d => ({ id: d.id, ...d.data() }) as BookingDoc);
+}
+
+// ─── Admin: Export CSV ─────────────────────────────────────
+
+export function exportBookingsCSV(bookings: BookingDoc[]): void {
+    const headers = ['PNR', 'Flight', 'Route', 'Date', 'Passengers', 'Amount', 'Currency', 'Status', 'Email'];
+    const rows = bookings.map(b => {
+        const dep = b.departureTime?.toDate?.() ?? new Date();
+        return [
+            b.pnr,
+            b.flightNumber,
+            `${b.origin?.code ?? ''}-${b.destination?.code ?? ''}`,
+            dep.toISOString().slice(0, 10),
+            String(b.passengerCount),
+            b.totalAmount.toFixed(2),
+            b.currency,
+            b.status,
+            b.contactEmail,
+        ];
+    });
+
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bookings_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}

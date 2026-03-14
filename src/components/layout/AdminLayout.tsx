@@ -32,6 +32,7 @@ const navGroups = [
             { label: 'Alert Audit Log', path: ROUTES.ALERT_AUDIT_LOG, icon: 'notification_important' },
             { label: 'Seat Map CMS', path: ROUTES.SEAT_MAP_CMS, icon: 'airline_seat_recline_normal' },
             { label: 'Route Management', path: ROUTES.ROUTE_MANAGEMENT, icon: 'route' },
+            { label: 'Airports', path: ROUTES.AIRPORT_MANAGEMENT, icon: 'flight_takeoff' },
         ],
     },
     {

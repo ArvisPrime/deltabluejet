@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { RouteDoc } from '../../types/firestore';
 import { createRoute, updateRoute } from '../../services/firestore';
-import { AIRPORTS, calculateDistance, estimateDuration, toAirportRef, getAirportByCode } from '../../data/airports';
+import {
+    getAirports,
+    getAirportByCode,
+    calculateDistance,
+    estimateDuration,
+    toAirportRef,
+    type Airport,
+} from '../../services/airportService';
 import { useToastStore } from '../../stores/toastStore';
 
 interface RouteFormModalProps {
@@ -23,6 +30,8 @@ const DAYS = [
 const RouteFormModal: React.FC<RouteFormModalProps> = ({ route, onClose, onSaved }) => {
     const isEdit = !!route;
 
+    const [airports, setAirports] = useState<Airport[]>([]);
+    const [airportsLoading, setAirportsLoading] = useState(true);
     const [originCode, setOriginCode] = useState(route?.origin?.code || '');
     const [destCode, setDestCode] = useState(route?.destination?.code || '');
     const [fareEconomy, setFareEconomy] = useState(route?.baseFares?.economy || 0);
@@ -32,7 +41,18 @@ const RouteFormModal: React.FC<RouteFormModalProps> = ({ route, onClose, onSaved
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
-    const distance = originCode && destCode ? calculateDistance(originCode, destCode) : 0;
+    // Load airports from Firestore on mount
+    useEffect(() => {
+        getAirports()
+            .then(setAirports)
+            .catch(() => setError('Failed to load airports.'))
+            .finally(() => setAirportsLoading(false));
+    }, []);
+
+    // Calculate distance & duration from cached airport data
+    const originAirport = airports.find(a => a.code === originCode);
+    const destAirport = airports.find(a => a.code === destCode);
+    const distance = originAirport && destAirport ? calculateDistance(originAirport, destAirport) : 0;
     const duration = distance > 0 ? estimateDuration(distance) : 0;
 
     const toggleDay = (day: number) => {
@@ -62,9 +82,9 @@ const RouteFormModal: React.FC<RouteFormModalProps> = ({ route, onClose, onSaved
             return;
         }
 
-        const originAirport = getAirportByCode(originCode);
-        const destAirport = getAirportByCode(destCode);
-        if (!originAirport || !destAirport) {
+        const origin = await getAirportByCode(originCode);
+        const dest = await getAirportByCode(destCode);
+        if (!origin || !dest) {
             setError('Invalid airport selection.');
             return;
         }
@@ -72,8 +92,8 @@ const RouteFormModal: React.FC<RouteFormModalProps> = ({ route, onClose, onSaved
         setSaving(true);
         try {
             const data = {
-                origin: toAirportRef(originAirport),
-                destination: toAirportRef(destAirport),
+                origin: toAirportRef(origin),
+                destination: toAirportRef(dest),
                 distance_km: distance,
                 duration_minutes: duration,
                 isActive: route?.isActive ?? true,
@@ -119,36 +139,42 @@ const RouteFormModal: React.FC<RouteFormModalProps> = ({ route, onClose, onSaved
                     )}
 
                     {/* Airport Selectors */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[9px] font-black text-navy-400 uppercase tracking-widest mb-1.5">Origin</label>
-                            <select
-                                value={originCode}
-                                onChange={(e) => setOriginCode(e.target.value)}
-                                disabled={isEdit}
-                                className="w-full h-11 px-3 rounded-xl border border-navy-100 bg-white text-sm font-bold text-navy-800 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50"
-                            >
-                                <option value="">Select airport</option>
-                                {AIRPORTS.map((a) => (
-                                    <option key={a.code} value={a.code}>{a.code} — {a.city}</option>
-                                ))}
-                            </select>
+                    {airportsLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                            <span className="material-symbols-outlined text-primary animate-spin text-3xl">progress_activity</span>
                         </div>
-                        <div>
-                            <label className="block text-[9px] font-black text-navy-400 uppercase tracking-widest mb-1.5">Destination</label>
-                            <select
-                                value={destCode}
-                                onChange={(e) => setDestCode(e.target.value)}
-                                disabled={isEdit}
-                                className="w-full h-11 px-3 rounded-xl border border-navy-100 bg-white text-sm font-bold text-navy-800 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50"
-                            >
-                                <option value="">Select airport</option>
-                                {AIRPORTS.filter((a) => a.code !== originCode).map((a) => (
-                                    <option key={a.code} value={a.code}>{a.code} — {a.city}</option>
-                                ))}
-                            </select>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[9px] font-black text-navy-400 uppercase tracking-widest mb-1.5">Origin</label>
+                                <select
+                                    value={originCode}
+                                    onChange={(e) => setOriginCode(e.target.value)}
+                                    disabled={isEdit}
+                                    className="w-full h-11 px-3 rounded-xl border border-navy-100 bg-white text-sm font-bold text-navy-800 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50"
+                                >
+                                    <option value="">Select airport</option>
+                                    {airports.map((a) => (
+                                        <option key={a.code} value={a.code}>{a.code} — {a.city}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[9px] font-black text-navy-400 uppercase tracking-widest mb-1.5">Destination</label>
+                                <select
+                                    value={destCode}
+                                    onChange={(e) => setDestCode(e.target.value)}
+                                    disabled={isEdit}
+                                    className="w-full h-11 px-3 rounded-xl border border-navy-100 bg-white text-sm font-bold text-navy-800 focus:ring-2 focus:ring-primary/20 outline-none disabled:opacity-50"
+                                >
+                                    <option value="">Select airport</option>
+                                    {airports.filter((a) => a.code !== originCode).map((a) => (
+                                        <option key={a.code} value={a.code}>{a.code} — {a.city}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Auto-Calculated Distance & Duration */}
                     {distance > 0 && (
@@ -221,7 +247,7 @@ const RouteFormModal: React.FC<RouteFormModalProps> = ({ route, onClose, onSaved
                         </button>
                         <button
                             type="submit"
-                            disabled={saving}
+                            disabled={saving || airportsLoading}
                             className="px-6 py-2.5 rounded-xl bg-primary text-white font-black text-[10px] uppercase tracking-widest hover:bg-primary-600 transition-all disabled:opacity-50"
                         >
                             {saving ? 'Saving...' : isEdit ? 'Update Route' : 'Create Route'}

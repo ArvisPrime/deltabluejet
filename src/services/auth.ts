@@ -10,7 +10,7 @@ import {
     onAuthStateChanged,
     type User,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase.config';
 import { useAuthStore, type AuthUser } from '../stores/authStore';
 
@@ -64,6 +64,9 @@ export async function loginWithEmail(email: string, password: string): Promise<A
     await setDoc(doc(db, 'users', user.uid), {
         lastLoginAt: serverTimestamp(),
     }, { merge: true });
+
+    // Session tracking — create active session document
+    await createSessionDoc(user.uid, authUser.displayName || user.email || '', authUser.role);
 
     useAuthStore.getState().setUser(authUser);
     return authUser;
@@ -123,6 +126,10 @@ export async function loginWithGoogle(): Promise<AuthUser> {
     }
 
     const authUser = await mapFirebaseUser(user);
+
+    // Session tracking — create active session document
+    await createSessionDoc(user.uid, authUser.displayName || user.email || '', authUser.role);
+
     useAuthStore.getState().setUser(authUser);
     return authUser;
 }
@@ -146,8 +153,68 @@ export async function confirmReset(oobCode: string, newPassword: string): Promis
  */
 export async function logout(): Promise<void> {
     stopIdleTimer();
+    const user = auth.currentUser;
+
+    // Clean up session document before signing out
+    if (user) {
+        await cleanupSessionDoc(user.uid, user.email || '');
+    }
+
     await signOut(auth);
     useAuthStore.getState().logout();
+}
+
+// ─── Session Tracking Helpers ─────────────────────────────
+
+/**
+ * Create an active session document and write a LOGIN audit log.
+ */
+async function createSessionDoc(uid: string, name: string, role: string): Promise<void> {
+    try {
+        await setDoc(doc(db, 'active_sessions', uid), {
+            userId: uid,
+            name,
+            role,
+            location: 'Web App',
+            activity: 'Dashboard',
+            risk: 'safe',
+            riskLabel: 'Normal Login',
+            startedAt: serverTimestamp(),
+            lastActiveAt: serverTimestamp(),
+            userAgent: navigator.userAgent,
+        });
+
+        // Write audit log
+        await addDoc(collection(db, 'session_audit_log'), {
+            action: 'LOGIN',
+            userId: uid,
+            userName: name,
+            userAgent: navigator.userAgent,
+            timestamp: serverTimestamp(),
+        });
+    } catch (err) {
+        console.warn('[Session] Failed to create session doc:', err);
+    }
+}
+
+/**
+ * Clean up session document and write a LOGOUT audit log.
+ */
+async function cleanupSessionDoc(uid: string, email: string): Promise<void> {
+    try {
+        await deleteDoc(doc(db, 'active_sessions', uid));
+
+        // Write audit log
+        await addDoc(collection(db, 'session_audit_log'), {
+            action: 'LOGOUT',
+            userId: uid,
+            userName: email,
+            userAgent: navigator.userAgent,
+            timestamp: serverTimestamp(),
+        });
+    } catch (err) {
+        console.warn('[Session] Failed to cleanup session doc:', err);
+    }
 }
 
 // ─── Admin Idle Session Timeout ───────────────────────────
