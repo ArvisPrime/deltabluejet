@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { BRAND } from '../../config/brand';
 import { ROUTES } from '../../config/routes';
+import { useToastStore } from '../../stores/toastStore';
 
 /* ─── Shared Modal Shell ────────────────────────────────────────────── */
 interface ModalShellProps {

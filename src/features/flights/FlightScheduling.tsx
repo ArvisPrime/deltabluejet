@@ -6,6 +6,7 @@ import { generateFlights, publishFlights, type GeneratedFlight } from '../../ser
 import WizardStepper from '../../components/scheduling/WizardStepper';
 import FlightPreviewTable from '../../components/scheduling/FlightPreviewTable';
 import { useToastStore } from '../../stores/toastStore';
+import { useAuth } from '../../hooks/useAuth';
 
 const STEPS = ['Route', 'Aircraft', 'Schedule', 'Preview', 'Publish'];
 const DAYS = [
@@ -19,6 +20,7 @@ const DAYS = [
 ];
 
 const FlightScheduling: React.FC = () => {
+   const { user } = useAuth();
    const [step, setStep] = useState(1);
 
    // Data sources
@@ -150,11 +152,11 @@ const FlightScheduling: React.FC = () => {
             effectiveTo: Timestamp.fromDate(new Date(effectiveTo)),
             status: 'draft',
             publishedFlightCount: 0,
-            createdBy: 'ops-user', // TODO: wire to auth
+            createdBy: user?.uid || 'unknown',
          });
 
          // Publish flights
-         const count = await publishFlights(previewFlights, scheduleId, 'ops-user');
+         const count = await publishFlights(previewFlights, scheduleId, user?.uid || 'unknown');
          setPublishResult({ count, scheduleId });
          setStep(5);
       } catch (err) {

@@ -134,7 +134,7 @@ const TicketReissue: React.FC = () => {
       paymentMethod,
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem(`reissue_draft_${booking.pnr}`, JSON.stringify(draft));
+    sessionStorage.setItem(`reissue_draft_${booking.pnr}`, JSON.stringify(draft));
     setSuccessMsg('Draft saved successfully. You can return to complete this later.');
     setTimeout(() => setSuccessMsg(null), 4000);
   }, [booking, newBaseFare, penaltyFee, paymentMethod]);
@@ -160,7 +160,7 @@ const TicketReissue: React.FC = () => {
       });
 
       // Clear draft if exists
-      localStorage.removeItem(`reissue_draft_${booking.pnr}`);
+      sessionStorage.removeItem(`reissue_draft_${booking.pnr}`);
 
       setSuccessMsg(`New ticket issued successfully for booking ${booking.pnr}. The updated fare is ${formatCurrency(newAmount + (parseFloat(penaltyFee) || 0), currency)}.`);
 

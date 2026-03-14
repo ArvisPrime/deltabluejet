@@ -68,6 +68,7 @@ const navGroups = [
             { label: 'MFA Settings', path: ROUTES.MFA_SETTINGS, icon: 'security' },
             { label: 'SSO Settings', path: ROUTES.SSO_SETTINGS, icon: 'key' },
             { label: 'Password Policy', path: ROUTES.PASSWORD_POLICY, icon: 'lock' },
+            { label: 'Security Keys', path: ROUTES.SECURITY_KEYS, icon: 'security_key' },
         ],
     },
     {
@@ -86,6 +87,24 @@ const navGroups = [
         items: [
             { label: 'Experiments', path: ROUTES.EXPERIMENTS_DASHBOARD, icon: 'labs' },
             { label: 'Experiment Audit', path: ROUTES.EXPERIMENTS_AUDIT_LOG, icon: 'biotech' },
+        ],
+    },
+    {
+        label: 'Revenue',
+        icon: 'payments',
+        items: [
+            { label: 'Sales Dashboard', path: ROUTES.SALES_DASHBOARD, icon: 'trending_up' },
+            { label: 'Pricing Rules', path: ROUTES.PRICING_RULES, icon: 'price_change' },
+            { label: 'Loyalty Admin', path: ROUTES.LOYALTY_ADMIN, icon: 'loyalty' },
+            { label: 'Ancillary Products', path: ROUTES.ANCILLARY_ADMIN, icon: 'shopping_bag' },
+        ],
+    },
+    {
+        label: 'Crew',
+        icon: 'badge',
+        items: [
+            { label: 'Crew Management', path: ROUTES.CREW_MANAGEMENT, icon: 'group' },
+            { label: 'Crew Scheduling', path: ROUTES.CREW_SCHEDULING, icon: 'calendar_month' },
         ],
     },
 ];
@@ -125,7 +144,7 @@ const AdminLayout: React.FC = () => {
                 {/* Brand */}
                 <div className="h-20 flex items-center px-6 border-b border-white/10">
                     {logoUrl ? (
-                        <img src={logoUrl} alt={brandName} className="h-7 w-auto object-contain" />
+                        <img src={logoUrl} alt={brandName} className="h-10 w-auto object-contain" />
                     ) : (
                         <>
                             <span className="material-symbols-outlined text-primary text-2xl">flight</span>
@@ -139,7 +158,7 @@ const AdminLayout: React.FC = () => {
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 overflow-y-auto py-4 custom-scrollbar">
+                <nav className="flex-1 overflow-y-auto py-4 custom-scrollbar" role="navigation" aria-label="Admin sidebar">
                     {navGroups.map((group) => (
                         <div key={group.label} className="mb-2">
                             {!sidebarCollapsed && (
@@ -158,6 +177,7 @@ const AdminLayout: React.FC = () => {
                                             ? 'text-white bg-primary/20 border-r-2 border-primary'
                                             : 'text-navy-400 hover:text-white hover:bg-white/5'
                                             }`}
+                                        aria-current={isActive ? 'page' : undefined}
                                     >
                                         <span className="material-symbols-outlined text-lg">{item.icon}</span>
                                         {!sidebarCollapsed && <span className="whitespace-nowrap">{item.label}</span>}

@@ -31,6 +31,8 @@ const AccountSettings: React.FC = () => {
    const [mealPref, setMealPref] = useState<CustomerDoc['preferences']['mealPreference']>('standard');
    const [emailNotif, setEmailNotif] = useState(true);
    const [smsNotif, setSmsNotif] = useState(false);
+   const [gdprConsent, setGdprConsent] = useState(false);
+   const [marketingOptIn, setMarketingOptIn] = useState(false);
 
    const loadData = useCallback(async () => {
       if (!authUser) return;
@@ -50,6 +52,8 @@ const AccountSettings: React.FC = () => {
          setMealPref(c.preferences.mealPreference);
          setEmailNotif(c.preferences.emailNotifications);
          setSmsNotif(c.preferences.smsNotifications);
+         setGdprConsent(c.gdprConsent ?? false);
+         setMarketingOptIn(c.marketingOptIn ?? false);
       } catch (err) {
          console.error('Failed to load profile:', err);
          useToastStore.getState().addToast("Failed to load profile", "error");
@@ -76,7 +80,9 @@ const AccountSettings: React.FC = () => {
                emailNotifications: emailNotif,
                smsNotifications: smsNotif,
             },
-         });
+            gdprConsent,
+            marketingOptIn,
+         } as any);
          setSuccessMsg('Profile updated successfully!');
          setTimeout(() => setSuccessMsg(''), 3000);
       } catch (err) {
@@ -262,6 +268,63 @@ const AccountSettings: React.FC = () => {
                   <input type="checkbox" checked={smsNotif} onChange={(e) => setSmsNotif(e.target.checked)} className="h-4 w-4 rounded text-primary" />
                   <span className="text-xs font-bold text-navy-700">SMS Notifications</span>
                </label>
+            </div>
+         </div>
+
+         {/* Data & Privacy */}
+         <div className="bg-white rounded-3xl border border-navy-100 p-8 shadow-sm space-y-6">
+            <h3 className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Data & Privacy</h3>
+            <div className="space-y-4">
+               <label className="flex items-center justify-between p-4 bg-navy-50/50 rounded-2xl cursor-pointer group hover:bg-navy-50 transition-all">
+                  <div className="flex items-center gap-4">
+                     <span className="material-symbols-outlined text-primary text-xl">campaign</span>
+                     <div>
+                        <p className="text-sm font-black text-navy-950">Marketing Communications</p>
+                        <p className="text-[10px] font-bold text-navy-400 uppercase tracking-widest opacity-60">Receive promotions, offers, and news</p>
+                     </div>
+                  </div>
+                  <button
+                     onClick={() => setMarketingOptIn(!marketingOptIn)}
+                     className="relative inline-flex items-center h-7 w-14 cursor-pointer"
+                  >
+                     <div className={`w-14 h-7 rounded-full transition-all ${marketingOptIn ? 'bg-primary' : 'bg-navy-200'}`}>
+                        <div className={`absolute top-1 left-1 bg-white rounded-full h-5 w-5 transition-all shadow-md ${marketingOptIn ? 'translate-x-7' : ''}`} />
+                     </div>
+                  </button>
+               </label>
+
+               <label className="flex items-center justify-between p-4 bg-navy-50/50 rounded-2xl cursor-pointer group hover:bg-navy-50 transition-all">
+                  <div className="flex items-center gap-4">
+                     <span className="material-symbols-outlined text-emerald-600 text-xl">verified_user</span>
+                     <div>
+                        <p className="text-sm font-black text-navy-950">GDPR Data Consent</p>
+                        <p className="text-[10px] font-bold text-navy-400 uppercase tracking-widest opacity-60">I consent to the processing of my personal data</p>
+                     </div>
+                  </div>
+                  <button
+                     onClick={() => setGdprConsent(!gdprConsent)}
+                     className="relative inline-flex items-center h-7 w-14 cursor-pointer"
+                  >
+                     <div className={`w-14 h-7 rounded-full transition-all ${gdprConsent ? 'bg-emerald-500' : 'bg-navy-200'}`}>
+                        <div className={`absolute top-1 left-1 bg-white rounded-full h-5 w-5 transition-all shadow-md ${gdprConsent ? 'translate-x-7' : ''}`} />
+                     </div>
+                  </button>
+               </label>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+               <button
+                  onClick={() => useToastStore.getState().addToast('Data export request submitted. You will receive an email shortly.', 'success')}
+                  className="flex-1 py-3 border-2 border-navy-100 rounded-xl text-[10px] font-black text-navy-700 uppercase tracking-widest hover:bg-navy-50 transition-all flex items-center justify-center gap-2"
+               >
+                  <span className="material-symbols-outlined text-sm">download</span> Download My Data
+               </button>
+               <button
+                  onClick={() => useToastStore.getState().addToast('Please contact support@deltabluejetair.com to delete your account.', 'info')}
+                  className="flex-1 py-3 border-2 border-red-100 rounded-xl text-[10px] font-black text-red-600 uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+               >
+                  <span className="material-symbols-outlined text-sm">delete_forever</span> Delete My Account
+               </button>
             </div>
          </div>
 

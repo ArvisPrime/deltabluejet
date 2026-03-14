@@ -41,8 +41,8 @@ const HeaderManagement: React.FC = () => {
    // Branding state
    const [logoUrl, setLogoUrl] = useState<string | null>(null);
    const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
-   const [brandName, setBrandName] = useState(BRAND.shortName);
-   const [tagSuffix, setTagSuffix] = useState(BRAND.tagSuffix);
+   const [brandName, setBrandName] = useState('');
+   const [tagSuffix, setTagSuffix] = useState('');
    const [uploadingLogo, setUploadingLogo] = useState(false);
    const [uploadingFavicon, setUploadingFavicon] = useState(false);
    const logoInputRef = useRef<HTMLInputElement>(null);
@@ -83,8 +83,8 @@ const HeaderManagement: React.FC = () => {
             if (config) {
                setLogoUrl(config.logoUrl || null);
                setFaviconUrl(config.faviconUrl || null);
-               setBrandName(config.brandName || BRAND.shortName);
-               setTagSuffix(config.tagSuffix || BRAND.tagSuffix);
+               setBrandName(config.brandName ?? '');
+               setTagSuffix(config.tagSuffix ?? '');
                // CTA
                if (config.ctaLabel !== undefined) setCtaLabel(config.ctaLabel);
                if (config.ctaLink !== undefined) setCtaLink(config.ctaLink);
@@ -148,27 +148,31 @@ const HeaderManagement: React.FC = () => {
       setSaving(true);
       try {
          const navItems: CmsMenuItemDoc[] = menuItems.map((m, i) => ({
-            label: m.label,
-            href: m.path,
+            label: m.label ?? '',
+            href: m.path ?? '',
             order: i,
             children: [],
-            openInNewTab: m.openInNewTab,
-            hasMegaMenu: m.hasMegaMenu,
-            badge: m.badge || '',
+            openInNewTab: m.openInNewTab ?? false,
+            hasMegaMenu: m.hasMegaMenu ?? false,
+            badge: m.badge ?? '',
          }));
-         await updateHeaderConfig({
+
+         // Sanitize: Firestore rejects `undefined` — ensure every value is concrete
+         const payload: Record<string, any> = {
             navItems,
-            logoUrl,
-            faviconUrl,
-            brandName,
-            tagSuffix,
-            ctaLabel,
-            ctaLink,
-            ctaVisible,
-            showSearch,
-            showLanguageSwitcher,
-            showLoginButton,
-         });
+            logoUrl: logoUrl ?? null,
+            faviconUrl: faviconUrl ?? null,
+            brandName: brandName ?? '',
+            tagSuffix: tagSuffix ?? '',
+            ctaLabel: ctaLabel ?? '',
+            ctaLink: ctaLink ?? '',
+            ctaVisible: ctaVisible ?? true,
+            showSearch: showSearch ?? true,
+            showLanguageSwitcher: showLanguageSwitcher ?? true,
+            showLoginButton: showLoginButton ?? true,
+         };
+
+         await updateHeaderConfig(payload);
          addToast('Header settings saved successfully', 'success');
          // Reload the global CMS store so public header updates immediately
          useCmsHeaderStore.getState().load();

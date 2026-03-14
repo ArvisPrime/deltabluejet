@@ -112,7 +112,10 @@ export async function searchFlights(
         orderBy('departureTime', 'asc'),
     ));
 
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as FlightDoc);
+    // Client-side filter: only return bookable flights (avoids composite index)
+    return snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as FlightDoc)
+        .filter((f) => f.status === 'scheduled' || f.status === 'boarding');
 }
 
 /**

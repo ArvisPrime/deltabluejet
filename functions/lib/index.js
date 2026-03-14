@@ -6,7 +6,7 @@
  * Firebase reads this file to discover deployable functions.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.geminiAssistant = exports.generateBoardingPass = exports.onBookingConfirmed = exports.sendNotificationSms = exports.sendNotificationEmail = exports.sendBookingConfirmation = exports.processRefund = exports.createPaymentIntent = exports.getDashboardStats = exports.swapAircraft = exports.assignGate = exports.updateFlightStatus = exports.onUserCreated = exports.setUserRole = void 0;
+exports.webauthnRemoveKey = exports.webauthnListKeys = exports.webauthnVerifyAuthentication = exports.webauthnGenerateAuthentication = exports.webauthnVerifyRegistration = exports.webauthnGenerateRegistration = exports.onBookingRefundedLoyalty = exports.onBookingConfirmedLoyalty = exports.onUserCreatedLoyalty = exports.withdrawFlight = exports.publishSchedule = exports.reconcilePayments = exports.aggregateDailySales = exports.geminiAssistant = exports.generateBoardingPass = exports.onCheckinReminder = exports.onFlightDelayed = exports.onBookingConfirmed = exports.sendNotificationSms = exports.sendNotificationEmail = exports.handleStripeWebhook = exports.sendBookingConfirmation = exports.processRefund = exports.createPaymentIntent = exports.getDashboardStats = exports.swapAircraft = exports.assignGate = exports.updateFlightStatus = exports.onUserCreated = exports.setUserRole = void 0;
 var users_1 = require("./users");
 Object.defineProperty(exports, "setUserRole", { enumerable: true, get: function () { return users_1.setUserRole; } });
 Object.defineProperty(exports, "onUserCreated", { enumerable: true, get: function () { return users_1.onUserCreated; } });
@@ -20,12 +20,34 @@ var payments_1 = require("./payments");
 Object.defineProperty(exports, "createPaymentIntent", { enumerable: true, get: function () { return payments_1.createPaymentIntent; } });
 Object.defineProperty(exports, "processRefund", { enumerable: true, get: function () { return payments_1.processRefund; } });
 Object.defineProperty(exports, "sendBookingConfirmation", { enumerable: true, get: function () { return payments_1.sendBookingConfirmation; } });
+var webhook_1 = require("./webhook");
+Object.defineProperty(exports, "handleStripeWebhook", { enumerable: true, get: function () { return webhook_1.handleStripeWebhook; } });
 var notifications_1 = require("./notifications");
 Object.defineProperty(exports, "sendNotificationEmail", { enumerable: true, get: function () { return notifications_1.sendNotificationEmail; } });
 Object.defineProperty(exports, "sendNotificationSms", { enumerable: true, get: function () { return notifications_1.sendNotificationSms; } });
 Object.defineProperty(exports, "onBookingConfirmed", { enumerable: true, get: function () { return notifications_1.onBookingConfirmed; } });
+Object.defineProperty(exports, "onFlightDelayed", { enumerable: true, get: function () { return notifications_1.onFlightDelayed; } });
+Object.defineProperty(exports, "onCheckinReminder", { enumerable: true, get: function () { return notifications_1.onCheckinReminder; } });
 var boarding_1 = require("./boarding");
 Object.defineProperty(exports, "generateBoardingPass", { enumerable: true, get: function () { return boarding_1.generateBoardingPass; } });
 var gemini_1 = require("./gemini");
 Object.defineProperty(exports, "geminiAssistant", { enumerable: true, get: function () { return gemini_1.geminiAssistant; } });
+var sales_1 = require("./sales");
+Object.defineProperty(exports, "aggregateDailySales", { enumerable: true, get: function () { return sales_1.aggregateDailySales; } });
+var reconciliation_1 = require("./reconciliation");
+Object.defineProperty(exports, "reconcilePayments", { enumerable: true, get: function () { return reconciliation_1.reconcilePayments; } });
+var inventory_1 = require("./inventory");
+Object.defineProperty(exports, "publishSchedule", { enumerable: true, get: function () { return inventory_1.publishSchedule; } });
+Object.defineProperty(exports, "withdrawFlight", { enumerable: true, get: function () { return inventory_1.withdrawFlight; } });
+var loyalty_1 = require("./loyalty");
+Object.defineProperty(exports, "onUserCreatedLoyalty", { enumerable: true, get: function () { return loyalty_1.onUserCreatedLoyalty; } });
+Object.defineProperty(exports, "onBookingConfirmedLoyalty", { enumerable: true, get: function () { return loyalty_1.onBookingConfirmedLoyalty; } });
+Object.defineProperty(exports, "onBookingRefundedLoyalty", { enumerable: true, get: function () { return loyalty_1.onBookingRefundedLoyalty; } });
+var webauthn_1 = require("./webauthn");
+Object.defineProperty(exports, "webauthnGenerateRegistration", { enumerable: true, get: function () { return webauthn_1.webauthnGenerateRegistration; } });
+Object.defineProperty(exports, "webauthnVerifyRegistration", { enumerable: true, get: function () { return webauthn_1.webauthnVerifyRegistration; } });
+Object.defineProperty(exports, "webauthnGenerateAuthentication", { enumerable: true, get: function () { return webauthn_1.webauthnGenerateAuthentication; } });
+Object.defineProperty(exports, "webauthnVerifyAuthentication", { enumerable: true, get: function () { return webauthn_1.webauthnVerifyAuthentication; } });
+Object.defineProperty(exports, "webauthnListKeys", { enumerable: true, get: function () { return webauthn_1.webauthnListKeys; } });
+Object.defineProperty(exports, "webauthnRemoveKey", { enumerable: true, get: function () { return webauthn_1.webauthnRemoveKey; } });
 //# sourceMappingURL=index.js.map

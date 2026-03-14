@@ -40,6 +40,7 @@ const Careers = lazyRetry(() => import('../features/careers/Careers'));
 
 // --- Auth ---
 const Login = lazyRetry(() => import('../features/auth/Login'));
+const StaffLogin = lazyRetry(() => import('../features/auth/StaffLogin'));
 const Register = lazyRetry(() => import('../features/auth/Register'));
 const ForgotPassword = lazyRetry(() => import('../features/auth/ForgotPassword'));
 const CreateNewPassword = lazyRetry(() => import('../features/auth/CreateNewPassword'));
@@ -75,6 +76,7 @@ const FlightTrackerResults = lazyRetry(() => import('../features/flights/FlightT
 
 // --- Loyalty ---
 const LoyaltyDashboard = lazyRetry(() => import('../features/users/LoyaltyDashboard'));
+const LoyaltyRedemption = lazyRetry(() => import('../features/users/LoyaltyRedemption'));
 
 // --- Passenger Portal ---
 const PassengerLayout = lazyRetry(() => import('../components/layout/PassengerLayout'));
@@ -121,6 +123,8 @@ const SessionAuditLog = lazyRetry(() => import('../features/security/SessionAudi
 const MFASettings = lazyRetry(() => import('../features/security/MFASettings'));
 const SSOSettings = lazyRetry(() => import('../features/security/SSOSettings'));
 const PasswordPolicy = lazyRetry(() => import('../features/security/PasswordPolicy'));
+const SecurityKeySetup = lazyRetry(() => import('../features/security/SecurityKeySetup'));
+const YubiKeyVerify = lazyRetry(() => import('../features/security/YubiKeyVerify'));
 
 // --- Communications ---
 const EmailTemplatesCMS = lazyRetry(() => import('../features/communications/EmailTemplatesCMS'));
@@ -131,6 +135,12 @@ const SMSAuditLog = lazyRetry(() => import('../features/communications/SMSAuditL
 // --- Experiments ---
 const ExperimentsDashboard = lazyRetry(() => import('../features/experiments/ExperimentsDashboard'));
 const ExperimentsAuditLog = lazyRetry(() => import('../features/experiments/ExperimentsAuditLog'));
+
+// --- Phase 4: Loyalty Admin, Ancillary, Crew ---
+const LoyaltyAdmin = lazyRetry(() => import('../features/dashboard/LoyaltyAdmin'));
+const AncillaryAdmin = lazyRetry(() => import('../features/dashboard/AncillaryAdmin'));
+const CrewManagement = lazyRetry(() => import('../features/operations/CrewManagement'));
+const CrewScheduling = lazyRetry(() => import('../features/operations/CrewScheduling'));
 
 
 /**
@@ -209,11 +219,13 @@ export const router = createBrowserRouter([
 
             // --- Loyalty ---
             { path: ROUTES.LOYALTY, element: withAuth(LoyaltyDashboard) },
+            { path: ROUTES.LOYALTY_REDEMPTION, element: withAuth(LoyaltyRedemption) },
         ],
     },
 
     // ═══ AUTH ROUTES (standalone, own branding) ════════════════
     { path: ROUTES.LOGIN, element: withSuspense(Login) },
+    { path: ROUTES.STAFF_LOGIN, element: withSuspense(StaffLogin) },
     { path: ROUTES.REGISTER, element: withSuspense(Register) },
     { path: ROUTES.FORGOT_PASSWORD, element: withSuspense(ForgotPassword) },
     { path: ROUTES.CREATE_NEW_PASSWORD, element: withSuspense(CreateNewPassword) },
@@ -278,6 +290,7 @@ export const router = createBrowserRouter([
             { path: ROUTES.MFA_SETTINGS, element: withSuspense(MFASettings) },
             { path: ROUTES.SSO_SETTINGS, element: withSuspense(SSOSettings) },
             { path: ROUTES.PASSWORD_POLICY, element: withSuspense(PasswordPolicy) },
+            { path: ROUTES.SECURITY_KEYS, element: withSuspense(SecurityKeySetup) },
 
             // --- Communications ---
             { path: ROUTES.EMAIL_TEMPLATES, element: withSuspense(EmailTemplatesCMS) },
@@ -288,7 +301,23 @@ export const router = createBrowserRouter([
             // --- Experiments ---
             { path: ROUTES.EXPERIMENTS_DASHBOARD, element: withSuspense(ExperimentsDashboard) },
             { path: ROUTES.EXPERIMENTS_AUDIT_LOG, element: withSuspense(ExperimentsAuditLog) },
+
+            // --- Phase 4: Loyalty Admin, Ancillary, Crew ---
+            { path: ROUTES.LOYALTY_ADMIN, element: withSuspense(LoyaltyAdmin) },
+            { path: ROUTES.ANCILLARY_ADMIN, element: withSuspense(AncillaryAdmin) },
+            { path: ROUTES.CREW_MANAGEMENT, element: withSuspense(CrewManagement) },
+            { path: ROUTES.CREW_SCHEDULING, element: withSuspense(CrewScheduling) },
         ],
+    },
+
+    // ═══ YUBIKEY VERIFY GATE (Standalone — no admin layout) ════
+    {
+        path: ROUTES.YUBIKEY_VERIFY,
+        element: (
+            <ProtectedRoute allowedRoles={['super_admin', 'ops_manager', 'cs_agent']}>
+                {withSuspense(YubiKeyVerify)}
+            </ProtectedRoute>
+        ),
     },
 
     // ═══ 404 CATCH-ALL ═════════════════════════════════════════

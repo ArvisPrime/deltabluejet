@@ -1,8 +1,10 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { useToastStore } from '../../stores/toastStore';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../../config/firebase.config';
 
 const PROVIDERS = [
    { id: 'Okta', label: 'Corporate Okta', protocol: 'SAML 2.0', sync: '2 mins ago', verified: true, color: 'bg-blue-600' },
@@ -23,6 +25,24 @@ const SSOSettings: React.FC = () => {
    const [ssoUrl, setSsoUrl] = useState('https://dev-847291.okta.com/app/airline_sso/exk184729/sso/saml');
    const [entityId, setEntityId] = useState('http://www.okta.com/exk184729');
    const [dirty, setDirty] = useState(false);
+   const [saving, setSaving] = useState(false);
+
+   // Load saved config from Firestore
+   useEffect(() => {
+      const load = async () => {
+         try {
+            const snap = await getDoc(doc(db, 'admin_config', 'sso_settings'));
+            if (snap.exists()) {
+               const d = snap.data();
+               if (d.providerEnabled !== undefined) setProviderEnabled(d.providerEnabled);
+               if (d.providerName) setProviderName(d.providerName);
+               if (d.ssoUrl) setSsoUrl(d.ssoUrl);
+               if (d.entityId) setEntityId(d.entityId);
+            }
+         } catch (err) { console.error('Failed to load SSO config:', err); }
+      };
+      load();
+   }, []);
 
    // ── Derived ─────────────────────────────────────────────
    const filteredProviders = useMemo(() =>
@@ -45,9 +65,23 @@ const SSOSettings: React.FC = () => {
       toast(providerEnabled ? 'Provider disabled' : 'Provider enabled', 'success');
    };
 
-   const handleSave = () => {
-      setDirty(false);
-      toast('SSO settings saved successfully', 'success');
+   const handleSave = async () => {
+      setSaving(true);
+      try {
+         await setDoc(doc(db, 'admin_config', 'sso_settings'), {
+            providerEnabled,
+            providerName,
+            ssoUrl,
+            entityId,
+            activeProvider,
+            updatedAt: Timestamp.now(),
+         }, { merge: true });
+         setDirty(false);
+         toast('SSO settings saved successfully', 'success');
+      } catch (err) {
+         console.error('Failed to save SSO settings:', err);
+         toast('Failed to save settings. Please try again.', 'error');
+      } finally { setSaving(false); }
    };
 
    const handleRemove = () => {

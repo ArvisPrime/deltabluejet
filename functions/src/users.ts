@@ -52,9 +52,23 @@ export const onUserCreated = onDocumentCreated('users/{userId}', async (event) =
     const role = userData?.role || 'customer';
 
     try {
+        // Set custom auth claims
         await getAuth().setCustomUserClaims(userId, { role });
         console.log(`Custom claim set for user ${userId}: role=${role}`);
+
+        // Auto-create loyalty document for DeltaBlue Club enrollment
+        await db.doc(`loyalty/${userId}`).set({
+            uid: userId,
+            tier: 'blue',
+            totalPoints: 0,
+            lifetimePoints: 0,
+            pointsHistory: [],
+            tierExpiryDate: null,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+        });
+        console.log(`Loyalty doc created for user ${userId}: tier=blue`);
     } catch (error) {
-        console.error(`Failed to set custom claim for user ${userId}:`, error);
+        console.error(`Failed to initialize user ${userId}:`, error);
     }
 });

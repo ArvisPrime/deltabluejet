@@ -16,6 +16,13 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: path.resolve(__dirname, 'index.html'),
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router'],
+          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          'vendor-charts': ['recharts'],
+        },
+      },
     },
   },
 });

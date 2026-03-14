@@ -30,16 +30,8 @@ const ACTION_FILTERS: { key: ActionFilter; label: string }[] = [
    { key: 'Failed Login', label: 'Failed Login' },
 ];
 
-const DEMO_LOGS: AuditEntry[] = [
-   { id: '1', ts: 'Oct 09', hour: '14:02:11', actor: 'Admin_JSmith', avatar: 'bg-gradient-to-tr from-blue-500 to-cyan-400', action: 'Termination', color: 'bg-red-50 text-red-700 border-red-100', icon: 'gavel', target: 'Session_882A', desc: 'Suspicious activity detected from unusual location.', ip: '192.168.1.42' },
-   { id: '2', ts: 'Oct 09', hour: '13:45:00', actor: 'SuperAdmin_K', avatar: 'bg-gradient-to-tr from-purple-500 to-pink-400', action: 'Policy Change', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: 'edit_document', target: 'Timeout_Setting', desc: 'Changed inactivity timeout from 30m to 15m.', ip: '10.0.0.5' },
-   { id: '3', ts: 'Oct 08', hour: '09:12:44', actor: 'System', avatar: 'bg-gradient-to-tr from-green-500 to-emerald-400', action: 'Timeout', color: 'bg-orange-50 text-orange-700 border-orange-200', icon: 'timer_off', target: 'Session_91X2', desc: 'Session expired due to inactivity > 15m.', ip: '172.16.254.1' },
-   { id: '4', ts: 'Oct 08', hour: '08:30:15', actor: 'Admin_JSmith', avatar: 'bg-gradient-to-tr from-blue-500 to-cyan-400', action: 'Access', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: 'vpn_key', target: 'Session_91X2', desc: 'Successful login via 2FA verification.', ip: '192.168.1.42' },
-   { id: '5', ts: 'Oct 07', hour: '16:22:01', actor: 'Admin_M', avatar: 'bg-gradient-to-tr from-gray-500 to-slate-400', action: 'Failed Login', color: 'bg-red-50 text-red-700 border-red-200', icon: 'block', target: 'N/A', desc: 'Invalid credentials provided (Attempt 3).', ip: '203.0.113.8' },
-   { id: '6', ts: 'Oct 07', hour: '12:00:00', actor: 'Admin_B', avatar: 'bg-gradient-to-tr from-amber-500 to-orange-400', action: 'Access', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: 'vpn_key', target: 'Session_A12B', desc: 'Successful login from known IP.', ip: '10.0.0.22' },
-   { id: '7', ts: 'Oct 06', hour: '23:15:30', actor: 'System', avatar: 'bg-gradient-to-tr from-green-500 to-emerald-400', action: 'Timeout', color: 'bg-orange-50 text-orange-700 border-orange-200', icon: 'timer_off', target: 'Session_C3D4', desc: 'Session expired due to inactivity.', ip: '172.16.254.9' },
-   { id: '8', ts: 'Oct 05', hour: '10:45:22', actor: 'SuperAdmin_K', avatar: 'bg-gradient-to-tr from-purple-500 to-pink-400', action: 'Termination', color: 'bg-red-50 text-red-700 border-red-100', icon: 'gavel', target: 'Session_E5F6', desc: 'Multiple failed login attempts detected.', ip: '203.0.113.15' },
-];
+
+
 
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -72,18 +64,14 @@ const SessionAuditLog: React.FC = () => {
       setLoading(true);
       try {
          const snap = await getDocs(query(collection(db, 'session_audit_log'), orderBy('timestamp', 'desc'), limit(200)));
-         if (snap.empty) {
-            setLogs(DEMO_LOGS);
-         } else {
-            setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }) as AuditEntry));
-         }
+         setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }) as AuditEntry));
       } catch (err) {
          console.error('[AuditLog] Load error:', err);
-         setLogs(DEMO_LOGS);
+         addToast('Failed to load audit logs', 'error');
       } finally {
          setLoading(false);
       }
-   }, []);
+   }, [addToast]);
 
    useEffect(() => { loadData(); }, [loadData]);
 

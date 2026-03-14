@@ -1,11 +1,38 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
+import { useBookingStore } from '../../stores/bookingStore';
+import { useAuth } from '../../hooks/useAuth';
+import { useBooking } from '../../hooks/useBooking';
 import { createPayment, processPayment, confirmPaymentAndBooking } from '../../services/paymentService';
 import { useToastStore } from '../../stores/toastStore';
 
 const PaymentProcessing: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // ─── Read real booking data from store ─────────────────
+  const selectedFlight = useBookingStore((s) => s.selectedFlight);
+  const passengers = useBookingStore((s) => s.passengers);
+  const bookingId = useBookingStore((s) => s.bookingId);
+  const pnr = useBookingStore((s) => s.pnr);
+  const { completeBooking } = useBooking();
+
+  // Compute real amounts from booking store
+  const pricePerPax = selectedFlight?.price || 0;
+  const paxCount = passengers.length || 1;
+  const bookingAmountDollars = pricePerPax * paxCount;
+  const bookingAmountCents = Math.round(bookingAmountDollars * 100);
+  const displayAmount = bookingAmountDollars.toFixed(2);
+
+  // Flight display data
+  const originCode = selectedFlight?.origin || '—';
+  const destCode = selectedFlight?.destination || '—';
+  const flightNumber = selectedFlight?.flightNumber || '—';
+  const fareClass = selectedFlight?.fareClass || 'economy';
+  const passengerName = passengers[0]
+    ? `${passengers[0].firstName} ${passengers[0].lastName}`.toUpperCase()
+    : 'PASSENGER';
 
   // Card form state
   const [cardNumber, setCardNumber] = useState('');
@@ -16,10 +43,6 @@ const PaymentProcessing: React.FC = () => {
   // Processing state
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
-
-  // Mock booking data (in real flow, these come from booking store/context)
-  const bookingAmount = 60500; // $605.00 in cents
-  const displayAmount = (bookingAmount / 100).toFixed(2);
 
   const formatCardNumber = (val: string) => {
     const digits = val.replace(/\D/g, '').slice(0, 16);
@@ -55,32 +78,42 @@ const PaymentProcessing: React.FC = () => {
       const last4 = digits.slice(-4);
       const cardBrand = detectCardBrand(digits);
 
-      // 1. Create payment record
+      // Step 0: Create booking if not already created
+      let currentBookingId = bookingId;
+      let currentPnr = pnr;
+      if (!currentBookingId) {
+        const result = await completeBooking();
+        currentBookingId = result.bookingId;
+        currentPnr = result.pnr;
+      }
+
+      // Step 1: Create payment record
       const paymentId = await createPayment({
-        bookingId: 'pending-booking', // TODO: wire to real booking
-        amount: bookingAmount,
+        bookingId: currentBookingId!,
+        amount: bookingAmountCents,
         cardLast4: last4,
         cardBrand,
         metadata: {
-          passengerName: cardholderName,
-          flightNumber: 'DB-101',
-          route: 'BJL → DSS',
-          seatClass: 'economy',
+          passengerName: passengerName || cardholderName,
+          flightNumber,
+          route: `${originCode} → ${destCode}`,
+          seatClass: fareClass,
         },
       });
 
-      // 2. Process payment (simulated in dev mode)
+      // Step 2: Process payment (simulated in dev mode)
       const result = await processPayment(paymentId);
 
       if (result.success && result.eTicketNumber) {
-        // 3. Confirm booking
+        // Step 3: Confirm booking
         await confirmPaymentAndBooking(
           paymentId,
-          'pending-booking',
+          currentBookingId!,
           result.eTicketNumber,
-          'customer-user',
+          user?.uid || 'anonymous',
         );
-        // Navigate to confirmation
+
+        // Navigate to confirmation with real data
         navigate(ROUTES.TICKET_CONFIRMATION, {
           state: {
             paymentId,
@@ -88,6 +121,12 @@ const PaymentProcessing: React.FC = () => {
             amount: displayAmount,
             last4,
             cardBrand,
+            pnr: currentPnr,
+            origin: originCode,
+            destination: destCode,
+            flightNumber,
+            fareClass,
+            bookingId: currentBookingId,
           },
         });
       } else {
@@ -126,7 +165,7 @@ const PaymentProcessing: React.FC = () => {
         <div className="lg:col-span-2 space-y-8">
           {/* Error Banner */}
           {error && (
-            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3">
+            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3" role="alert">
               <span className="material-symbols-outlined text-red-500">error</span>
               <p className="text-sm font-bold text-red-600">{error}</p>
             </div>
@@ -264,19 +303,23 @@ const PaymentProcessing: React.FC = () => {
                   <span className="material-symbols-outlined">flight</span>
                 </div>
                 <div>
-                  <p className="text-xl font-black">BJL → DSS</p>
-                  <p className="text-[10px] font-black uppercase opacity-40">Deltablue Jet Air • DB-101</p>
+                  <p className="text-xl font-black">{originCode} → {destCode}</p>
+                  <p className="text-[10px] font-black uppercase opacity-40">Deltablue Jet Air • {flightNumber}</p>
                 </div>
               </div>
               <hr className="border-white/10" />
               <div className="space-y-4">
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest opacity-60">
                   <span>Fare Type</span>
-                  <span className="text-white opacity-100">Economy Standard</span>
+                  <span className="text-white opacity-100 capitalize">{fareClass} Standard</span>
                 </div>
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest opacity-60">
-                  <span>Passenger</span>
-                  <span className="text-white opacity-100">{cardholderName || 'PASSENGER'}</span>
+                  <span>Passengers</span>
+                  <span className="text-white opacity-100">{paxCount}</span>
+                </div>
+                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest opacity-60">
+                  <span>Lead Passenger</span>
+                  <span className="text-white opacity-100">{passengerName || cardholderName || 'PASSENGER'}</span>
                 </div>
               </div>
               <div className="pt-6 border-t border-white/10 flex justify-between items-end">

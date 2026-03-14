@@ -21,11 +21,12 @@ const ToastContainer: React.FC = () => {
     if (toasts.length === 0) return null;
 
     return (
-        <div className="fixed bottom-6 right-6 z-[9999] flex flex-col-reverse gap-3 max-w-sm w-full pointer-events-none">
+        <div className="fixed bottom-6 right-6 z-[9999] flex flex-col-reverse gap-3 max-w-sm w-full pointer-events-none" role="status" aria-live="polite" aria-label="Notifications">
             {toasts.map((toast) => (
                 <div
                     key={toast.id}
                     className={`pointer-events-auto flex items-start gap-3 px-5 py-4 rounded-2xl text-white shadow-2xl animate-in slide-in-from-right-5 fade-in duration-300 ${colorMap[toast.type]}`}
+                    role="alert"
                 >
                     <span className="material-symbols-outlined text-xl mt-0.5 shrink-0">
                         {iconMap[toast.type]}
@@ -36,6 +37,7 @@ const ToastContainer: React.FC = () => {
                     <button
                         onClick={() => removeToast(toast.id)}
                         className="text-white/60 hover:text-white transition-colors shrink-0"
+                        aria-label="Dismiss notification"
                     >
                         <span className="material-symbols-outlined text-lg">close</span>
                     </button>

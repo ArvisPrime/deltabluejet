@@ -185,9 +185,10 @@ const SeatMapCMS: React.FC = () => {
          try {
             await logAuditEntry({
                action: 'seat_map_saved',
-               module: 'seat_map_cms',
-               detail: `Saved seat map layout: ${seats.length} seats`,
+               targetCollection: 'cms_config',
+               targetId: 'seat_maps',
                performedBy: 'admin',
+               details: { seatCount: seats.length },
             });
          } catch { /* non-critical */ }
 

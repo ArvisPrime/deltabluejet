@@ -25,6 +25,7 @@ import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase.config';
 import type { BookingDoc, PassengerDoc, FlightDoc } from '../types/firestore';
 import type { PassengerInfo } from '../stores/bookingStore';
+import { awardPoints, deductPoints } from './loyaltyService';
 
 // ─── PNR Generation ────────────────────────────────────────
 
@@ -123,11 +124,31 @@ export async function confirmBooking(
     bookingId: string,
     paymentIntentId: string,
 ): Promise<void> {
+    const bookingSnap = await getDoc(doc(db, 'bookings', bookingId));
+    if (!bookingSnap.exists()) throw new Error('Booking not found');
+
+    const booking = bookingSnap.data() as BookingDoc;
+
     await updateDoc(doc(db, 'bookings', bookingId), {
         status: 'confirmed',
         paymentIntentId,
         updatedAt: serverTimestamp(),
     });
+
+    // Award loyalty points after booking confirmation
+    if (booking.userId && booking.totalAmount) {
+        try {
+            await awardPoints(
+                booking.userId,
+                booking.totalAmount,
+                booking.fareClass || 'economy',
+                booking.pnr || bookingId,
+                `Flight ${booking.flightNumber || ''} booking confirmed`,
+            );
+        } catch (err) {
+            console.error('Failed to award loyalty points:', err);
+        }
+    }
 }
 
 // ─── Cancel Booking ────────────────────────────────────────
@@ -154,6 +175,20 @@ export async function cancelBooking(bookingId: string): Promise<void> {
     batch.update(doc(db, 'flights', booking.flightId), seatUpdates);
 
     await batch.commit();
+
+    // Deduct loyalty points on cancellation
+    if (booking.userId && booking.totalAmount) {
+        try {
+            await deductPoints(
+                booking.userId,
+                booking.totalAmount,
+                booking.pnr || bookingId,
+                `Cancellation of booking ${booking.pnr || bookingId}`,
+            );
+        } catch (err) {
+            console.error('Failed to deduct loyalty points:', err);
+        }
+    }
 }
 
 // ─── Modify Booking ────────────────────────────────────────

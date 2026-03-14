@@ -1,20 +1,75 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
-import { useAdminAction } from '../../hooks/useAdminAction';
+import { useToastStore } from '../../stores/toastStore';
+import { collection, query, orderBy, limit, where, getDocs } from 'firebase/firestore';
+import { db } from '../../config/firebase.config';
 
-const auditLogs = [
-   { id: 1, ts: 'Oct 24, 2023', hour: '10:42 AM', actor: 'Sarah Jenkins', role: 'Product Lead', avatar: 'https://i.pravatar.cc/100?u=sarah', test: 'Homepage Hero Banner', testId: 'AB-2023-894', action: 'Status Change', detail: 'Changed status from Draft to Running.', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', dot: 'bg-emerald-500' },
-   { id: 2, ts: 'Oct 24, 2023', hour: '09:15 AM', actor: 'Mike Thompson', role: 'CRO Specialist', avatar: 'https://i.pravatar.cc/100?u=mike', test: 'Checkout Flow Button Color', testId: 'AB-2023-892', action: 'Traffic Allocation', detail: 'Variant B traffic allocation increased from 20% to 50%.', color: 'bg-purple-50 text-purple-700 border-purple-100', dot: 'bg-purple-500' },
-   { id: 3, ts: 'Oct 23, 2023', hour: '04:00 PM', actor: 'System Logic', role: 'Automated System', icon: 'smart_toy', test: 'Mobile Menu Order', testId: 'AB-2023-880', action: 'Auto-Stop', detail: 'Test ended automatically due to statistical significance.', color: 'bg-orange-50 text-orange-700 border-orange-100', dot: 'bg-orange-500' },
-   { id: 4, ts: 'Oct 23, 2023', hour: '01:30 PM', actor: 'Sarah Jenkins', role: 'Product Lead', avatar: 'https://i.pravatar.cc/100?u=sarah', test: 'Search Results Filtering', testId: 'AB-2023-888', action: 'Configuration', detail: 'Modified JSON config for Variant C filter layout.', color: 'bg-blue-50 text-blue-700 border-blue-100', dot: 'bg-blue-500' },
-   { id: 5, ts: 'Oct 22, 2023', hour: '11:15 AM', actor: 'Alex Chen', role: 'DevOps Engineer', avatar: 'https://i.pravatar.cc/100?u=alex', test: 'Flight Detail Page Pricing', testId: 'AB-2023-875', action: 'Terminated', detail: 'Emergency stop triggered. Negative impact on conversion > 5%.', color: 'bg-red-50 text-red-700 border-red-100', dot: 'bg-red-500' },
-];
+interface AuditLogEntry {
+   id: string;
+   ts: string;
+   hour: string;
+   actor: string;
+   role: string;
+   avatar?: string;
+   icon?: string;
+   test: string;
+   testId: string;
+   action: string;
+   detail: string;
+   color: string;
+   dot: string;
+}
+
+const ACTION_COLORS: Record<string, { color: string; dot: string }> = {
+   'Status Change': { color: 'bg-emerald-50 text-emerald-700 border-emerald-100', dot: 'bg-emerald-500' },
+   'Traffic Allocation': { color: 'bg-purple-50 text-purple-700 border-purple-100', dot: 'bg-purple-500' },
+   'Auto-Stop': { color: 'bg-orange-50 text-orange-700 border-orange-100', dot: 'bg-orange-500' },
+   'Configuration': { color: 'bg-blue-50 text-blue-700 border-blue-100', dot: 'bg-blue-500' },
+   'Terminated': { color: 'bg-red-50 text-red-700 border-red-100', dot: 'bg-red-500' },
+};
+const DEFAULT_COLOR = { color: 'bg-navy-50 text-navy-700 border-navy-100', dot: 'bg-navy-500' };
 
 const ExperimentsAuditLog: React.FC = () => {
-   const action = useAdminAction();
+   const addToast = useToastStore(s => s.addToast);
    const navigate = useNavigate();
+   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+   const [loading, setLoading] = useState(true);
+
+   useEffect(() => {
+      const load = async () => {
+         try {
+            const snap = await getDocs(
+               query(collection(db, 'audit_logs'), where('targetCollection', '==', 'experiments'), orderBy('timestamp', 'desc'), limit(50))
+            );
+            const logs: AuditLogEntry[] = snap.docs.map(d => {
+               const data = d.data();
+               const ts = data.timestamp?.toDate?.() || new Date();
+               const actionLabel = data.action || 'Action';
+               const colors = ACTION_COLORS[actionLabel] || DEFAULT_COLOR;
+               return {
+                  id: d.id,
+                  ts: ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                  hour: ts.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                  actor: data.performedBy || 'System',
+                  role: data.details?.role || (data.performedBy === 'system/scheduler' ? 'Automated System' : 'User'),
+                  icon: data.performedBy === 'system/scheduler' ? 'smart_toy' : undefined,
+                  avatar: data.performedBy !== 'system/scheduler' ? `https://i.pravatar.cc/100?u=${encodeURIComponent(data.performedBy || '')}` : undefined,
+                  test: data.details?.experimentName || data.targetId || 'Unknown',
+                  testId: data.targetId || d.id.slice(0,8),
+                  action: actionLabel,
+                  detail: data.details?.description || data.action || '',
+                  ...colors,
+               };
+            });
+            setAuditLogs(logs);
+         } catch (err) {
+            console.error('Failed to load experiment audit logs:', err);
+         } finally { setLoading(false); }
+      };
+      load();
+   }, []);
    return (
       <div className="p-8 max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-700 font-display pb-32">
          {/* Header */}
@@ -29,10 +84,10 @@ const ExperimentsAuditLog: React.FC = () => {
                <p className="text-navy-500 font-medium italic text-lg opacity-80 uppercase tracking-widest">Track, filter, and audit all modifications to A/B tests, traffic clusters, and system configurations.</p>
             </div>
             <div className="flex gap-3 shrink-0">
-               <button onClick={action('Exporting experiment audit log…', 'success')} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-navy-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-navy-700 hover:bg-navy-50 transition-all shadow-sm group">
+               <button onClick={() => addToast('Exporting experiment audit log…', 'success')} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-navy-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-navy-700 hover:bg-navy-50 transition-all shadow-sm group">
                   <span className="material-symbols-outlined text-xl text-navy-300 group-hover:text-primary">tune</span> Configure
                </button>
-               <button onClick={action('Navigated to previous cycle', 'info')} className="flex items-center gap-3 px-8 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
+               <button onClick={() => addToast('Export log started', 'info')} className="flex items-center gap-3 px-8 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
                   <span className="material-symbols-outlined text-xl">download</span> Export Log
                </button>
             </div>
@@ -178,7 +233,7 @@ const ExperimentsAuditLog: React.FC = () => {
                               </p>
                            </td>
                            <td className="px-12 py-10 text-right">
-                              <button onClick={action('Navigated to next cycle', 'info')} className="p-3 bg-navy-50 rounded-2xl text-navy-200 border border-navy-50 hover:text-primary hover:bg-white hover:border-navy-100 transition-all shadow-inner hover:shadow-md active:scale-90"><span className="material-symbols-outlined text-lg">visibility</span></button>
+                              <button onClick={() => addToast('Viewing details…', 'info')} className="p-3 bg-navy-50 rounded-2xl text-navy-200 border border-navy-50 hover:text-primary hover:bg-white hover:border-navy-100 transition-all shadow-inner hover:shadow-md active:scale-90"><span className="material-symbols-outlined text-lg">visibility</span></button>
                            </td>
                         </tr>
                      ))}
@@ -189,16 +244,14 @@ const ExperimentsAuditLog: React.FC = () => {
             {/* Table Pagination Controller */}
             <div className="px-12 py-10 bg-navy-50/30 border-t border-navy-100 flex flex-col sm:flex-row items-center justify-between gap-8">
                <div className="text-[10px] font-black text-navy-400 uppercase tracking-widest">
-                  Displaying <span className="text-navy-950 font-black">1</span> to <span className="text-navy-950 font-black">5</span> of <span className="text-navy-950 font-black">45</span> sequential logs
+                  Displaying <span className="text-navy-950 font-black">1</span> to <span className="text-navy-950 font-black">{auditLogs.length}</span> of <span className="text-navy-950 font-black">{auditLogs.length}</span> sequential logs
                </div>
                <div className="flex items-center gap-3">
-                  <button onClick={action('Prev Cycle — action triggered', 'info')} className="px-6 py-3 bg-white border-2 border-navy-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-navy-300 cursor-not-allowed shadow-sm transition-all" disabled>Prev Cycle</button>
-                  {[1, 2, 3].map(p => (
-                     <button onClick={action('Action triggered', 'info')} key={p} className={`size-11 flex items-center justify-center rounded-2xl text-xs font-black transition-all ${p === 1 ? 'bg-primary text-white shadow-lg shadow-primary/30 border-primary' : 'bg-white border-2 border-navy-100 text-navy-400 hover:border-navy-400 hover:text-navy-950'}`}>{p}</button>
+                  <button onClick={() => addToast('Prev Cycle — action triggered', 'info')} className="px-6 py-3 bg-white border-2 border-navy-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-navy-300 cursor-not-allowed shadow-sm transition-all" disabled>Prev Cycle</button>
+                  {[1].map(p => (
+                     <button onClick={() => addToast('Page selected', 'info')} key={p} className={`size-11 flex items-center justify-center rounded-2xl text-xs font-black transition-all ${p === 1 ? 'bg-primary text-white shadow-lg shadow-primary/30 border-primary' : 'bg-white border-2 border-navy-100 text-navy-400 hover:border-navy-400 hover:text-navy-950'}`}>{p}</button>
                   ))}
-                  <span className="px-3 text-navy-200 font-black uppercase tracking-[0.3em]">...</span>
-                  <button onClick={action('Navigated to next cycle', 'info')} className="size-11 flex items-center justify-center rounded-2xl bg-white border-2 border-navy-100 text-navy-400 hover:border-navy-400 font-black text-xs">9</button>
-                  <button onClick={action('Navigated to next cycle', 'info')} className="px-6 py-3 bg-white border-2 border-navy-100 text-navy-950 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-navy-50 shadow-sm transition-all">Next Cycle</button>
+                  <button onClick={() => addToast('Next cycle', 'info')} className="px-6 py-3 bg-white border-2 border-navy-100 text-navy-950 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-navy-50 shadow-sm transition-all">Next Cycle</button>
                </div>
             </div>
          </div>

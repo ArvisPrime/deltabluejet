@@ -1,7 +1,7 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase.config';
 import { logAuditEntry } from '../../services/firestore';
 import { useToastStore } from '../../stores/toastStore';
@@ -140,6 +140,25 @@ const OperationalTriggers: React.FC = () => {
 
   // Saved snapshot for discard
   const [savedStates, setSavedStates] = useState(() => JSON.parse(JSON.stringify(roleStates)));
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
+  // Load saved config from Firestore on mount
+  useEffect(() => {
+    const loadSaved = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'cms_config', 'alert_triggers'));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.rolePermissions) {
+            setRoleStates(prev => ({ ...prev, ...data.rolePermissions }));
+            setSavedStates(JSON.parse(JSON.stringify({ ...roleStates, ...data.rolePermissions })));
+          }
+        }
+      } catch (err) { console.error('Failed to load alert config:', err); }
+      finally { setLoadingConfig(false); }
+    };
+    loadSaved();
+  }, []);
 
   const currentRole = useMemo(() => ROLES.find(r => r.id === activeRole) || ROLES[0], [activeRole]);
   const currentState = roleStates[activeRole] || getDefaultState(activeRole);
@@ -187,9 +206,10 @@ const OperationalTriggers: React.FC = () => {
       try {
         await logAuditEntry({
           action: 'alert_settings_updated',
-          module: 'operational_triggers',
-          detail: `Updated alert settings for role: ${currentRole.label}`,
+          targetCollection: 'cms_config',
+          targetId: 'alert_triggers',
           performedBy: 'admin',
+          details: { role: currentRole.label },
         });
       } catch { /* non-critical */ }
 

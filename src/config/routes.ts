@@ -12,6 +12,7 @@ export const ROUTES = {
 
     // Auth
     LOGIN: '/login',
+    STAFF_LOGIN: '/staff-login',
     REGISTER: '/register',
     FORGOT_PASSWORD: '/forgot-password',
     CREATE_NEW_PASSWORD: '/reset-password',
@@ -47,6 +48,7 @@ export const ROUTES = {
 
     // Loyalty
     LOYALTY: '/loyalty',
+    LOYALTY_REDEMPTION: '/loyalty/redeem',
 
     // Passenger Portal
     MY_DASHBOARD: '/my',
@@ -96,6 +98,8 @@ export const ROUTES = {
     MFA_SETTINGS: '/admin/security/mfa',
     SSO_SETTINGS: '/admin/security/sso',
     PASSWORD_POLICY: '/admin/security/password-policy',
+    SECURITY_KEYS: '/admin/security/keys',
+    YUBIKEY_VERIFY: '/admin/verify-key',
 
     // Admin — Communications
     EMAIL_TEMPLATES: '/admin/comms/email',
@@ -106,4 +110,14 @@ export const ROUTES = {
     // Admin — Experiments
     EXPERIMENTS_DASHBOARD: '/admin/experiments',
     EXPERIMENTS_AUDIT_LOG: '/admin/experiments/audit',
+
+    // Admin — Loyalty
+    LOYALTY_ADMIN: '/admin/loyalty',
+
+    // Admin — Ancillary Revenue
+    ANCILLARY_ADMIN: '/admin/ancillary',
+
+    // Admin — Crew
+    CREW_MANAGEMENT: '/admin/crew',
+    CREW_SCHEDULING: '/admin/crew/scheduling',
 } as const;

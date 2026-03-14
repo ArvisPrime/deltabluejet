@@ -1,13 +1,16 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
 import { getOrCreateCustomer, getBookingHistory } from '../../services/customerService';
 import { getLoyaltyStatus, getTierInfo, getNextTierInfo, TIER_THRESHOLDS } from '../../services/loyaltyService';
+import { checkEligibility } from '../../services/checkin';
 import type { CustomerDoc, BookingDoc, LoyaltyDoc } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
+
+type ModalType = 'book' | 'manage' | 'checkin' | 'flight' | null;
 
 /**
  * MyDashboard — Passenger home after login/registration.
@@ -16,7 +19,9 @@ import { useToastStore } from '../../stores/toastStore';
  */
 const MyDashboard: React.FC = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const addToast = useToastStore(s => s.addToast);
+    const [activeModal, setActiveModal] = useState<ModalType>(null);
 
     const [customer, setCustomer] = useState<CustomerDoc | null>(null);
     const [bookings, setBookings] = useState<BookingDoc[]>([]);
@@ -33,18 +38,20 @@ const MyDashboard: React.FC = () => {
                 ]);
                 setCustomer(cust);
                 setBookings(bkgs);
-
-                try {
-                    const loy = await getLoyaltyStatus(user.uid);
-                    setLoyalty(loy);
-                } catch { /* no loyalty record yet */ }
             } catch {
-                addToast('Failed to load dashboard data', 'error');
-            } finally {
-                setLoading(false);
+                addToast('Unable to load your profile and bookings. Please try refreshing.', 'error');
             }
+
+            try {
+                const loy = await getLoyaltyStatus(user.uid);
+                setLoyalty(loy);
+            } catch {
+                // No loyalty record yet — this is normal for new users
+            }
+
+            setLoading(false);
         })();
-    }, [user]);
+    }, [user, addToast]);
 
     // ── Profile completion ─────────────────────────────────
     const profileFields = useMemo(() => {
@@ -89,12 +96,14 @@ const MyDashboard: React.FC = () => {
     const firstName = user?.displayName?.split(' ')[0] || 'Traveler';
 
     // ── Quick Actions ──────────────────────────────────────
-    const quickActions = [
-        { label: 'Book a Flight', icon: 'flight_takeoff', route: ROUTES.FLIGHT_SEARCH, color: 'bg-primary' },
-        { label: 'Manage Booking', icon: 'confirmation_number', route: ROUTES.MANAGE_BOOKING, color: 'bg-emerald-500' },
-        { label: 'Online Check-in', icon: 'check_circle', route: ROUTES.CHECKIN, color: 'bg-amber-500' },
-        { label: 'Flight Status', icon: 'radar', route: ROUTES.FLIGHT_TRACKER, color: 'bg-violet-500' },
+    const quickActions: { label: string; icon: string; modal: ModalType; color: string }[] = [
+        { label: 'Book a Flight', icon: 'flight_takeoff', modal: 'book', color: 'bg-primary' },
+        { label: 'Manage Booking', icon: 'confirmation_number', modal: 'manage', color: 'bg-emerald-500' },
+        { label: 'Online Check-in', icon: 'check_circle', modal: 'checkin', color: 'bg-amber-500' },
+        { label: 'Flight Status', icon: 'radar', modal: 'flight', color: 'bg-violet-500' },
     ];
+
+    const closeModal = useCallback(() => setActiveModal(null), []);
 
     // ── Helper to format Timestamp ─────────────────────────
     const formatDate = (ts: any, opts?: Intl.DateTimeFormatOptions) => {
@@ -168,16 +177,16 @@ const MyDashboard: React.FC = () => {
             {/* ═══ Quick Actions Grid ═══════════════════════════ */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {quickActions.map(action => (
-                    <Link
+                    <button
                         key={action.label}
-                        to={action.route}
-                        className="group bg-white rounded-2xl border border-navy-100 p-5 flex flex-col items-center gap-3 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all no-underline"
+                        onClick={() => setActiveModal(action.modal)}
+                        className="group bg-white rounded-2xl border border-navy-100 p-5 flex flex-col items-center gap-3 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer"
                     >
                         <div className={`size-12 rounded-2xl ${action.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
                             <span className="material-symbols-outlined text-white text-xl font-black">{action.icon}</span>
                         </div>
                         <span className="text-[10px] font-black text-navy-700 uppercase tracking-widest text-center">{action.label}</span>
-                    </Link>
+                    </button>
                 ))}
             </div>
 
@@ -338,7 +347,232 @@ const MyDashboard: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* ═══ Quick Action Popup Modals ═══════════════════════ */}
+            {activeModal && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                    onClick={closeModal}
+                    style={{ animation: 'fadeIn 0.2s ease-out' }}
+                >
+                    {/* Backdrop */}
+                    <div className="absolute inset-0 bg-navy-950/60 backdrop-blur-sm" />
+
+                    {/* Modal Card */}
+                    <div
+                        className="relative bg-white rounded-[2.5rem] shadow-2xl border border-navy-100 w-full max-w-lg max-h-[85vh] overflow-y-auto"
+                        onClick={e => e.stopPropagation()}
+                        style={{ animation: 'modalSlideUp 0.35s cubic-bezier(0.16,1,0.3,1)' }}
+                    >
+                        {/* Modal Header */}
+                        <div className="sticky top-0 bg-white/95 backdrop-blur-md z-10 px-8 pt-8 pb-4 flex items-center justify-between border-b border-navy-50 rounded-t-[2.5rem]">
+                            <div className="flex items-center gap-3">
+                                <div className={`size-10 rounded-xl flex items-center justify-center shadow-lg ${activeModal === 'book' ? 'bg-primary' :
+                                    activeModal === 'manage' ? 'bg-emerald-500' :
+                                        activeModal === 'checkin' ? 'bg-amber-500' : 'bg-violet-500'
+                                    }`}>
+                                    <span className="material-symbols-outlined text-white text-lg font-black">
+                                        {activeModal === 'book' ? 'flight_takeoff' :
+                                            activeModal === 'manage' ? 'confirmation_number' :
+                                                activeModal === 'checkin' ? 'check_circle' : 'radar'}
+                                    </span>
+                                </div>
+                                <h3 className="text-lg font-black text-navy-950 uppercase tracking-tight">
+                                    {activeModal === 'book' ? 'Book a Flight' :
+                                        activeModal === 'manage' ? 'Manage Booking' :
+                                            activeModal === 'checkin' ? 'Online Check-in' : 'Flight Status'}
+                                </h3>
+                            </div>
+                            <button
+                                onClick={closeModal}
+                                className="size-10 rounded-xl bg-navy-50 flex items-center justify-center text-navy-400 hover:bg-red-50 hover:text-red-500 transition-all"
+                            >
+                                <span className="material-symbols-outlined text-lg">close</span>
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-8">
+                            {activeModal === 'book' && <BookFlightForm navigate={navigate} onClose={closeModal} />}
+                            {activeModal === 'manage' && <ManageBookingForm navigate={navigate} onClose={closeModal} />}
+                            {activeModal === 'checkin' && <CheckinForm navigate={navigate} onClose={closeModal} addToast={addToast} />}
+                            {activeModal === 'flight' && <FlightStatusForm navigate={navigate} onClose={closeModal} />}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Animations */}
+            <style>{`
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes modalSlideUp {
+                    from { opacity: 0; transform: translateY(40px) scale(0.95); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+            `}</style>
         </div>
+    );
+};
+
+/* ─── Inline Modal Form Components ──────────────────────── */
+
+const BookFlightForm: React.FC<{ navigate: (path: string) => void; onClose: () => void }> = ({ navigate, onClose }) => {
+    return (
+        <div className="space-y-6">
+            <p className="text-xs font-bold text-navy-400 italic leading-relaxed">
+                Search hundreds of routes across the {BRAND.name} network. Find the best fares for your journey.
+            </p>
+            <button
+                onClick={() => { onClose(); navigate(ROUTES.FLIGHT_SEARCH); }}
+                className="w-full h-14 bg-primary text-white font-black uppercase tracking-[0.25em] text-xs rounded-2xl shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
+            >
+                Open Flight Search
+                <span className="material-symbols-outlined text-lg">arrow_forward</span>
+            </button>
+            <button onClick={onClose} className="w-full text-[10px] font-black text-navy-300 uppercase tracking-widest hover:text-navy-700 transition-colors">
+                Cancel
+            </button>
+        </div>
+    );
+};
+
+const ManageBookingForm: React.FC<{ navigate: (path: string) => void; onClose: () => void }> = ({ navigate, onClose }) => {
+    const [pnr, setPnr] = useState('');
+    const [lastName, setLastName] = useState('');
+    return (
+        <form className="space-y-6" onSubmit={e => { e.preventDefault(); if (pnr.trim()) { onClose(); navigate(`/manage-booking/${pnr.trim().toUpperCase()}`); } }}>
+            <p className="text-xs font-bold text-navy-400 italic leading-relaxed">
+                Enter your booking reference and last name to view or modify your trip.
+            </p>
+            <div className="space-y-2">
+                <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest block px-1">Booking Reference (PNR)</label>
+                <div className="relative">
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-navy-200">qr_code</span>
+                    <input
+                        required placeholder="E.G. DJXJ799" value={pnr}
+                        onChange={e => setPnr(e.target.value.toUpperCase())}
+                        className="w-full h-14 pl-14 pr-6 bg-navy-50 border-none rounded-2xl text-sm font-black text-navy-950 uppercase tracking-widest focus:ring-4 focus:ring-primary/10 transition-all"
+                    />
+                </div>
+            </div>
+            <div className="space-y-2">
+                <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest block px-1">Last Name</label>
+                <div className="relative">
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-navy-200">person</span>
+                    <input
+                        required placeholder="E.G. CHEN" value={lastName}
+                        onChange={e => setLastName(e.target.value.toUpperCase())}
+                        className="w-full h-14 pl-14 pr-6 bg-navy-50 border-none rounded-2xl text-sm font-black text-navy-950 uppercase tracking-widest focus:ring-4 focus:ring-primary/10 transition-all"
+                    />
+                </div>
+            </div>
+            <button type="submit" className="w-full h-14 bg-emerald-500 text-white font-black uppercase tracking-[0.25em] text-xs rounded-2xl shadow-xl shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+                Retrieve Booking <span className="material-symbols-outlined text-lg">arrow_forward</span>
+            </button>
+            <button type="button" onClick={onClose} className="w-full text-[10px] font-black text-navy-300 uppercase tracking-widest hover:text-navy-700 transition-colors">
+                Cancel
+            </button>
+        </form>
+    );
+};
+
+const CheckinForm: React.FC<{ navigate: (path: string, opts?: any) => void; onClose: () => void; addToast: (msg: string, type?: any) => void }> = ({ navigate, onClose, addToast }) => {
+    const [pnr, setPnr] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!pnr.trim() || !lastName.trim()) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const result = await checkEligibility(pnr.trim().toUpperCase());
+            if (!result.eligible) {
+                setError(result.reason || 'This booking is not eligible for check-in.');
+                setLoading(false);
+                return;
+            }
+            onClose();
+            navigate(ROUTES.CHECKIN_PASSENGERS, {
+                state: { pnr: pnr.trim().toUpperCase(), lastName: lastName.trim().toUpperCase(), booking: result.booking, passengers: result.passengers, flight: result.flight },
+            });
+        } catch (err: any) {
+            setError(err.message || 'Failed to look up booking.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <form className="space-y-6" onSubmit={handleSubmit}>
+            <p className="text-xs font-bold text-navy-400 italic leading-relaxed">
+                Check in online 24 hours before departure. Have your booking reference ready.
+            </p>
+            {error && (
+                <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2">
+                    <span className="material-symbols-outlined text-red-500 text-sm mt-0.5">error</span>
+                    <p className="text-[10px] font-bold text-red-600">{error}</p>
+                </div>
+            )}
+            <div className="space-y-2">
+                <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest block px-1">Booking Reference (PNR)</label>
+                <div className="relative">
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-navy-200">confirmation_number</span>
+                    <input
+                        required placeholder="E.G. DJXJ799" value={pnr}
+                        onChange={e => setPnr(e.target.value.toUpperCase())} disabled={loading}
+                        className="w-full h-14 pl-14 pr-6 bg-navy-50 border-none rounded-2xl text-sm font-black text-navy-950 uppercase tracking-widest focus:ring-4 focus:ring-primary/10 transition-all disabled:opacity-50"
+                    />
+                </div>
+            </div>
+            <div className="space-y-2">
+                <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest block px-1">Last Name</label>
+                <div className="relative">
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-navy-200">person</span>
+                    <input
+                        required placeholder="E.G. CHEN" value={lastName}
+                        onChange={e => setLastName(e.target.value.toUpperCase())} disabled={loading}
+                        className="w-full h-14 pl-14 pr-6 bg-navy-50 border-none rounded-2xl text-sm font-black text-navy-950 uppercase tracking-widest focus:ring-4 focus:ring-primary/10 transition-all disabled:opacity-50"
+                    />
+                </div>
+            </div>
+            <button type="submit" disabled={loading} className="w-full h-14 bg-amber-500 text-white font-black uppercase tracking-[0.25em] text-xs rounded-2xl shadow-xl shadow-amber-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-60">
+                {loading ? <><div className="animate-spin size-4 border-2 border-white/30 border-t-white rounded-full" /> Searching...</> : <>Start Check-in <span className="material-symbols-outlined text-lg">arrow_forward</span></>}
+            </button>
+            <button type="button" onClick={onClose} className="w-full text-[10px] font-black text-navy-300 uppercase tracking-widest hover:text-navy-700 transition-colors">
+                Cancel
+            </button>
+        </form>
+    );
+};
+
+const FlightStatusForm: React.FC<{ navigate: (path: string) => void; onClose: () => void }> = ({ navigate, onClose }) => {
+    const [flightId, setFlightId] = useState('');
+    return (
+        <form className="space-y-6" onSubmit={e => { e.preventDefault(); if (flightId.trim()) { onClose(); navigate(ROUTES.FLIGHT_TRACKER_RESULTS); } }}>
+            <p className="text-xs font-bold text-navy-400 italic leading-relaxed">
+                Track real-time flight status, gate assignments, and estimated arrival times.
+            </p>
+            <div className="space-y-2">
+                <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest block px-1">Flight Number</label>
+                <div className="relative">
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-navy-200">flight</span>
+                    <input
+                        required placeholder="E.G. DJ-102" value={flightId}
+                        onChange={e => setFlightId(e.target.value.toUpperCase())}
+                        className="w-full h-14 pl-14 pr-6 bg-navy-50 border-none rounded-2xl text-sm font-black text-navy-950 uppercase tracking-widest focus:ring-4 focus:ring-primary/10 transition-all"
+                    />
+                </div>
+            </div>
+            <button type="submit" className="w-full h-14 bg-violet-500 text-white font-black uppercase tracking-[0.25em] text-xs rounded-2xl shadow-xl shadow-violet-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+                Track Flight <span className="material-symbols-outlined text-lg">my_location</span>
+            </button>
+            <button type="button" onClick={onClose} className="w-full text-[10px] font-black text-navy-300 uppercase tracking-widest hover:text-navy-700 transition-colors">
+                Cancel
+            </button>
+        </form>
     );
 };
 

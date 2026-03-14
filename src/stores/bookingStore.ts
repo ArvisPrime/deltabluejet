@@ -55,6 +55,8 @@ interface BookingState {
     setSelectedSeats: (seats: Record<string, string>) => void;
 
     // Booking confirmation
+    bookingId: string | null;
+    setBookingId: (bookingId: string) => void;
     pnr: string | null;
     setPnr: (pnr: string) => void;
 
@@ -75,6 +77,9 @@ export const useBookingStore = create<BookingState>((set) => ({
     selectedSeats: {},
     setSelectedSeats: (selectedSeats) => set({ selectedSeats }),
 
+    bookingId: null,
+    setBookingId: (bookingId) => set({ bookingId }),
+
     pnr: null,
     setPnr: (pnr) => set({ pnr }),
 
@@ -83,6 +88,7 @@ export const useBookingStore = create<BookingState>((set) => ({
         selectedFlight: null,
         passengers: [],
         selectedSeats: {},
+        bookingId: null,
         pnr: null,
     }),
 }));

@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import {
     loginWithEmail,
@@ -6,22 +6,18 @@ import {
     loginWithGoogle,
     resetPassword,
     logout as logoutService,
-    onAuthChange,
 } from '../services/auth';
 
 /**
  * Custom hook for authentication operations.
  * Provides login, register, Google SSO, reset, and logout functions,
  * plus reactive auth state from the Zustand store.
+ *
+ * Auth state listener is set up once at the App level (App.tsx),
+ * so this hook only exposes actions + state — no duplicate listener.
  */
 export function useAuth() {
     const { user, isLoading, isAuthenticated } = useAuthStore();
-
-    // Subscribe to auth state changes on mount
-    useEffect(() => {
-        const unsubscribe = onAuthChange();
-        return unsubscribe;
-    }, []);
 
     const login = useCallback(async (email: string, password: string) => {
         return loginWithEmail(email, password);

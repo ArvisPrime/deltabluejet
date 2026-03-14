@@ -58,8 +58,8 @@ const LandingHome: React.FC = () => {
    const getYouTubeId = (url: string): string | null => {
        const patterns = [
            /youtu\.be\/([\w-]+)/,
-           /youtube\.com\/watch\?v=([\w-]+)/,,
-           /youtube\.com\/embed\/([\w-]+)/,,
+           /youtube\.com\/watch\?v=([\w-]+)/,
+           /youtube\.com\/embed\/([\w-]+)/,
        ];
        for (const p of patterns) {
            const m = url.match(p);

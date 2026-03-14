@@ -9,6 +9,14 @@ export { setUserRole, onUserCreated } from './users';
 export { updateFlightStatus, assignGate, swapAircraft } from './flights';
 export { getDashboardStats } from './dashboard';
 export { createPaymentIntent, processRefund, sendBookingConfirmation } from './payments';
-export { sendNotificationEmail, sendNotificationSms, onBookingConfirmed } from './notifications';
+export { handleStripeWebhook } from './webhook';
+export { sendNotificationEmail, sendNotificationSms, onBookingConfirmed, onFlightDelayed, onCheckinReminder } from './notifications';
 export { generateBoardingPass } from './boarding';
 export { geminiAssistant } from './gemini';
+export { aggregateDailySales } from './sales';
+export { reconcilePayments } from './reconciliation';
+export { publishSchedule, withdrawFlight } from './inventory';
+export { onUserCreatedLoyalty, onBookingConfirmedLoyalty, onBookingRefundedLoyalty } from './loyalty';
+export { webauthnGenerateRegistration, webauthnVerifyRegistration, webauthnGenerateAuthentication, webauthnVerifyAuthentication, webauthnListKeys, webauthnRemoveKey } from './webauthn';
+
+

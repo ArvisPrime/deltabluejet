@@ -219,7 +219,7 @@ const Register: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>First Name *</label>
-          <input className={inputCls} placeholder="John" value={form.firstName} onChange={e => set('firstName', e.target.value)} />
+          <input className={inputCls} placeholder="John" value={form.firstName} onChange={e => set('firstName', e.target.value)} aria-required="true" />
         </div>
         <div>
           <label className={labelCls}>Middle Name <span className="text-navy-300 normal-case tracking-normal">(optional)</span></label>
@@ -230,7 +230,7 @@ const Register: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className={labelCls}>Last Name *</label>
-          <input className={inputCls} placeholder="Doe" value={form.lastName} onChange={e => set('lastName', e.target.value)} />
+          <input className={inputCls} placeholder="Doe" value={form.lastName} onChange={e => set('lastName', e.target.value)} aria-required="true" />
         </div>
         <div>
           {showSuffix ? (
@@ -443,7 +443,7 @@ const Register: React.FC = () => {
           <label className={labelCls}>Password *</label>
           <div className="relative">
             <input className={inputCls} type={showPassword ? 'text' : 'password'} placeholder="Min. 8 characters" value={form.password} onChange={e => set('password', e.target.value)} />
-            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-300 hover:text-primary transition-colors p-1">
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-300 hover:text-primary transition-colors p-1" aria-label={showPassword ? 'Hide password' : 'Show password'}>
               <span className="material-symbols-outlined text-lg">{showPassword ? 'visibility_off' : 'visibility'}</span>
             </button>
           </div>
@@ -452,7 +452,7 @@ const Register: React.FC = () => {
           <label className={labelCls}>Confirm Password *</label>
           <div className="relative">
             <input className={inputCls} type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-enter password" value={form.confirmPassword} onChange={e => set('confirmPassword', e.target.value)} />
-            <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-300 hover:text-primary transition-colors p-1">
+            <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-300 hover:text-primary transition-colors p-1" aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}>
               <span className="material-symbols-outlined text-lg">{showConfirmPassword ? 'visibility_off' : 'visibility'}</span>
             </button>
           </div>
@@ -578,14 +578,14 @@ const Register: React.FC = () => {
 
             {/* Error Banner */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 animate-in fade-in duration-300">
+              <div id="register-error" className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 animate-in fade-in duration-300" role="alert">
                 <span className="material-symbols-outlined text-red-500 text-lg mt-0.5">error</span>
                 <p className="text-xs font-bold text-red-700 tracking-wide">{error}</p>
               </div>
             )}
 
             {/* Form Steps */}
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} aria-label="Registration form">
               {step === 0 && phase1}
               {step === 1 && phase2}
               {step === 2 && phase3}

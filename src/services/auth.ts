@@ -145,8 +145,47 @@ export async function confirmReset(oobCode: string, newPassword: string): Promis
  * Sign out the current user.
  */
 export async function logout(): Promise<void> {
+    stopIdleTimer();
     await signOut(auth);
     useAuthStore.getState().logout();
+}
+
+// ─── Admin Idle Session Timeout ───────────────────────────
+// Auto-logout admin/staff users after 30 minutes of inactivity.
+// Customers are exempt (they use persistent sessions).
+
+const ADMIN_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+const ACTIVITY_EVENTS = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'] as const;
+
+function resetIdleTimer(): void {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(async () => {
+        const user = useAuthStore.getState().user;
+        if (user && user.role !== 'customer') {
+            console.warn('[Security] Admin idle timeout — signing out');
+            await signOut(auth);
+            useAuthStore.getState().logout();
+            window.location.href = '/login?reason=idle';
+        }
+    }, ADMIN_IDLE_TIMEOUT_MS);
+}
+
+function startIdleTimer(): void {
+    ACTIVITY_EVENTS.forEach(event =>
+        document.addEventListener(event, resetIdleTimer, { passive: true })
+    );
+    resetIdleTimer();
+}
+
+function stopIdleTimer(): void {
+    if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+    }
+    ACTIVITY_EVENTS.forEach(event =>
+        document.removeEventListener(event, resetIdleTimer)
+    );
 }
 
 /**
@@ -159,8 +198,13 @@ export function onAuthChange(callback?: (user: AuthUser | null) => void): () => 
         if (firebaseUser) {
             const authUser = await mapFirebaseUser(firebaseUser);
             useAuthStore.getState().setUser(authUser);
+            // Start idle timer for admin/staff users only
+            if (authUser.role !== 'customer') {
+                startIdleTimer();
+            }
             callback?.(authUser);
         } else {
+            stopIdleTimer();
             useAuthStore.getState().setUser(null);
             callback?.(null);
         }

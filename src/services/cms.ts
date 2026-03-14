@@ -188,15 +188,26 @@ export async function getDestinationsConfig(): Promise<CmsDestinationsConfigDoc 
 
 export async function updateDestinationConfig(
     code: string,
-    data: CmsDestinationDoc
+    data: CmsDestinationDoc,
+    pageFields?: Partial<Omit<CmsDestinationsConfigDoc, 'destinations' | 'updatedAt'>>
 ): Promise<void> {
     const existing = await getDestinationsConfig();
     const destinations = existing?.destinations || {};
     destinations[code] = data;
     await setDoc(doc(cmsConfigRef, 'destinations'), {
+        ...pageFields,
         destinations,
         updatedAt: Timestamp.now(),
-    });
+    }, { merge: true });
+}
+
+export async function updateDestinationsPageContent(
+    fields: Partial<Omit<CmsDestinationsConfigDoc, 'destinations' | 'updatedAt'>>
+): Promise<void> {
+    await setDoc(doc(cmsConfigRef, 'destinations'), {
+        ...fields,
+        updatedAt: Timestamp.now(),
+    }, { merge: true });
 }
 
 export async function uploadDestinationImage(

@@ -10,6 +10,11 @@ import {
     getDoc,
     setDoc,
     updateDoc,
+    addDoc,
+    getDocs,
+    query,
+    where,
+    orderBy,
     Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase.config';
@@ -185,4 +190,92 @@ export function getPointsHistory(loyalty: LoyaltyDoc): PointsHistoryEntry[] {
     return [...loyalty.pointsHistory].sort(
         (a, b) => b.date.toDate().getTime() - a.date.toDate().getTime()
     );
+}
+
+// ─── Rewards & Redemption ────────────────────────────────
+
+export interface LoyaltyReward {
+    id: string;
+    name: string;
+    description: string;
+    pointsCost: number;
+    category: 'upgrade' | 'lounge' | 'baggage' | 'miles' | 'partner' | 'experience';
+    partnerName?: string;
+    imageUrl?: string;
+    available: boolean;
+}
+
+export interface RedemptionRecord {
+    id: string;
+    uid: string;
+    rewardId: string;
+    rewardName: string;
+    pointsSpent: number;
+    status: 'completed' | 'pending' | 'cancelled';
+    redeemedAt: Timestamp;
+}
+
+/**
+ * Get available rewards catalog.
+ */
+export async function getRewardsCatalog(): Promise<LoyaltyReward[]> {
+    const q = query(collection(db, 'loyalty_rewards'), where('available', '==', true));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as LoyaltyReward));
+}
+
+/**
+ * Redeem points for a reward.
+ */
+export async function redeemPoints(
+    uid: string,
+    reward: LoyaltyReward,
+): Promise<{ success: boolean; message: string }> {
+    const loyalty = await getLoyaltyStatus(uid);
+
+    if (loyalty.totalPoints < reward.pointsCost) {
+        return { success: false, message: `Not enough points. You need ${reward.pointsCost - loyalty.totalPoints} more.` };
+    }
+
+    // Deduct points
+    const entry: PointsHistoryEntry = {
+        date: Timestamp.now(),
+        amount: reward.pointsCost,
+        type: 'redeem' as any,
+        bookingRef: `REDEEM-${Date.now()}`,
+        description: `Redeemed ${reward.pointsCost} pts for ${reward.name}`,
+    };
+
+    const newTotal = loyalty.totalPoints - reward.pointsCost;
+    const ref = doc(loyaltyRef, uid);
+    await updateDoc(ref, {
+        totalPoints: newTotal,
+        pointsHistory: [...loyalty.pointsHistory, entry],
+        updatedAt: Timestamp.now(),
+    });
+
+    // Create redemption record
+    await addDoc(collection(db, 'loyalty_redemptions'), {
+        uid,
+        rewardId: reward.id,
+        rewardName: reward.name,
+        pointsSpent: reward.pointsCost,
+        status: 'completed',
+        redeemedAt: Timestamp.now(),
+    });
+
+    return { success: true, message: `Successfully redeemed ${reward.name}!` };
+}
+
+/**
+ * Get redemption history for a user.
+ */
+export async function getRedemptionHistory(uid: string): Promise<RedemptionRecord[]> {
+    const q = query(
+        collection(db, 'loyalty_redemptions'),
+        where('uid', '==', uid),
+        orderBy('redeemedAt', 'desc'),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as RedemptionRecord));
 }

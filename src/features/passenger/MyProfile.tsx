@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { BRAND } from '../../config/brand';
 import { getOrCreateCustomer, updateCustomer } from '../../services/customerService';
 import type { CustomerDoc } from '../../types/firestore';
+import { Timestamp } from 'firebase/firestore';
 import { useToastStore } from '../../stores/toastStore';
 
 /**
@@ -69,6 +70,7 @@ const MyProfile: React.FC = () => {
                 nationality: nationality || null,
                 documentType,
                 documentNumber: documentNumber || null,
+                dateOfBirth: dateOfBirth ? Timestamp.fromDate(new Date(dateOfBirth)) : null,
                 preferences: {
                     seatPreference: seatPref,
                     mealPreference: mealPref,
@@ -77,7 +79,8 @@ const MyProfile: React.FC = () => {
                 },
             });
             addToast('Profile updated successfully', 'success');
-        } catch {
+        } catch (err) {
+            console.error('[MyProfile] Save failed:', err);
             addToast('Failed to save profile', 'error');
         } finally {
             setSaving(false);

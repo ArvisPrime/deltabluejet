@@ -66,6 +66,9 @@ export async function getOrCreateCustomer(
         preferences: DEFAULT_PREFERENCES,
         loyaltyTier: 'bronze',
         totalTrips: 0,
+        gdprConsent: false,
+        marketingOptIn: false,
+        consentUpdatedAt: null,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
     };
@@ -89,10 +92,10 @@ export async function updateCustomer(
     uid: string,
     data: Partial<Omit<CustomerDoc, 'uid' | 'createdAt'>>,
 ): Promise<void> {
-    await updateDoc(doc(customersRef, uid), {
+    await setDoc(doc(customersRef, uid), {
         ...data,
         updatedAt: serverTimestamp(),
-    });
+    }, { merge: true });
 }
 
 // ─── Booking History ───────────────────────────────────────

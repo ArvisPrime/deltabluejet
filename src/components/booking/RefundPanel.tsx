@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { PaymentDoc, BookingDoc } from '../../types/firestore';
 import { calculateRefund, processRefund, type RefundCalculation } from '../../services/paymentService';
 import { useToastStore } from '../../stores/toastStore';
+import { useAuth } from '../../hooks/useAuth';
 
 interface RefundPanelProps {
     payment: PaymentDoc;
@@ -18,6 +19,7 @@ const RefundPanel: React.FC<RefundPanelProps> = ({
     onRefundComplete,
     onClose,
 }) => {
+    const { user } = useAuth();
     const [reason, setReason] = useState('');
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState('');
@@ -39,7 +41,7 @@ const RefundPanel: React.FC<RefundPanelProps> = ({
                 payment.id,
                 booking.id,
                 departureDate,
-                'ops-user', // TODO: wire to auth
+                user?.uid || 'unknown',
                 reason,
             );
             onRefundComplete();

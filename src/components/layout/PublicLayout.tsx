@@ -35,7 +35,7 @@ const PublicLayout: React.FC = () => {
                     {/* Brand */}
                     <Link to={ROUTES.HOME} className="flex items-center gap-3">
                         {logoUrl ? (
-                            <img src={logoUrl} alt={displayBrandName} className="h-9 w-auto object-contain" />
+                            <img src={logoUrl} alt={displayBrandName} className="h-12 w-auto object-contain" />
                         ) : (
                             <>
                                 <span className="material-symbols-outlined text-primary text-3xl">flight</span>
@@ -181,7 +181,7 @@ const PublicLayout: React.FC = () => {
                     <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex items-center gap-3">
                             {logoUrl ? (
-                                <img src={logoUrl} alt={displayBrandName} className="h-7 w-auto object-contain" />
+                                <img src={logoUrl} alt={displayBrandName} className="h-9 w-auto object-contain" />
                             ) : (
                                 <>
                                     <span className="material-symbols-outlined text-primary text-2xl">flight</span>
@@ -195,7 +195,7 @@ const PublicLayout: React.FC = () => {
                         <div className="flex gap-8 text-[10px] font-bold text-navy-500 uppercase tracking-widest">
                             <a href="#" className="hover:text-primary transition-colors">Privacy</a>
                             <a href="#" className="hover:text-primary transition-colors">Terms</a>
-                            <Link to={ROUTES.LOGIN} className="text-primary font-black">Staff Login</Link>
+                            <Link to={ROUTES.STAFF_LOGIN} className="text-primary font-black">Staff Login</Link>
                         </div>
                     </div>
                 </div>

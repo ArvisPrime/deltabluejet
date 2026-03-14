@@ -1,9 +1,11 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ROUTES } from '../../config/routes';
-import { useAdminAction } from '../../hooks/useAdminAction';
+import { useToastStore } from '../../stores/toastStore';
+import { collection, query, orderBy, limit, where, getDocs, Timestamp } from 'firebase/firestore';
+import { db } from '../../config/firebase.config';
 
 const trendData = [
    { name: 'Mon', control: 2.1, variant: 2.8 },
@@ -15,21 +17,76 @@ const trendData = [
    { name: 'Sun', control: 2.5, variant: 3.8 },
 ];
 
-const experiments = [
-   { name: 'Homepage Winter Sale Hero', id: 'EXP-2023-089', target: '/home', visitors: '12,450', conv: '4.2%', uplift: '+12%', status: 'Running', icon: 'web' },
-   { name: 'Seat Selection UI v2', id: 'EXP-2023-092', target: '/booking/seats', visitors: '3,205', conv: '18.5%', uplift: '0%', status: 'Running', icon: 'airline_seat_recline_extra' },
-   { name: 'Quick Checkout Flow', id: 'EXP-2023-085', target: '/checkout/payment', visitors: '850', conv: '-', uplift: '-', status: 'Draft', icon: 'credit_card' },
-];
+interface Experiment {
+   id: string;
+   name: string;
+   target: string;
+   visitors: number;
+   conv: string;
+   uplift: string;
+   status: string;
+   icon: string;
+}
 
-const auditPreview = [
-   { action: 'Traffic Update', time: '12m ago', actor: 'Admin User', detail: 'changed allocation for Homepage Hero to 50/50.' },
-   { action: 'Status Change', time: '2h ago', actor: 'Sarah J.', detail: 'paused experiment Checkout Flow due to errors.' },
-   { action: 'New Variant', time: 'Yesterday', actor: 'Dev Team', detail: 'added Variant C to Seat Selection.' },
-];
+interface AuditPreviewEntry {
+   action: string;
+   time: string;
+   actor: string;
+   detail: string;
+}
 
 const ExperimentsDashboard: React.FC = () => {
-  const action = useAdminAction();
+   const addToast = useToastStore(s => s.addToast);
    const navigate = useNavigate();
+   const [experiments, setExperiments] = useState<Experiment[]>([]);
+   const [auditPreview, setAuditPreview] = useState<AuditPreviewEntry[]>([]);
+   const [loading, setLoading] = useState(true);
+
+   useEffect(() => {
+      const load = async () => {
+         try {
+            // Load experiments
+            const expSnap = await getDocs(query(collection(db, 'experiments'), orderBy('createdAt', 'desc'), limit(20)));
+            const exps: Experiment[] = expSnap.docs.map(d => {
+               const data = d.data();
+               return {
+                  id: d.id,
+                  name: data.name || 'Untitled Experiment',
+                  target: data.target || '/',
+                  visitors: data.visitors || 0,
+                  conv: data.conversionRate ? `${data.conversionRate}%` : '-',
+                  uplift: data.uplift ? `${data.uplift > 0 ? '+' : ''}${data.uplift}%` : '-',
+                  status: data.status || 'Draft',
+                  icon: data.icon || 'science',
+               };
+            });
+            setExperiments(exps);
+
+            // Load recent audit logs (experiments module)
+            const auditSnap = await getDocs(
+               query(collection(db, 'audit_logs'), where('targetCollection', '==', 'experiments'), orderBy('timestamp', 'desc'), limit(3))
+            );
+            const logs: AuditPreviewEntry[] = auditSnap.docs.map(d => {
+               const data = d.data();
+               const ts = data.timestamp?.toDate?.() || new Date();
+               const ago = getTimeAgo(ts);
+               return {
+                  action: data.action || 'Action',
+                  time: ago,
+                  actor: data.performedBy || 'System',
+                  detail: data.details?.description || data.action || '',
+               };
+            });
+            setAuditPreview(logs);
+         } catch (err) {
+            console.error('Failed to load experiments data:', err);
+         } finally { setLoading(false); }
+      };
+      load();
+   }, []);
+
+   const activeCount = experiments.filter(e => e.status === 'Running').length;
+   const totalVisitors = experiments.reduce((s, e) => s + e.visitors, 0);
    return (
       <div className="p-8 max-w-7xl mx-auto space-y-10 animate-in fade-in duration-500 font-display">
          {/* Header */}
@@ -44,10 +101,10 @@ const ExperimentsDashboard: React.FC = () => {
                <p className="text-navy-500 font-medium italic mt-2 text-lg">Monitor active tests, analyze traffic allocation, and configure optimizations.</p>
             </div>
             <div className="flex gap-3">
-               <button onClick={action('Opening new experiment form…', 'info')} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-navy-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-navy-700 hover:bg-navy-50 transition-all shadow-sm">
+               <button onClick={() => addToast('Opening new experiment form…', 'info')} className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-navy-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-navy-700 hover:bg-navy-50 transition-all shadow-sm">
                   <span className="material-symbols-outlined text-lg">filter_list</span> Filter View
                </button>
-               <button onClick={action('Switched to 7-day range', 'info')} className="flex items-center gap-3 px-8 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
+               <button onClick={() => addToast('Create Experiment — coming soon', 'info')} className="flex items-center gap-3 px-8 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
                   <span className="material-symbols-outlined text-xl">add</span> Create Experiment
                </button>
             </div>
@@ -56,9 +113,9 @@ const ExperimentsDashboard: React.FC = () => {
          {/* Stats Cards */}
          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-               { label: 'Active Experiments', val: '8', sub: '1 New', icon: 'science', color: 'text-primary', bg: 'bg-primary/5', progress: 65, pText: '65% of traffic in tests' },
-               { label: 'Traffic Impacted', val: '15.4k', sub: '+12%', icon: 'group', color: 'text-blue-500', bg: 'bg-blue-50', progress: 0, pText: 'Daily unique visitors' },
-               { label: 'Avg. Conversion Uplift', val: '+2.4%', sub: '+0.5%', icon: 'payments', color: 'text-emerald-500', bg: 'bg-emerald-50', progress: 0, pText: 'Est. impact: $12,400' },
+               { label: 'Active Experiments', val: String(activeCount), sub: experiments.length > 0 ? `${experiments.length} Total` : '0', icon: 'science', color: 'text-primary', bg: 'bg-primary/5', progress: experiments.length > 0 ? Math.round((activeCount/experiments.length)*100) : 0, pText: `${Math.round((activeCount/Math.max(1,experiments.length))*100)}% of traffic in tests` },
+               { label: 'Traffic Impacted', val: totalVisitors > 1000 ? `${(totalVisitors/1000).toFixed(1)}k` : String(totalVisitors), sub: experiments.length > 0 ? `${experiments.length} tests` : '0', icon: 'group', color: 'text-blue-500', bg: 'bg-blue-50', progress: 0, pText: 'Daily unique visitors' },
+               { label: 'Avg. Conversion Uplift', val: '+2.4%', sub: '+0.5%', icon: 'payments', color: 'text-emerald-500', bg: 'bg-emerald-50', progress: 0, pText: 'Est. impact calculated' },
             ].map((stat, i) => (
                <div key={i} className="bg-white rounded-[3rem] border border-navy-100 p-8 shadow-sm flex flex-col group hover:shadow-xl transition-all relative overflow-hidden">
                   <div className="flex justify-between items-start mb-6">
@@ -96,8 +153,8 @@ const ExperimentsDashboard: React.FC = () => {
                      <p className="text-[10px] font-bold text-navy-400 uppercase tracking-widest opacity-60">Experiment: <span className="text-primary">Homepage Winter Sale Hero</span></p>
                   </div>
                   <div className="flex gap-4 items-center bg-navy-50 p-1.5 rounded-[1.5rem] shadow-inner border border-navy-100">
-                     <button onClick={action('Switched to 30-day range', 'info')} className="px-6 py-2 bg-white text-navy-950 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-md border border-navy-100">7 Days</button>
-                     <button onClick={action('Switched to 30-day range', 'info')} className="px-6 py-2 text-navy-400 text-[10px] font-black uppercase tracking-widest">30 Days</button>
+                     <button onClick={() => addToast('Switched to 30-day range', 'info')} className="px-6 py-2 bg-white text-navy-950 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-md border border-navy-100">7 Days</button>
+                     <button onClick={() => addToast('Switched to 30-day range', 'info')} className="px-6 py-2 text-navy-400 text-[10px] font-black uppercase tracking-widest">30 Days</button>
                   </div>
                </div>
                <div className="h-[400px] w-full relative z-10">
@@ -153,7 +210,7 @@ const ExperimentsDashboard: React.FC = () => {
                      </div>
                   </div>
 
-                  <button onClick={action('Declare Operational Winner — action triggered', 'info')} className="w-full py-4 rounded-2xl bg-navy-950 text-white font-black uppercase text-[10px] tracking-[0.3em] shadow-xl hover:bg-black transition-all">Declare Operational Winner</button>
+                  <button onClick={() => addToast('Declare Operational Winner — action triggered', 'info')} className="w-full py-4 rounded-2xl bg-navy-950 text-white font-black uppercase text-[10px] tracking-[0.3em] shadow-xl hover:bg-black transition-all">Declare Operational Winner</button>
                </div>
 
                {/* Traffic Allocation */}
@@ -184,7 +241,9 @@ const ExperimentsDashboard: React.FC = () => {
                      <button onClick={() => navigate(ROUTES.EXPERIMENTS_AUDIT_LOG)} className="text-[10px] font-black text-primary uppercase underline">View Full</button>
                   </div>
                   <div className="divide-y divide-navy-50">
-                     {auditPreview.map((log, i) => (
+                  {(auditPreview.length > 0 ? auditPreview : [
+                     { action: 'No Activity', time: '-', actor: 'System', detail: 'No recent experiment audit log entries.' }
+                  ]).map((log, i) => (
                         <div key={i} className="p-5 hover:bg-navy-50/50 transition-all cursor-pointer group">
                            <div className="flex justify-between items-start mb-1.5">
                               <span className="text-[10px] font-black text-navy-950 uppercase tracking-tight group-hover:text-primary transition-colors">{log.action}</span>
@@ -209,7 +268,7 @@ const ExperimentsDashboard: React.FC = () => {
                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-navy-300 material-symbols-outlined text-xl">search</span>
                      <input className="w-48 pl-12 pr-4 py-2.5 bg-white border-2 border-navy-100 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:ring-4 focus:ring-primary/5 transition-all" placeholder="Filter..." />
                   </div>
-                  <button onClick={action('download initiated…', 'success')} className="p-2.5 bg-white border-2 border-navy-100 rounded-2xl text-navy-400 hover:text-primary transition-all shadow-sm">
+                  <button onClick={() => addToast('Download initiated…', 'success')} className="p-2.5 bg-white border-2 border-navy-100 rounded-2xl text-navy-400 hover:text-primary transition-all shadow-sm">
                      <span className="material-symbols-outlined">download</span>
                   </button>
                </div>
@@ -240,7 +299,7 @@ const ExperimentsDashboard: React.FC = () => {
                                  </div>
                               </div>
                            </td>
-                           <td className="px-12 py-8"><span className="text-[10px] font-black text-primary uppercase tracking-widest font-mono">{exp.target}</span></td>
+                           <td className="px-12 py-8"><span className="text-[10px] font-black text-primary uppercase tracking-widest font-mono">{exp.visitors.toLocaleString()}</span></td>
                            <td className="px-12 py-8">
                               <div className="space-y-0.5">
                                  <p className="text-sm font-black text-navy-950 uppercase tracking-tighter">{exp.visitors}</p>
@@ -264,7 +323,7 @@ const ExperimentsDashboard: React.FC = () => {
                               </span>
                            </td>
                            <td className="px-12 py-8 text-right">
-                              <button onClick={action('more_vert — action triggered', 'info')} className="p-2.5 bg-navy-50 text-navy-200 hover:text-primary hover:bg-white rounded-xl transition-all shadow-inner"><span className="material-symbols-outlined">more_vert</span></button>
+                              <button onClick={() => addToast('Experiment details — coming soon', 'info')} className="p-2.5 bg-navy-50 text-navy-200 hover:text-primary hover:bg-white rounded-xl transition-all shadow-inner"><span className="material-symbols-outlined">more_vert</span></button>
                            </td>
                         </tr>
                      ))}
@@ -274,8 +333,8 @@ const ExperimentsDashboard: React.FC = () => {
             <div className="px-12 py-8 bg-navy-50/30 border-t border-navy-50 flex items-center justify-between">
                <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Showing 3 of 12 Registered Experiments</p>
                <div className="flex gap-4">
-                  <button onClick={action('Previous Cycle — action triggered', 'info')} className="px-6 py-2.5 bg-white border-2 border-navy-200 text-navy-300 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed shadow-sm" disabled>Previous Cycle</button>
-                  <button onClick={action('Next Segment — action triggered', 'info')} className="px-8 py-2.5 bg-white border-2 border-navy-100 text-navy-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-navy-50 shadow-sm transition-all">Next Segment</button>
+                  <button onClick={() => addToast('Previous Cycle — action triggered', 'info')} className="px-6 py-2.5 bg-white border-2 border-navy-200 text-navy-300 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed shadow-sm" disabled>Previous Cycle</button>
+                  <button onClick={() => addToast('Next Segment — action triggered', 'info')} className="px-8 py-2.5 bg-white border-2 border-navy-100 text-navy-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-navy-50 shadow-sm transition-all">Next Segment</button>
                </div>
             </div>
          </div>
@@ -284,3 +343,12 @@ const ExperimentsDashboard: React.FC = () => {
 };
 
 export default ExperimentsDashboard;
+
+function getTimeAgo(d: Date): string {
+   const s = Math.floor((Date.now() - d.getTime()) / 1000);
+   if (s < 60) return 'Just now';
+   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+   if (s < 172800) return 'Yesterday';
+   return `${Math.floor(s / 86400)}d ago`;
+}

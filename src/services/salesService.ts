@@ -79,6 +79,26 @@ async function fetchBookings(days: number): Promise<BookingDoc[]> {
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BookingDoc);
 }
 
+/**
+ * Fetch bookings from a specific date range: from `daysAgoStart` to `daysAgoEnd` days ago.
+ * Used for historical comparison (e.g. prior 30-day period).
+ */
+async function fetchBookingRange(daysAgoStart: number, daysAgoEnd: number): Promise<BookingDoc[]> {
+    const start = new Date();
+    start.setDate(start.getDate() - daysAgoStart);
+    const end = new Date();
+    end.setDate(end.getDate() - daysAgoEnd);
+
+    const q = query(
+        collection(db, 'bookings'),
+        where('createdAt', '>=', Timestamp.fromDate(start)),
+        where('createdAt', '<', Timestamp.fromDate(end)),
+        orderBy('createdAt', 'desc'),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BookingDoc);
+}
+
 async function fetchFlights(): Promise<FlightDoc[]> {
     const q = query(
         collection(db, 'flights'),
@@ -152,8 +172,10 @@ export async function getRevenueByClass(days = 30): Promise<ClassBreakdown[]> {
  * Route-level performance metrics.
  */
 export async function getRoutePerformance(days = 30): Promise<RoutePerformance[]> {
-    const [bookings, flights] = await Promise.all([
+    // Fetch current period AND prior period bookings for trend comparison
+    const [bookings, priorBookings, flights] = await Promise.all([
         fetchBookings(days),
+        fetchBookingRange(days * 2, days), // prior period of equal length
         fetchFlights(),
     ]);
 
@@ -165,7 +187,15 @@ export async function getRoutePerformance(days = 30): Promise<RoutePerformance[]
         routeCapacity.set(key, (routeCapacity.get(key) || 0) + total);
     }
 
-    // Aggregate booking data by route
+    // Aggregate prior-period bookings by route for trend calculation
+    const priorRouteMap = new Map<string, number>();
+    for (const b of priorBookings) {
+        if (b.status === 'cancelled') continue;
+        const key = `${b.origin.code} → ${b.destination.code}`;
+        priorRouteMap.set(key, (priorRouteMap.get(key) || 0) + 1);
+    }
+
+    // Aggregate current-period booking data by route
     const routeMap = new Map<string, { revenue: number; bookings: number; origin: string; destination: string }>();
 
     for (const b of bookings) {
@@ -180,6 +210,11 @@ export async function getRoutePerformance(days = 30): Promise<RoutePerformance[]
     return Array.from(routeMap.entries())
         .map(([route, data]) => {
             const capacity = routeCapacity.get(route) || 1;
+            const priorCount = priorRouteMap.get(route) || 0;
+            // Calculate trend: percentage change vs prior period
+            const trend = priorCount > 0
+                ? Math.round(((data.bookings - priorCount) / priorCount) * 100)
+                : data.bookings > 0 ? 100 : 0; // 100% if new route, 0% if no bookings at all
             return {
                 route,
                 origin: data.origin,
@@ -188,7 +223,7 @@ export async function getRoutePerformance(days = 30): Promise<RoutePerformance[]
                 bookings: data.bookings,
                 avgFare: data.bookings > 0 ? Math.round(data.revenue / data.bookings) : 0,
                 loadFactor: Math.min(100, Math.round((data.bookings / capacity) * 100)),
-                trend: Math.round(Math.random() * 20 - 10), // placeholder until historical comparison
+                trend,
             };
         })
         .sort((a, b) => b.revenue - a.revenue);

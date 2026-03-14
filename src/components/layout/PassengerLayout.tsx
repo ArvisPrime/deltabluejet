@@ -37,13 +37,13 @@ const PassengerLayout: React.FC = () => {
                         {/* Logo */}
                         <Link to={ROUTES.HOME} className="flex items-center gap-3 group no-underline shrink-0">
                             {logoUrl ? (
-                                <img src={logoUrl} alt={BRAND.name} className="h-8 w-auto" />
+                                <img src={logoUrl} alt={BRAND.name} className="h-11 w-auto" />
                             ) : (
                                 <div className="size-9 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/15 group-hover:scale-110 transition-transform">
                                     <span className="material-symbols-outlined text-white text-xl font-black">airlines</span>
                                 </div>
                             )}
-                            <span className="text-lg font-black tracking-tighter uppercase text-navy-950 hidden sm:inline">{BRAND.shortName}</span>
+                            {!logoUrl && <span className="text-lg font-black tracking-tighter uppercase text-navy-950 hidden sm:inline">{BRAND.shortName}</span>}
                         </Link>
 
                         {/* Nav Tabs */}

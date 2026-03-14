@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { BRAND } from '../../config/brand';
 import { ROUTES } from '../../config/routes';
+import { useBookingStore } from '../../stores/bookingStore';
 
 interface ConfirmationState {
    paymentId?: string;
@@ -9,6 +10,12 @@ interface ConfirmationState {
    amount?: string;
    last4?: string;
    cardBrand?: string;
+   pnr?: string;
+   origin?: string;
+   destination?: string;
+   flightNumber?: string;
+   fareClass?: string;
+   bookingId?: string;
 }
 
 const TicketConfirmation: React.FC = () => {
@@ -16,13 +23,35 @@ const TicketConfirmation: React.FC = () => {
    const location = useLocation();
    const state = (location.state as ConfirmationState) || {};
 
-   const pnr = `DBJ${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-   const eTicket = state.eTicketNumber || 'DBJ-20260221-0001';
-   const amount = state.amount || '605.00';
-   const last4 = state.last4 || '4242';
-   const cardBrand = state.cardBrand || 'visa';
+   // Read from navigation state (passed by PaymentProcessing) or fall back to booking store
+   const storePnr = useBookingStore((s) => s.pnr);
+   const storeFlight = useBookingStore((s) => s.selectedFlight);
+   const resetBooking = useBookingStore((s) => s.resetBooking);
 
-   const onDone = () => navigate(ROUTES.HOME);
+   const pnr = state.pnr || storePnr || '—';
+   const eTicket = state.eTicketNumber || 'DBJ-PENDING';
+   const amount = state.amount || '0.00';
+   const last4 = state.last4 || '****';
+   const cardBrand = state.cardBrand || 'card';
+   const originCode = state.origin || storeFlight?.origin || '—';
+   const destCode = state.destination || storeFlight?.destination || '—';
+   const flightNum = state.flightNumber || storeFlight?.flightNumber || '—';
+   const fareClass = state.fareClass || storeFlight?.fareClass || 'economy';
+
+   // Friendly city names (can be enhanced with a lookup)
+   const cityName = (code: string) => {
+      const cities: Record<string, string> = {
+         BJL: 'Banjul', DSS: 'Dakar', LHR: 'London', ACC: 'Accra',
+         LOS: 'Lagos', FNA: 'Freetown', ABV: 'Abuja', DKR: 'Dakar',
+         NBO: 'Nairobi', JNB: 'Johannesburg',
+      };
+      return cities[code] || code;
+   };
+
+   const onDone = () => {
+      resetBooking(); // Clear the booking store after confirmation
+      navigate(ROUTES.HOME);
+   };
 
    return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50/50 to-white p-8">
@@ -55,8 +84,8 @@ const TicketConfirmation: React.FC = () => {
 
                   <div className="flex items-center gap-6">
                      <div className="flex-1 text-center">
-                        <p className="text-3xl font-black">BJL</p>
-                        <p className="text-[9px] font-black uppercase tracking-widest text-white/50 mt-1">Banjul</p>
+                        <p className="text-3xl font-black">{originCode}</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-white/50 mt-1">{cityName(originCode)}</p>
                      </div>
                      <div className="flex flex-col items-center gap-1">
                         <span className="material-symbols-outlined text-primary text-xl">flight</span>
@@ -64,8 +93,8 @@ const TicketConfirmation: React.FC = () => {
                         <p className="text-[8px] font-black uppercase tracking-widest text-white/30">Direct</p>
                      </div>
                      <div className="flex-1 text-center">
-                        <p className="text-3xl font-black">DSS</p>
-                        <p className="text-[9px] font-black uppercase tracking-widest text-white/50 mt-1">Dakar</p>
+                        <p className="text-3xl font-black">{destCode}</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-white/50 mt-1">{cityName(destCode)}</p>
                      </div>
                   </div>
                </div>
@@ -79,7 +108,7 @@ const TicketConfirmation: React.FC = () => {
                      </div>
                      <div>
                         <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest">Flight</p>
-                        <p className="text-lg font-black text-navy-950 tracking-tight mt-1">DB-101</p>
+                        <p className="text-lg font-black text-navy-950 tracking-tight mt-1">{flightNum}</p>
                      </div>
                      <div>
                         <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest">Status</p>
@@ -90,7 +119,7 @@ const TicketConfirmation: React.FC = () => {
                      </div>
                      <div>
                         <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest">Class</p>
-                        <p className="text-lg font-black text-navy-950 tracking-tight mt-1">Economy</p>
+                        <p className="text-lg font-black text-navy-950 tracking-tight mt-1 capitalize">{fareClass}</p>
                      </div>
                   </div>
 
@@ -126,8 +155,8 @@ const TicketConfirmation: React.FC = () => {
                            key={i}
                            className="bg-navy-900"
                            style={{
-                              width: Math.random() > 0.5 ? '2px' : '3px',
-                              height: `${20 + Math.random() * 20}px`,
+                              width: ((i * 7 + 3) % 5) > 2 ? '2px' : '3px',
+                              height: `${20 + ((i * 13 + 7) % 20)}px`,
                            }}
                         />
                      ))}

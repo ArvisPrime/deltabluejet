@@ -1,9 +1,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { BRAND } from '../../config/brand';
 import { ROUTES } from '../../config/routes';
 import { useAdminAction } from '../../hooks/useAdminAction';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../../config/firebase.config';
+import type { FlightDoc } from '../../types/firestore';
 
 /* ─── Fleet Spec Modal ──────────────────────────────────────────────── */
 const SPEC_TABS = ['Technical', 'Cabin', 'Amenities', 'Performance'] as const;
@@ -232,9 +235,95 @@ const FleetSpecModal: React.FC<FleetSpecModalProps> = ({ open, onClose }) => {
 /* ─── Main Component ────────────────────────────────────────────────── */
 const FlightTrackerResults: React.FC = () => {
    const navigate = useNavigate();
+   const [searchParams] = useSearchParams();
    const action = useAdminAction();
    const onBack = () => navigate(ROUTES.FLIGHT_TRACKER);
    const [specModalOpen, setSpecModalOpen] = useState(false);
+   const [flight, setFlight] = useState<FlightDoc | null>(null);
+   const [loading, setLoading] = useState(true);
+
+   // Extract search query from URL params
+   const flightQuery = searchParams.get('flight') || searchParams.get('q') || '';
+
+   useEffect(() => {
+      const loadFlight = async () => {
+         setLoading(true);
+         try {
+            // Try to find flight by number
+            if (flightQuery) {
+               const snap = await getDocs(
+                  query(collection(db, 'flights'), where('flightNumber', '==', flightQuery.toUpperCase()), limit(1))
+               );
+               if (!snap.empty) {
+                  setFlight({ id: snap.docs[0].id, ...snap.docs[0].data() } as FlightDoc);
+               } else {
+                  // Fallback: get the most recent flight
+                  const fallback = await getDocs(query(collection(db, 'flights'), limit(1)));
+                  if (!fallback.empty) {
+                     setFlight({ id: fallback.docs[0].id, ...fallback.docs[0].data() } as FlightDoc);
+                  }
+               }
+            } else {
+               // No query — show most recent flight
+               const fallback = await getDocs(query(collection(db, 'flights'), limit(1)));
+               if (!fallback.empty) {
+                  setFlight({ id: fallback.docs[0].id, ...fallback.docs[0].data() } as FlightDoc);
+               }
+            }
+         } catch (err) {
+            console.error('[FlightTracker] Failed to load flight:', err);
+         } finally {
+            setLoading(false);
+         }
+      };
+      loadFlight();
+   }, [flightQuery]);
+
+   // Format helpers
+   const fmtTime = (ts: any) => ts?.toDate ? ts.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+   const fmtDate = (ts: any) => ts?.toDate ? ts.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '--';
+
+   const statusColor = flight?.status === 'cancelled' ? 'text-red-600' : flight?.status === 'delayed' ? 'text-amber-600' : 'text-emerald-600';
+   const statusLabel = flight?.status ? flight.status.charAt(0).toUpperCase() + flight.status.slice(1) : 'Unknown';
+
+   // Calculate progress percentage based on times
+   const getProgress = () => {
+      if (!flight?.departureTime?.toDate || !flight?.arrivalTime?.toDate) return 50;
+      const now = Date.now();
+      const dep = flight.departureTime.toDate().getTime();
+      const arr = flight.arrivalTime.toDate().getTime();
+      if (now <= dep) return 0;
+      if (now >= arr) return 100;
+      return Math.round(((now - dep) / (arr - dep)) * 100);
+   };
+   const progress = getProgress();
+   const isInFlight = progress > 0 && progress < 100;
+
+   if (loading) {
+      return (
+         <div className="h-full flex items-center justify-center font-display">
+            <div className="text-center space-y-4">
+               <span className="material-symbols-outlined text-5xl text-primary animate-spin">progress_activity</span>
+               <p className="text-xs font-black text-navy-400 uppercase tracking-widest">Loading Flight Data…</p>
+            </div>
+         </div>
+      );
+   }
+
+   if (!flight) {
+      return (
+         <div className="h-full flex items-center justify-center font-display">
+            <div className="text-center space-y-6">
+               <span className="material-symbols-outlined text-6xl text-navy-200">flight_takeoff</span>
+               <h2 className="text-2xl font-black text-navy-950 uppercase tracking-tight">No Flight Found</h2>
+               <p className="text-sm text-navy-400">We couldn't find a flight matching your search. Please try a different flight number.</p>
+               <button onClick={onBack} className="px-8 py-4 bg-primary text-white font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
+                  Search Again
+               </button>
+            </div>
+         </div>
+      );
+   }
 
    return (
       <div className="p-4 md:p-10 max-w-7xl mx-auto space-y-10 animate-in fade-in duration-500 font-display pb-32">
@@ -246,26 +335,30 @@ const FlightTrackerResults: React.FC = () => {
                   <span className="material-symbols-outlined text-xs">chevron_right</span>
                   <span className="text-primary font-black">Live Flight Tracking</span>
                </nav>
-               <div className="flex items-center gap-4 px-6 py-2 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest border border-emerald-100 shadow-sm animate-in zoom-in duration-700">
-                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Transponder Signal DJ-102: Active
+               <div className={`flex items-center gap-4 px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm animate-in zoom-in duration-700 ${
+                  isInFlight ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-100'
+               }`}>
+                  {isInFlight && <span className="size-2 rounded-full bg-emerald-500 animate-pulse"></span>}
+                  Transponder Signal {flight.flightNumber}: {isInFlight ? 'Active' : statusLabel}
                </div>
             </div>
 
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-10 border-b border-navy-100 pb-10">
                <div className="space-y-2">
-                  <h1 className="text-5xl font-black text-navy-950 tracking-tighter uppercase leading-none">Flight DJ-102</h1>
-                  <p className="text-navy-400 font-bold text-lg italic uppercase tracking-wider">New York (JFK) <span className="text-primary mx-2">→</span> London (LHR Terminal)</p>
+                  <h1 className="text-5xl font-black text-navy-950 tracking-tighter uppercase leading-none">Flight {flight.flightNumber}</h1>
+                  <p className="text-navy-400 font-bold text-lg italic uppercase tracking-wider">
+                     {flight.origin.city} ({flight.origin.code}) <span className="text-primary mx-2">→</span> {flight.destination.city} ({flight.destination.code})
+                  </p>
                </div>
                <div className="flex gap-4">
                   <div className="text-right">
                      <p className="text-[10px] font-black text-navy-300 uppercase tracking-widest mb-1">Operational State</p>
-                     <p className="text-xl font-black text-navy-950 uppercase">In Flight</p>
+                     <p className={`text-xl font-black uppercase ${statusColor}`}>{isInFlight ? 'In Flight' : statusLabel}</p>
                   </div>
                   <div className="h-12 w-px bg-navy-100 hidden sm:block mx-4" />
                   <div className="text-right">
                      <p className="text-[10px] font-black text-navy-300 uppercase tracking-widest mb-1">Equipment Profile</p>
-                     <p className="text-xl font-black text-primary uppercase">Embraer ERJ-120</p>
+                     <p className="text-xl font-black text-primary uppercase">{typeof flight.aircraft === 'string' ? flight.aircraft : flight.aircraft?.type || 'Embraer ERJ-120'}</p>
                   </div>
                </div>
             </div>
@@ -278,8 +371,8 @@ const FlightTrackerResults: React.FC = () => {
             <div className="relative z-10 space-y-20">
                <div className="flex justify-between items-center relative">
                   <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 bg-white/5 overflow-hidden rounded-full">
-                     <div className="absolute left-0 h-full bg-primary shadow-[0_0_15px_rgba(19,127,236,0.8)]" style={{ width: '64%' }}></div>
-                     <div className="absolute left-[64%] h-full w-20 bg-gradient-to-r from-primary to-transparent animate-progress-fast"></div>
+                     <div className="absolute left-0 h-full bg-primary shadow-[0_0_15px_rgba(19,127,236,0.8)]" style={{ width: `${progress}%` }}></div>
+                     {isInFlight && <div className="absolute h-full w-20 bg-gradient-to-r from-primary to-transparent animate-progress-fast" style={{ left: `${progress}%` }}></div>}
                   </div>
 
                   <div className="relative flex flex-col items-center gap-4 group/node">
@@ -287,37 +380,39 @@ const FlightTrackerResults: React.FC = () => {
                         <span className="material-symbols-outlined text-3xl text-primary font-black">flight_takeoff</span>
                      </div>
                      <div className="text-center">
-                        <span className="text-3xl font-black tracking-tighter">JFK</span>
-                        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mt-1">Terminal 4</p>
+                        <span className="text-3xl font-black tracking-tighter">{flight.origin.code}</span>
+                        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mt-1">{flight.gate ? `Gate ${flight.gate}` : flight.terminal || '--'}</p>
                      </div>
                   </div>
 
-                  <div className="absolute left-[64%] top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center">
-                     <div className="size-14 rounded-full bg-primary flex items-center justify-center shadow-[0_0_40px_rgba(19,127,236,0.6)] border-4 border-navy-950 animate-pulse">
-                        <span className="material-symbols-outlined text-2xl font-black rotate-90">flight</span>
+                  {isInFlight && (
+                     <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center" style={{ left: `${progress}%` }}>
+                        <div className="size-14 rounded-full bg-primary flex items-center justify-center shadow-[0_0_40px_rgba(19,127,236,0.6)] border-4 border-navy-950 animate-pulse">
+                           <span className="material-symbols-outlined text-2xl font-black rotate-90">flight</span>
+                        </div>
+                        <div className="mt-4 px-4 py-1.5 rounded-xl bg-navy-900/80 backdrop-blur-md border border-white/10 text-[9px] font-black uppercase tracking-widest shadow-2xl">
+                           {progress}% Complete
+                        </div>
                      </div>
-                     <div className="mt-4 px-4 py-1.5 rounded-xl bg-navy-900/80 backdrop-blur-md border border-white/10 text-[9px] font-black uppercase tracking-widest shadow-2xl">
-                        ALT: 38,000 FT
-                     </div>
-                  </div>
+                  )}
 
                   <div className="relative flex flex-col items-center gap-4 group/node">
-                     <div className="size-16 rounded-[2rem] bg-navy-900 border-2 border-white/5 flex items-center justify-center shadow-xl group-hover/node:scale-110 transition-transform">
-                        <span className="material-symbols-outlined text-3xl text-white/20 font-black">flight_land</span>
+                     <div className={`size-16 rounded-[2rem] bg-navy-900 border-2 flex items-center justify-center shadow-xl group-hover/node:scale-110 transition-transform ${progress >= 100 ? 'border-primary/20' : 'border-white/5'}`}>
+                        <span className={`material-symbols-outlined text-3xl font-black ${progress >= 100 ? 'text-primary' : 'text-white/20'}`}>flight_land</span>
                      </div>
                      <div className="text-center">
-                        <span className="text-3xl font-black tracking-tighter text-white/30">LHR</span>
-                        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mt-1">Terminal 2</p>
+                        <span className={`text-3xl font-black tracking-tighter ${progress >= 100 ? '' : 'text-white/30'}`}>{flight.destination.code}</span>
+                        <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mt-1">{flight.destination.city}</p>
                      </div>
                   </div>
                </div>
 
                <div className="grid grid-cols-2 md:grid-cols-4 gap-12 pt-10 border-t border-white/5">
                   {[
-                     { lbl: 'Ground Velocity', val: '542 KTS', icon: 'speed' },
-                     { lbl: 'Range to Target', val: '1,420 NM', icon: 'alt_route' },
-                     { lbl: 'Est. Block Time', val: '06:45 AM', icon: 'schedule', color: 'text-primary' },
-                     { lbl: 'Punctuality', val: 'On Time', icon: 'verified', color: 'text-emerald-400' }
+                     { lbl: 'Departure', val: fmtTime(flight.departureTime), icon: 'schedule' },
+                     { lbl: 'Arrival', val: fmtTime(flight.arrivalTime), icon: 'schedule', color: 'text-primary' },
+                     { lbl: 'Date', val: fmtDate(flight.departureTime), icon: 'calendar_today' },
+                     { lbl: 'Status', val: statusLabel, icon: 'verified', color: statusColor }
                   ].map((m, i) => (
                      <div key={i} className="space-y-4 group/item">
                         <div className="flex items-center gap-3 opacity-40 group-hover/item:opacity-100 transition-opacity">
@@ -351,15 +446,15 @@ const FlightTrackerResults: React.FC = () => {
                         <div className="space-y-6">
                            <div className="flex justify-between items-end border-b border-navy-50 pb-4">
                               <span className="text-xs font-black text-navy-950 uppercase">Gate</span>
-                              <span className="text-2xl font-black text-primary tracking-tighter">B42</span>
+                              <span className="text-2xl font-black text-primary tracking-tighter">{flight.gate || '--'}</span>
                            </div>
                            <div className="flex justify-between items-end border-b border-navy-50 pb-4">
-                              <span className="text-xs font-black text-navy-950 uppercase">Off-Block Actual</span>
-                              <span className="text-lg font-black text-navy-900 uppercase">18:30 (Verified)</span>
+                              <span className="text-xs font-black text-navy-950 uppercase">Departure</span>
+                              <span className="text-lg font-black text-navy-900 uppercase">{fmtTime(flight.departureTime)}</span>
                            </div>
                            <div className="flex justify-between items-end border-b border-navy-50 pb-4">
                               <span className="text-xs font-black text-navy-950 uppercase">Terminal</span>
-                              <span className="text-lg font-black text-navy-900 uppercase">JFK-T4</span>
+                              <span className="text-lg font-black text-navy-900 uppercase">{flight.terminal || '--'}</span>
                            </div>
                         </div>
                      </div>
@@ -371,16 +466,16 @@ const FlightTrackerResults: React.FC = () => {
                         </p>
                         <div className="space-y-6">
                            <div className="flex justify-between items-end border-b border-navy-50 pb-4">
-                              <span className="text-xs font-black text-navy-950 uppercase">Assigned Gate</span>
-                              <span className="text-2xl font-black text-primary tracking-tighter">C12</span>
+                              <span className="text-xs font-black text-navy-950 uppercase">Destination</span>
+                              <span className="text-2xl font-black text-primary tracking-tighter">{flight.destination.code}</span>
                            </div>
                            <div className="flex justify-between items-end border-b border-navy-50 pb-4">
-                              <span className="text-xs font-black text-navy-950 uppercase">Baggage Carousel</span>
-                              <span className="text-lg font-black text-navy-900 uppercase">Gate 04</span>
+                              <span className="text-xs font-black text-navy-950 uppercase">Arrival Time</span>
+                              <span className="text-lg font-black text-navy-900 uppercase">{fmtTime(flight.arrivalTime)}</span>
                            </div>
                            <div className="flex justify-between items-end border-b border-navy-50 pb-4">
-                              <span className="text-xs font-black text-navy-950 uppercase">Passport Congestion</span>
-                              <span className="text-sm font-black text-emerald-600 uppercase">Nominal Flow</span>
+                              <span className="text-xs font-black text-navy-950 uppercase">Seats Available</span>
+                              <span className="text-sm font-black text-emerald-600 uppercase">{flight.seatsAvailable ? Object.values(flight.seatsAvailable).reduce((a, b) => a + b, 0) : '--'}</span>
                            </div>
                         </div>
                      </div>
@@ -390,19 +485,19 @@ const FlightTrackerResults: React.FC = () => {
                <div className="bg-white rounded-[3.5rem] border border-navy-100 p-10 shadow-sm group hover:shadow-xl transition-all">
                   <div className="flex items-center gap-6 mb-10">
                      <div className="size-16 rounded-[1.75rem] bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-inner group-hover:scale-110 transition-transform">
-                        <span className="material-symbols-outlined text-3xl font-black">wb_cloudy</span>
+                        <span className="material-symbols-outlined text-3xl font-black">info</span>
                      </div>
                      <div>
-                        <h4 className="text-xl font-black text-navy-950 uppercase tracking-tight leading-none">Destination Weather</h4>
-                        <p className="text-[10px] font-bold text-navy-400 uppercase tracking-widest mt-2 opacity-60 italic">Live feed from London Heathrow Weather Station</p>
+                        <h4 className="text-xl font-black text-navy-950 uppercase tracking-tight leading-none">Flight Details</h4>
+                        <p className="text-[10px] font-bold text-navy-400 uppercase tracking-widest mt-2 opacity-60 italic">Route and pricing information</p>
                      </div>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                      {[
-                        { lbl: 'Temperature', val: '12°C', icon: 'thermostat' },
-                        { lbl: 'Wind Vector', val: '14 KTS NW', icon: 'air' },
-                        { lbl: 'Visibility', val: '10+ NM', icon: 'visibility' },
-                        { lbl: 'Cloud Cover', val: 'Overcast', icon: 'cloud' }
+                        { lbl: 'Route', val: `${flight.origin.code} → ${flight.destination.code}`, icon: 'route' },
+                        { lbl: 'Aircraft', val: (typeof flight.aircraft === 'string' ? flight.aircraft : flight.aircraft?.type) || '--', icon: 'airlines' },
+                        { lbl: 'Economy Fare', val: flight.baseFare?.economy ? `$${flight.baseFare.economy}` : '--', icon: 'payments' },
+                        { lbl: 'Total Seats', val: flight.seatsAvailable ? `${Object.values(flight.seatsAvailable).reduce((a, b) => a + b, 0)} avail` : '--', icon: 'event_seat' },
                      ].map((w, i) => (
                         <div key={i} className="p-6 bg-navy-50/50 rounded-3xl border border-navy-50 flex flex-col gap-3 group/w hover:bg-white hover:shadow-md transition-all">
                            <span className="material-symbols-outlined text-navy-300 group-hover/w:text-primary transition-colors">{w.icon}</span>
@@ -445,9 +540,9 @@ const FlightTrackerResults: React.FC = () => {
                   </div>
                   <div className="space-y-4">
                      {[
-                        { lbl: 'Cabin Config', val: '3-Class Layout' },
-                        { lbl: 'Engines', val: 'GEnx-1B x2' },
-                        { lbl: 'Wi-Fi', val: 'High-Speed Active' }
+                        { lbl: 'Aircraft', val: (typeof flight.aircraft === 'string' ? flight.aircraft : flight.aircraft?.type) || 'ERJ-120' },
+                        { lbl: 'Route', val: `${flight.origin.code} → ${flight.destination.code}` },
+                        { lbl: 'Status', val: statusLabel },
                      ].map((f, i) => (
                         <div key={i} className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest py-3 border-b border-navy-50 last:border-0">
                            <span className="text-navy-300">{f.lbl}</span>

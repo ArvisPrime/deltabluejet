@@ -310,6 +310,9 @@ export interface CustomerDoc {
     };
     loyaltyTier: 'bronze' | 'silver' | 'gold' | 'platinum';
     totalTrips: number;
+    gdprConsent: boolean;
+    marketingOptIn: boolean;
+    consentUpdatedAt: Timestamp | null;
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
@@ -454,6 +457,20 @@ export interface CmsDestinationDoc {
 
 export interface CmsDestinationsConfigDoc {
     destinations: Record<string, CmsDestinationDoc>;
+    // Page-level content (hero, route network, intercontinental reach)
+    heroImage?: string;
+    heroTitle?: string;
+    heroHighlight?: string;
+    heroSubtitle?: string;
+    routeNetworkTitle?: string;
+    routeNetworkSubtitle?: string;
+    reachTitle?: string;
+    reachHighlight?: string;
+    reachSubtitle?: string;
+    stat1Value?: string;
+    stat1Label?: string;
+    stat2Value?: string;
+    stat2Label?: string;
     updatedAt: Timestamp;
 }
 

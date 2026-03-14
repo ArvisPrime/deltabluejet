@@ -11,7 +11,23 @@ const FILTERS: { label: string; value: RegionFilter }[] = [
    { label: 'Africa', value: 'africa' },
 ];
 
-const HERO_BG = 'https://images.unsplash.com/photo-1569154941061-e231b4725ef1?auto=format&fit=crop&q=80';
+const HERO_BG_DEFAULT = 'https://images.unsplash.com/photo-1569154941061-e231b4725ef1?auto=format&fit=crop&q=80';
+
+interface PageCms {
+   heroImage: string;
+   heroTitle: string;
+   heroHighlight: string;
+   heroSubtitle: string;
+   routeNetworkTitle: string;
+   routeNetworkSubtitle: string;
+   reachTitle: string;
+   reachHighlight: string;
+   reachSubtitle: string;
+   stat1Value: string;
+   stat1Label: string;
+   stat2Value: string;
+   stat2Label: string;
+}
 
 const Destinations: React.FC = () => {
    const navigate = useNavigate();
@@ -32,11 +48,44 @@ const Destinations: React.FC = () => {
 
    // ── Lazy-load destination data (Firestore CMS → fallback to hardcoded) ──
    const [hubs, setHubs] = useState<DestinationHub[]>([]);
+   const [pageCms, setPageCms] = useState<PageCms>({
+      heroImage: HERO_BG_DEFAULT,
+      heroTitle: 'Discover',
+      heroHighlight: 'New Destinations.',
+      heroSubtitle: `Explore the intercontinental ${BRAND.shortName} network, bridging the world with precision and excellence.`,
+      routeNetworkTitle: 'Route Network',
+      routeNetworkSubtitle: "Connecting travellers across Africa's most important aviation corridors.",
+      reachTitle: 'Intercontinental',
+      reachHighlight: 'Reach.',
+      reachSubtitle: 'Our route network expands continuously, connecting global destinations with reliable service and real-time flight tracking.',
+      stat1Value: '182',
+      stat1Label: 'Active Destinations',
+      stat2Value: '12.4M',
+      stat2Label: 'Annual Pax Transits',
+   });
    useEffect(() => {
       (async () => {
          try {
             const { getDestinationsConfig } = await import('../../services/cms');
             const config = await getDestinationsConfig();
+            if (config) {
+               // Load page-level CMS content
+               setPageCms((prev) => ({
+                  heroImage: config.heroImage || prev.heroImage,
+                  heroTitle: config.heroTitle || prev.heroTitle,
+                  heroHighlight: config.heroHighlight || prev.heroHighlight,
+                  heroSubtitle: config.heroSubtitle || prev.heroSubtitle,
+                  routeNetworkTitle: config.routeNetworkTitle || prev.routeNetworkTitle,
+                  routeNetworkSubtitle: config.routeNetworkSubtitle || prev.routeNetworkSubtitle,
+                  reachTitle: config.reachTitle || prev.reachTitle,
+                  reachHighlight: config.reachHighlight || prev.reachHighlight,
+                  reachSubtitle: config.reachSubtitle || prev.reachSubtitle,
+                  stat1Value: config.stat1Value || prev.stat1Value,
+                  stat1Label: config.stat1Label || prev.stat1Label,
+                  stat2Value: config.stat2Value || prev.stat2Value,
+                  stat2Label: config.stat2Label || prev.stat2Label,
+               }));
+            }
             if (config?.destinations && Object.keys(config.destinations).length > 0) {
                const merged = Object.values(config.destinations)
                   .filter((d: any) => d.visible !== false)
@@ -93,7 +142,7 @@ const Destinations: React.FC = () => {
                <div className="absolute inset-0 bg-gradient-to-b from-navy-950/80 via-navy-900/40 to-white z-10"></div>
                <div
                   className="w-full h-full bg-cover bg-center animate-slow-zoom scale-110"
-                  style={{ backgroundImage: `url('${HERO_BG}')` }}
+                  style={{ backgroundImage: `url('${pageCms.heroImage}')` }}
                />
             </div>
 
@@ -107,10 +156,10 @@ const Destinations: React.FC = () => {
                      <span className="text-white">Destinations</span>
                   </nav>
                   <h1 className="text-6xl md:text-8xl font-black text-white leading-none tracking-tighter uppercase mb-6">
-                     Discover <br /><span className="text-primary">New Destinations.</span>
+                     {pageCms.heroTitle} <br /><span className="text-primary">{pageCms.heroHighlight}</span>
                   </h1>
                   <p className="text-xl text-navy-50 font-medium italic uppercase tracking-wider opacity-90 max-w-xl">
-                     Explore the intercontinental {BRAND.shortName} network, bridging the world with precision and excellence.
+                     {pageCms.heroSubtitle}
                   </p>
                </div>
 
@@ -220,11 +269,11 @@ const Destinations: React.FC = () => {
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-10 border-b border-navy-100 pb-12">
                <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                     <h2 className="text-4xl md:text-5xl font-black text-navy-950 tracking-tighter uppercase leading-none">Route Network</h2>
+                     <h2 className="text-4xl md:text-5xl font-black text-navy-950 tracking-tighter uppercase leading-none">{pageCms.routeNetworkTitle}</h2>
                      <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[8px] font-black uppercase rounded-lg tracking-widest">Active Network</span>
                   </div>
                   <p className="text-navy-500 font-medium text-xl italic uppercase tracking-wider opacity-80">
-                     Connecting travellers across Africa's most important aviation corridors.
+                     {pageCms.routeNetworkSubtitle}
                   </p>
                </div>
                {/* FIX 4: Filter tabs now have active state + filtering logic */}
@@ -305,19 +354,19 @@ const Destinations: React.FC = () => {
             <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
                <div className="space-y-12">
                   <div className="space-y-6">
-                     <h2 className="text-5xl font-black text-navy-950 tracking-tighter uppercase leading-tight">Intercontinental <br /><span className="text-primary underline decoration-primary/20 underline-offset-8">Reach.</span></h2>
+                     <h2 className="text-5xl font-black text-navy-950 tracking-tighter uppercase leading-tight">{pageCms.reachTitle} <br /><span className="text-primary underline decoration-primary/20 underline-offset-8">{pageCms.reachHighlight}</span></h2>
                      <p className="text-navy-500 font-medium italic text-xl leading-relaxed uppercase tracking-wider opacity-80">
-                        Our route network expands continuously, connecting global destinations with reliable service and real-time flight tracking.
+                        {pageCms.reachSubtitle}
                      </p>
                   </div>
                   <div className="grid grid-cols-2 gap-10">
                      <div className="space-y-2">
-                        <p className="text-6xl font-black text-navy-950 tracking-tighter">182</p>
-                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em]">Active Destinations</p>
+                        <p className="text-6xl font-black text-navy-950 tracking-tighter">{pageCms.stat1Value}</p>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em]">{pageCms.stat1Label}</p>
                      </div>
                      <div className="space-y-2">
-                        <p className="text-6xl font-black text-navy-950 tracking-tighter">12.4M</p>
-                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em]">Annual Pax Transits</p>
+                        <p className="text-6xl font-black text-navy-950 tracking-tighter">{pageCms.stat2Value}</p>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em]">{pageCms.stat2Label}</p>
                      </div>
                   </div>
                </div>

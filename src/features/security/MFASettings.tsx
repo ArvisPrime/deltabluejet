@@ -1,8 +1,10 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { useToastStore } from '../../stores/toastStore';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../../config/firebase.config';
 
 // ── Types ──────────────────────────────────────────────────
 interface MfaMethod {
@@ -36,12 +38,8 @@ const AVAILABLE_ROLES = ['Super Admin', 'Ops Manager', 'Dispatcher', 'Captain', 
 
 const DEFAULT_MANDATORY_ROLES = ['Super Admin', 'Ops Manager', 'Dispatcher'];
 
-const DEFAULT_USERS: MfaUser[] = [
-   { name: 'Ethan Hunt', id: '882910', role: 'Captain', status: 'Enforced', method: 'Authenticator App', avatar: 'https://i.pravatar.cc/150?u=ethan', time: '2m ago' },
-   { name: 'Sarah Connor', id: '992100', role: 'Ground Ops', status: 'Optional', method: 'SMS / Text', avatar: 'https://i.pravatar.cc/150?u=sarah', time: 'Yesterday' },
-   { name: 'Michael Knight', id: '112093', role: 'Admin', status: 'Enforced', method: 'Security Key', avatar: 'https://i.pravatar.cc/150?u=michael', time: '4h ago' },
-   { name: 'Ellen Ripley', id: '449201', role: 'Dispatcher', status: 'Not Setup', method: '--', avatar: 'https://i.pravatar.cc/150?u=ellen', time: 'Never', alert: true },
-];
+const DEFAULT_USERS: MfaUser[] = [];
+
 
 // ════════════════════════════════════════════════════════════
 //    MFA Settings Component
@@ -53,6 +51,7 @@ const MFASettings: React.FC = () => {
 
    // ── State ────────────────────────────────────────────────
    const [dirty, setDirty] = useState(false);
+   const [saving, setSaving] = useState(false);
    const [globalEnforce, setGlobalEnforce] = useState(true);
    const [methods, setMethods] = useState<MfaMethod[]>(DEFAULT_METHODS);
    const [mandatoryRoles, setMandatoryRoles] = useState<string[]>(DEFAULT_MANDATORY_ROLES);
@@ -67,10 +66,44 @@ const MFASettings: React.FC = () => {
 
    const touch = () => { if (!dirty) setDirty(true); };
 
+   // Load saved config from Firestore
+   useEffect(() => {
+      const load = async () => {
+         try {
+            const snap = await getDoc(doc(db, 'admin_config', 'mfa_settings'));
+            if (snap.exists()) {
+               const d = snap.data();
+               if (d.globalEnforce !== undefined) setGlobalEnforce(d.globalEnforce);
+               if (d.methods) setMethods(d.methods);
+               if (d.mandatoryRoles) setMandatoryRoles(d.mandatoryRoles);
+               if (d.gracePeriod !== undefined) setGracePeriod(d.gracePeriod);
+               if (d.trustFrequency) setTrustFrequency(d.trustFrequency);
+               if (d.rememberDevices !== undefined) setRememberDevices(d.rememberDevices);
+            }
+         } catch (err) { console.error('Failed to load MFA config:', err); }
+      };
+      load();
+   }, []);
+
    // ── Handlers ─────────────────────────────────────────────
-   const handleSave = () => {
-      addToast('Two-step verification settings saved successfully.', 'success');
-      setDirty(false);
+   const handleSave = async () => {
+      setSaving(true);
+      try {
+         await setDoc(doc(db, 'admin_config', 'mfa_settings'), {
+            globalEnforce,
+            methods,
+            mandatoryRoles,
+            gracePeriod,
+            trustFrequency,
+            rememberDevices,
+            updatedAt: Timestamp.now(),
+         }, { merge: true });
+         addToast('Two-step verification settings saved successfully.', 'success');
+         setDirty(false);
+      } catch (err) {
+         console.error('Failed to save MFA settings:', err);
+         addToast('Failed to save settings. Please try again.', 'error');
+      } finally { setSaving(false); }
    };
 
    const toggleGlobalEnforce = () => {

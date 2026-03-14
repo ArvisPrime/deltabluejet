@@ -56,12 +56,6 @@ const DEFAULT_POLICY: PolicyConfig = {
    notifySms: false,
 };
 
-const DEMO_SESSIONS: Session[] = [
-   { id: '1', avatar: 'https://i.pravatar.cc/100?u=jane', name: 'jane_doe_super', adminId: '#8921', location: 'Banjul, GM', ip: '192.168.44.12', activity: 'Viewing Payment Settings', duration: '04h 12m', risk: 'high', riskLabel: 'High (Unusual IP)', startedAt: null },
-   { id: '2', avatar: 'https://i.pravatar.cc/100?u=mike', name: 'm_korver_admin', adminId: '#4402', location: 'London, UK', ip: '82.14.11.201', activity: 'Editing Flight Schedule', duration: '00h 45m', risk: 'medium', riskLabel: 'Medium (Multiple Logins)', startedAt: null },
-   { id: '3', avatar: 'https://i.pravatar.cc/100?u=smith', name: 'a_smith_ops', adminId: '#1120', location: 'Lagos, NG', ip: '104.22.18.5', activity: 'Reviewing Passenger List', duration: '01h 10m', risk: 'safe', riskLabel: 'Safe', startedAt: null },
-   { id: '4', avatar: 'https://i.pravatar.cc/100?u=turner', name: 'r_turner_support', adminId: '#3321', location: 'Accra, GH', ip: '92.16.88.11', activity: 'Processing Ticket Refund', duration: '02h 05m', risk: 'safe', riskLabel: 'Safe', startedAt: null },
-];
 
 const RISK_STYLES: Record<string, { col: string; dot: string }> = {
    high: { col: 'bg-red-50 text-red-700 border-red-100', dot: 'bg-red-500 animate-pulse' },
@@ -93,13 +87,9 @@ const SessionMonitor: React.FC = () => {
    const loadData = useCallback(async () => {
       setLoading(true);
       try {
-         // Load sessions
+         // Load real-time sessions from Firestore
          const sessSnap = await getDocs(query(collection(db, 'active_sessions'), orderBy('startedAt', 'desc')));
-         if (sessSnap.empty) {
-            setSessions(DEMO_SESSIONS);
-         } else {
-            setSessions(sessSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Session));
-         }
+         setSessions(sessSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Session));
 
          // Load policy
          const polSnap = await getDoc(doc(db, 'security_policies', 'session'));
@@ -108,11 +98,11 @@ const SessionMonitor: React.FC = () => {
          }
       } catch (err) {
          console.error('[Sessions] Load error:', err);
-         setSessions(DEMO_SESSIONS);
+         addToast('Unable to load sessions. Please try again.', 'error');
       } finally {
          setLoading(false);
       }
-   }, []);
+   }, [addToast]);
 
    useEffect(() => { loadData(); }, [loadData]);
 
@@ -240,7 +230,7 @@ const SessionMonitor: React.FC = () => {
                      </div>
                      <p className="text-navy-500 font-medium italic text-lg opacity-80 uppercase tracking-widest">Active Sessions · Security Alerts</p>
                      <p className="text-navy-400 text-xs font-bold uppercase tracking-widest mt-2 max-w-2xl leading-relaxed">
-                        Monitor active admin sessions and security access across the admin panel.
+                        See who is currently logged in and manage their access in real time.
                      </p>
                   </div>
                </div>
@@ -248,9 +238,9 @@ const SessionMonitor: React.FC = () => {
                {/* Stats */}
                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   {[
-                     { label: 'Active Admins', val: String(stats.total), icon: 'admin_panel_settings', color: 'text-primary', bg: 'bg-primary/5', alert: false },
+                     { label: 'Logged-In Admins', val: String(stats.total), icon: 'admin_panel_settings', color: 'text-primary', bg: 'bg-primary/5', alert: false },
                      { label: 'High Risk Sessions', val: String(stats.highRisk), sub: stats.highRisk > 0 ? 'NEEDS ATTENTION' : 'ALL CLEAR', icon: 'warning', color: 'text-red-600', bg: 'bg-red-50', alert: stats.highRisk > 0 },
-                     { label: 'Avg Session Time', val: `${stats.avgDuration}m`, sub: 'Across all sessions', icon: 'schedule', color: 'text-primary', bg: 'bg-primary/5', alert: false },
+                     { label: 'Avg. Time Online', val: `${stats.avgDuration}m`, sub: 'Across all sessions', icon: 'schedule', color: 'text-primary', bg: 'bg-primary/5', alert: false },
                   ].map((s, i) => (
                      <div key={i} className={`bg-white p-8 rounded-[3rem] border shadow-sm flex flex-col group hover:shadow-xl transition-all relative overflow-hidden ${s.alert ? 'border-red-100 ring-2 ring-red-50' : 'border-navy-100'}`}>
                         <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-navy-950 group-hover:scale-110 transition-transform">
@@ -299,8 +289,8 @@ const SessionMonitor: React.FC = () => {
                               key={f.key}
                               onClick={() => { setRiskFilter(f.key); setPage(0); }}
                               className={`flex items-center gap-2 px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${riskFilter === f.key
-                                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                                    : 'bg-navy-50 border border-navy-100 text-navy-500 hover:text-navy-950'
+                                 ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                                 : 'bg-navy-50 border border-navy-100 text-navy-500 hover:text-navy-950'
                                  }`}
                            >
                               {f.dotClass && <span className={`size-2 rounded-full ${f.dotClass}`}></span>}
@@ -336,7 +326,8 @@ const SessionMonitor: React.FC = () => {
                               <tr>
                                  <td colSpan={6} className="px-12 py-16 text-center">
                                     <span className="material-symbols-outlined text-4xl text-navy-200 block mb-3">search_off</span>
-                                    <p className="text-sm font-bold text-navy-400">No sessions match your filters</p>
+                                    <p className="text-sm font-bold text-navy-400">No active sessions found</p>
+                                    <p className="text-xs text-navy-300 mt-1">There are no admin sessions matching your filters right now.</p>
                                  </td>
                               </tr>
                            ) : pagedSessions.map(session => {
@@ -458,7 +449,7 @@ const SessionMonitor: React.FC = () => {
          <aside className="w-[440px] bg-white border-l border-navy-100 flex flex-col shrink-0 overflow-y-auto custom-scrollbar z-10 shadow-[-30px_0_60px_-15px_rgba(0,0,0,0.05)]">
             <div className="p-10 border-b border-navy-50 bg-navy-50/30 space-y-1">
                <h3 className="font-black text-2xl text-navy-950 uppercase tracking-tight">Security Alert Settings</h3>
-               <p className="text-[10px] font-bold text-navy-400 uppercase tracking-widest opacity-60">Configure automatic detection rules</p>
+               <p className="text-[10px] font-bold text-navy-400 uppercase tracking-widest opacity-60">Set up rules to detect and respond to threats</p>
             </div>
 
             <div className="p-10 space-y-12">
@@ -469,7 +460,7 @@ const SessionMonitor: React.FC = () => {
                   {/* Rule: Unrecognized IP */}
                   <div className="bg-navy-50/50 p-8 rounded-[3rem] border border-navy-50 shadow-inner space-y-8">
                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-black text-navy-950 uppercase tracking-tight">Unrecognized IP Address</label>
+                        <label className="text-sm font-black text-navy-950 uppercase tracking-tight">Unknown IP Address</label>
                         <div className="relative inline-flex items-center h-8 rounded-full w-14 transition-all cursor-pointer" onClick={() => updatePolicy('unrecognizedIp', !policy.unrecognizedIp)}>
                            <input checked={policy.unrecognizedIp} readOnly type="checkbox" className="sr-only peer" />
                            <div className="w-14 h-8 bg-navy-200 rounded-full peer peer-checked:bg-primary peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all shadow-md"></div>
@@ -478,11 +469,11 @@ const SessionMonitor: React.FC = () => {
                      {policy.unrecognizedIp && (
                         <div className="space-y-6 pt-4 border-t border-navy-100/50">
                            <div className="flex justify-between items-center text-[10px] font-black text-navy-400 uppercase tracking-widest px-1">
-                              <span>Trigger Condition</span>
+                              <span>Trigger</span>
                               <span className="text-navy-900">Unknown IP Address</span>
                            </div>
                            <div className="flex justify-between items-center text-[10px] font-black text-navy-400 uppercase tracking-widest px-1">
-                              <span>Automatic Response</span>
+                              <span>Action Taken</span>
                               <select
                                  value={policy.unrecognizedIpAction}
                                  onChange={e => updatePolicy('unrecognizedIpAction', e.target.value)}
@@ -499,7 +490,7 @@ const SessionMonitor: React.FC = () => {
                   {/* Rule: Concurrent Logins */}
                   <div className="bg-navy-50/50 p-8 rounded-[3rem] border border-navy-50 shadow-inner space-y-8">
                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-black text-navy-950 uppercase tracking-tight">Concurrent Logins</label>
+                        <label className="text-sm font-black text-navy-950 uppercase tracking-tight">Multiple Logins at Once</label>
                         <div className="relative inline-flex items-center h-8 rounded-full w-14 transition-all cursor-pointer" onClick={() => updatePolicy('concurrentLogins', !policy.concurrentLogins)}>
                            <input checked={policy.concurrentLogins} readOnly type="checkbox" className="sr-only peer" />
                            <div className="w-14 h-8 bg-navy-200 rounded-full peer peer-checked:bg-primary peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all shadow-md"></div>
@@ -507,7 +498,7 @@ const SessionMonitor: React.FC = () => {
                      </div>
                      {policy.concurrentLogins && (
                         <div className="pt-4 border-t border-navy-100/50 flex justify-between items-center px-1">
-                           <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Max Active Sessions</span>
+                           <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Max Logins Allowed</span>
                            <input type="number" value={policy.maxSessions} onChange={e => updatePolicy('maxSessions', parseInt(e.target.value) || 1)} min={1} max={10} className="w-16 h-10 text-center bg-white border border-navy-100 rounded-xl text-xs font-black text-navy-950 focus:ring-4 focus:ring-primary/5 shadow-sm" />
                         </div>
                      )}
@@ -516,7 +507,7 @@ const SessionMonitor: React.FC = () => {
                   {/* Rule: Failed Logins */}
                   <div className="bg-navy-50/50 p-8 rounded-[3rem] border border-navy-100 shadow-inner space-y-8 ring-2 ring-red-500/10">
                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-black text-navy-950 uppercase tracking-tight">Excessive Failed Logins</label>
+                        <label className="text-sm font-black text-navy-950 uppercase tracking-tight">Too Many Failed Attempts</label>
                         <div className="relative inline-flex items-center h-8 rounded-full w-14 transition-all cursor-pointer" onClick={() => updatePolicy('failedLogins', !policy.failedLogins)}>
                            <input checked={policy.failedLogins} readOnly type="checkbox" className="sr-only peer" />
                            <div className="w-14 h-8 bg-navy-200 rounded-full peer peer-checked:bg-primary peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all shadow-md"></div>
@@ -525,7 +516,7 @@ const SessionMonitor: React.FC = () => {
                      {policy.failedLogins && (
                         <div className="space-y-6 pt-4 border-t border-navy-100/50">
                            <div className="flex justify-between items-center px-1">
-                              <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Threshold (per minute)</span>
+                              <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Max Attempts (per minute)</span>
                               <input type="number" value={policy.failedLoginThreshold} onChange={e => updatePolicy('failedLoginThreshold', parseInt(e.target.value) || 1)} min={1} max={100} className="w-16 h-10 text-center bg-white border border-navy-100 rounded-xl text-xs font-black text-navy-950 focus:ring-4 focus:ring-primary/5 shadow-sm" />
                            </div>
                            <label className="flex items-center gap-4 cursor-pointer group px-1" onClick={() => updatePolicy('failedLoginLock', !policy.failedLoginLock)}>
@@ -533,7 +524,7 @@ const SessionMonitor: React.FC = () => {
                                  <input type="checkbox" checked={policy.failedLoginLock} readOnly className="peer h-6 w-6 appearance-none rounded-lg border-2 border-navy-200 checked:bg-red-500 checked:border-red-500 transition-all shadow-sm" />
                                  <span className="material-symbols-outlined text-white text-sm absolute left-1/2 top-1/2 -translate-y-1/2 -translate-x-1/2 opacity-0 peer-checked:opacity-100 font-black">check</span>
                               </div>
-                              <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest group-hover:text-red-600 transition-colors">Temporary Account Lock (15m)</span>
+                              <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest group-hover:text-red-600 transition-colors">Lock Account for 15 Minutes</span>
                            </label>
                         </div>
                      )}
@@ -542,12 +533,12 @@ const SessionMonitor: React.FC = () => {
 
                {/* Behavioral Monitoring */}
                <div className="space-y-8">
-                  <h4 className="text-[10px] font-black text-navy-300 uppercase tracking-[0.3em] px-1 border-l-2 border-primary">Activity Monitoring</h4>
+                  <h4 className="text-[10px] font-black text-navy-300 uppercase tracking-[0.3em] px-1 border-l-2 border-primary">Activity Tracking</h4>
 
                   {/* Unusual Hours */}
                   <div className="bg-navy-50/50 p-8 rounded-[3rem] border border-navy-50 shadow-inner space-y-8">
                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-black text-navy-950 uppercase tracking-tight">Unusual Hours Activity</label>
+                        <label className="text-sm font-black text-navy-950 uppercase tracking-tight">Off-Hours Activity</label>
                         <div className="relative inline-flex items-center h-8 rounded-full w-14 transition-all cursor-pointer" onClick={() => updatePolicy('unusualHours', !policy.unusualHours)}>
                            <input checked={policy.unusualHours} readOnly type="checkbox" className="sr-only peer" />
                            <div className="w-14 h-7 bg-navy-200 rounded-full peer peer-checked:bg-primary peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all shadow-md"></div>
@@ -570,7 +561,7 @@ const SessionMonitor: React.FC = () => {
                   {/* Sensitive Module */}
                   <div className="bg-navy-50/50 p-8 rounded-[3rem] border border-navy-50 shadow-inner space-y-8">
                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-black text-navy-950 uppercase tracking-tight">Sensitive Area Access</label>
+                        <label className="text-sm font-black text-navy-950 uppercase tracking-tight">Restricted Area Access</label>
                         <div className="relative inline-flex items-center h-8 rounded-full w-14 transition-all cursor-pointer" onClick={() => updatePolicy('sensitiveModule', !policy.sensitiveModule)}>
                            <input checked={policy.sensitiveModule} readOnly type="checkbox" className="sr-only peer" />
                            <div className="w-14 h-7 bg-navy-200 rounded-full peer peer-checked:bg-primary peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all shadow-md"></div>
@@ -578,7 +569,7 @@ const SessionMonitor: React.FC = () => {
                      </div>
                      {policy.sensitiveModule && (
                         <div className="space-y-4 pt-4 border-t border-navy-100/50">
-                           <p className="text-[9px] font-black text-navy-300 uppercase tracking-widest mb-2 ml-1">Alert when accessing:</p>
+                           <p className="text-[9px] font-black text-navy-300 uppercase tracking-widest mb-2 ml-1">Send alert when someone opens:</p>
                            {SENSITIVE_OPTIONS.map(lbl => (
                               <label key={lbl} className="flex items-center gap-4 cursor-pointer group" onClick={() => toggleSensitiveModule(lbl)}>
                                  <div className="relative flex items-center">
