@@ -1,0 +1,13 @@
+OK: features/cms/PageEditor.tsx (5 replacements)
+OK: features/cms/MenuManagement.tsx (5 replacements)
+OK: features/cms/HeaderManagement.tsx (8 replacements)
+OK: features/cms/FooterManagement.tsx (2 replacements)
+OK: features/checkin/CheckinPassengers.tsx (2 replacements)
+OK: features/checkin/CheckinSuccess.tsx (2 replacements)
+OK: features/checkin/CheckinDeclaration.tsx (1 replacements)
+OK: features/communications/EmailTemplatesCMS.tsx (1 replacements)
+OK: features/security/SSOSettings.tsx (1 replacements)
+OK: features/experiments/ExperimentsAuditLog.tsx (1 replacements)
+NOOP: features/booking/FlightChangeSuccess.tsx (no matches)
+
+Round 3 Done: 28 replacements across 10 files
