@@ -6,7 +6,7 @@
 
 import {
     collection, doc, getDocs, addDoc, updateDoc, deleteDoc, getDoc,
-    query, where, orderBy, Timestamp,
+    query, where, orderBy, onSnapshot, Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase.config';
 
@@ -36,6 +36,8 @@ export interface CrewAssignment {
     crewMemberName: string;
     crewRole: CrewRole;
     flightNumber: string;
+    flightId?: string;       // Link to flights collection
+    routeInfo?: string;      // e.g. "BJL → LOS"
     date: string;      // YYYY-MM-DD
     dutyStart: string;  // HH:mm
     dutyEnd: string;
@@ -120,6 +122,14 @@ export async function getAllCrew(): Promise<CrewMember[]> {
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as CrewMember));
 }
 
+/** Real-time subscription to crew members */
+export function subscribeToCrew(callback: (crew: CrewMember[]) => void): () => void {
+    return onSnapshot(crewRef, (snap) => {
+        const members = snap.docs.map(d => ({ id: d.id, ...d.data() } as CrewMember));
+        callback(members);
+    });
+}
+
 export async function getCrewMember(id: string): Promise<CrewMember | null> {
     const snap = await getDoc(doc(crewRef, id));
     return snap.exists() ? { id: snap.id, ...snap.data() } as CrewMember : null;
@@ -155,6 +165,14 @@ export async function getAssignments(crewId?: string, date?: string): Promise<Cr
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as CrewAssignment));
 }
 
+/** Real-time subscription to assignments */
+export function subscribeToAssignments(callback: (assignments: CrewAssignment[]) => void): () => void {
+    const q = query(assignRef, orderBy('date', 'desc'));
+    return onSnapshot(q, (snap) => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as CrewAssignment)));
+    });
+}
+
 export async function createAssignment(data: Omit<CrewAssignment, 'id'>): Promise<{ id: string; fatigueCheck: FatigueCheck }> {
     // Run fatigue check first
     const existing = await getAssignments(data.crewMemberId);
@@ -163,6 +181,10 @@ export async function createAssignment(data: Omit<CrewAssignment, 'id'>): Promis
     // Allow creation but return warning
     const ref = await addDoc(assignRef, { ...data, createdAt: Timestamp.now() });
     return { id: ref.id, fatigueCheck };
+}
+
+export async function updateAssignment(id: string, data: Partial<CrewAssignment>): Promise<void> {
+    await updateDoc(doc(assignRef, id), { ...data, updatedAt: Timestamp.now() });
 }
 
 export async function deleteAssignment(id: string): Promise<void> {

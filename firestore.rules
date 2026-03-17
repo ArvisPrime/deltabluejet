@@ -255,6 +255,20 @@ service cloud.firestore {
       allow read, write: if false;  // Only Cloud Functions can read/write
     }
 
+    // ─── Crew Members ──────────────────────────────────────────
+    match /crew_members/{crewId} {
+      allow read: if isOpsStaff();
+      allow create, update: if isOpsStaff();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Crew Assignments ──────────────────────────────────────
+    match /crew_assignments/{assignId} {
+      allow read: if isOpsStaff();
+      allow create, update: if isOpsStaff();
+      allow delete: if isOpsStaff();
+    }
+
     // ─── WebAuthn Credentials (Security Keys) ─────────────
     match /webauthn_credentials/{credId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
