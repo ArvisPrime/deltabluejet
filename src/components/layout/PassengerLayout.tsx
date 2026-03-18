@@ -46,8 +46,8 @@ const PassengerLayout: React.FC = () => {
                             {!logoUrl && <span className="text-lg font-black tracking-tighter uppercase text-navy-950 hidden sm:inline">{BRAND.shortName}</span>}
                         </Link>
 
-                        {/* Nav Tabs */}
-                        <nav className="flex items-center gap-1 h-full">
+                        {/* Nav Tabs — horizontally scrollable on mobile */}
+                        <nav className="flex items-center gap-1 h-full overflow-x-auto scrollbar-none">
                             {NAV_ITEMS.map(item => {
                                 const isActive = item.path === ROUTES.MY_DASHBOARD
                                     ? pathname === item.path
@@ -56,14 +56,14 @@ const PassengerLayout: React.FC = () => {
                                     <Link
                                         key={item.path}
                                         to={item.path}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all no-underline
+                                        className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-[0.1em] sm:tracking-[0.15em] transition-all no-underline whitespace-nowrap shrink-0
                       ${isActive
                                                 ? 'bg-primary/10 text-primary'
                                                 : 'text-navy-400 hover:text-navy-700 hover:bg-navy-50'
                                             }`}
                                     >
-                                        <span className="material-symbols-outlined text-[16px]">{item.icon}</span>
-                                        <span className="hidden md:inline">{item.label}</span>
+                                        <span className="material-symbols-outlined text-[14px] sm:text-[16px]">{item.icon}</span>
+                                        <span>{item.label}</span>
                                     </Link>
                                 );
                             })}

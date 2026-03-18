@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Outlet, Link, useLocation } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
@@ -6,6 +6,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useCmsHeaderStore } from '../../stores/cmsHeaderStore';
+import { getDashboardAccess, type DashboardAccessConfig } from '../../services/dashboardAccessService';
 
 const navGroups = [
     {
@@ -110,6 +111,17 @@ const navGroups = [
     },
 ];
 
+/** Reverse map: ROUTES path → module ID key.
+ *  e.g. ROUTES.DASHBOARD path → 'DASHBOARD' */
+const PATH_TO_MODULE_ID: Record<string, string> = {};
+for (const group of navGroups) {
+    for (const item of group.items) {
+        // Find the ROUTES key whose value matches this item.path
+        const routeKey = (Object.keys(ROUTES) as (keyof typeof ROUTES)[]).find(k => ROUTES[k] === item.path);
+        if (routeKey) PATH_TO_MODULE_ID[item.path] = routeKey;
+    }
+}
+
 /**
  * Admin layout with collapsible sidebar, top header, and content area.
  * Mirrors the existing prototype's admin chrome.
@@ -121,6 +133,30 @@ const AdminLayout: React.FC = () => {
     const addToast = useToastStore((s) => s.addToast);
     const { logoUrl, brandName } = useCmsHeaderStore();
     const [showNotifications, setShowNotifications] = useState(false);
+    const [accessConfig, setAccessConfig] = useState<DashboardAccessConfig | null>(null);
+
+    /* ── Load dashboard access config ────────────────────────── */
+    useEffect(() => {
+        getDashboardAccess().then(setAccessConfig).catch(() => setAccessConfig(null));
+    }, []);
+
+    /* ── Filter navGroups based on role ──────────────────────── */
+    const filteredNavGroups = useMemo(() => {
+        // super_admin always sees everything
+        if (!accessConfig || !user || user.role === 'super_admin') return navGroups;
+        const allowedModules = new Set(accessConfig[user.role] || []);
+        return navGroups
+            .map(group => ({
+                ...group,
+                items: group.items.filter(item => {
+                    const moduleId = PATH_TO_MODULE_ID[item.path];
+                    // If no module mapping exists (e.g. external links), always show
+                    if (!moduleId) return true;
+                    return allowedModules.has(moduleId);
+                }),
+            }))
+            .filter(group => group.items.length > 0);
+    }, [accessConfig, user]);
 
     const mockNotifications = [
         { id: 1, title: 'Gate B7 conflict detected', time: '2 min ago', type: 'warning' as const },
@@ -160,7 +196,7 @@ const AdminLayout: React.FC = () => {
 
                 {/* Navigation */}
                 <nav className="flex-1 overflow-y-auto py-4 custom-scrollbar" role="navigation" aria-label="Admin sidebar">
-                    {navGroups.map((group) => (
+                    {filteredNavGroups.map((group) => (
                         <div key={group.label} className="mb-2">
                             {!sidebarCollapsed && (
                                 <p className="px-6 py-2 text-[9px] font-black uppercase tracking-[0.3em] text-navy-500">

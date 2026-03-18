@@ -196,7 +196,7 @@ const LandingHome: React.FC = () => {
                </div>
 
                {/* Elevated Booking Card */}
-               <div className="bg-white/95 backdrop-blur-3xl rounded-[3.5rem] shadow-[0_60px_100px_-20px_rgba(0,0,0,0.5)] p-8 md:p-10 border border-white relative group animate-in zoom-in duration-700 delay-300">
+               <div className="bg-white/95 backdrop-blur-3xl rounded-2xl md:rounded-[3.5rem] shadow-[0_60px_100px_-20px_rgba(0,0,0,0.5)] p-6 sm:p-8 md:p-10 border border-white relative group animate-in zoom-in duration-700 delay-300">
                   <div className="absolute top-0 left-0 w-full h-1.5 bg-primary shadow-[0_0_20px_rgba(19,127,236,0.8)]"></div>
 
                   {/* Trip Type Selector */}
@@ -272,7 +272,7 @@ const LandingHome: React.FC = () => {
                            </button>
 
                            {showPaxDropdown && (
-                              <div className="absolute bottom-full mb-4 left-0 w-full min-w-[300px] bg-white rounded-[2rem] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.25)] border border-navy-100 p-8 z-50 animate-in slide-in-from-bottom-4 duration-300 backdrop-blur-xl">
+                              <div className="absolute bottom-full mb-4 left-0 w-full min-w-0 sm:min-w-[300px] bg-white rounded-2xl sm:rounded-[2rem] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.25)] border border-navy-100 p-6 sm:p-8 z-50 animate-in slide-in-from-bottom-4 duration-300 backdrop-blur-xl">
                                  <div className="space-y-8">
                                     <div className="flex items-center justify-between">
                                        <div className="space-y-0.5">
@@ -357,11 +357,11 @@ const LandingHome: React.FC = () => {
                   <div className="group relative h-[600px] rounded-[4rem] overflow-hidden shadow-2xl transition-all duration-700 cursor-pointer" onClick={onBookingStart}>
                      <div className="absolute inset-0 bg-navy-950/20 group-hover:bg-navy-950/10 transition-colors z-10" />
                      <div className="w-full h-full bg-cover bg-center transition-transform duration-[10s] group-hover:scale-110" style={{ backgroundImage: `url('${promoData.featuredPromo.imageUrl}')` }} />
-                     <div className="absolute bottom-0 left-0 w-full p-12 z-20 text-white space-y-6">
+                     <div className="absolute bottom-0 left-0 w-full p-6 sm:p-10 md:p-12 z-20 text-white space-y-4 sm:space-y-6">
                         <span className="px-5 py-2 rounded-full bg-white/20 backdrop-blur-xl border border-white/20 text-[10px] font-black uppercase tracking-widest">{promoData.featuredPromo.tag}</span>
                         <div className="space-y-2">
-                           <h3 className="text-5xl font-black tracking-tighter uppercase leading-none">{promoData.featuredPromo.title}</h3>
-                           <p className="text-xl font-medium italic opacity-80 max-w-lg leading-relaxed uppercase tracking-wider">{promoData.featuredPromo.description}</p>
+                           <h3 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter uppercase leading-none">{promoData.featuredPromo.title}</h3>
+                           <p className="text-sm sm:text-base md:text-xl font-medium italic opacity-80 max-w-lg leading-relaxed uppercase tracking-wider">{promoData.featuredPromo.description}</p>
                         </div>
                         <button className="px-10 py-5 bg-white text-navy-950 font-black uppercase tracking-[0.3em] text-[10px] rounded-2xl shadow-2xl transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">{promoData.featuredPromo.ctaLabel}</button>
                      </div>
@@ -408,7 +408,7 @@ const LandingHome: React.FC = () => {
                               </span>
                            </div>
                         </div>
-                        <div className="p-10 space-y-6 flex-1 flex flex-col justify-between">
+                        <div className="p-6 sm:p-8 md:p-10 space-y-4 sm:space-y-6 flex-1 flex flex-col justify-between">
                            <div className="space-y-2">
                               <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">{dest.country}</p>
                               <h3 className="text-3xl font-black text-navy-950 uppercase tracking-tighter leading-none">{dest.city}</h3>
@@ -434,8 +434,8 @@ const LandingHome: React.FC = () => {
                         <span className="material-symbols-outlined text-sm animate-pulse">loyalty</span>
                         {clubData.badge}
                      </div>
-                     <h2 className="text-6xl md:text-8xl font-black text-white leading-none tracking-tighter uppercase">{clubData.heading.replace('Club', '')}<span className="text-primary underline underline-offset-[20px] decoration-white/10">Club</span> <br />{clubData.headingHighlight}</h2>
-                     <p className="text-2xl text-navy-100 font-medium leading-relaxed italic uppercase tracking-widest opacity-60 max-w-2xl">
+                     <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-black text-white leading-none tracking-tighter uppercase">{clubData.heading.replace('Club', '')}<span className="text-primary underline underline-offset-[10px] sm:underline-offset-[20px] decoration-white/10">Club</span> <br />{clubData.headingHighlight}</h2>
+                     <p className="text-lg sm:text-xl md:text-2xl text-navy-100 font-medium leading-relaxed italic uppercase tracking-widest opacity-60 max-w-2xl">
                         {clubData.description}
                      </p>
                   </div>
@@ -493,7 +493,7 @@ const LandingHome: React.FC = () => {
 
          {/* Floating Network Status */}
          {statusData.visible && (
-            <div className="fixed bottom-10 right-10 z-50 animate-in slide-in-from-right duration-1000">
+            <div className="hidden sm:block fixed bottom-4 right-4 sm:bottom-10 sm:right-10 z-50 animate-in slide-in-from-right duration-1000">
                <div className="bg-navy-950/90 backdrop-blur-xl border border-white/10 px-8 py-5 rounded-[2.5rem] shadow-2xl flex items-center gap-6 group hover:scale-105 transition-all cursor-help">
                   <div className="size-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.8)]"></div>
                   <div className="space-y-0.5">

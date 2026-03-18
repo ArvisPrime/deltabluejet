@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { collection, getDocs, query, orderBy, limit, startAfter, type DocumentSnapshot } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../../config/firebase.config';
 import type { UserDoc } from '../../types/firestore';
+
+const DashboardAccessControl = lazy(() => import('./DashboardAccessControl'));
 
 /* ── Constants ──────────────────────────────────────────────── */
 const PAGE_SIZE = 20;
@@ -86,6 +88,7 @@ const UserManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [activeTab, setActiveTab] = useState<'users' | 'access'>('users');
 
   /* ── Modal state ───────────────────────────────────────────── */
   const [showNewUserModal, setShowNewUserModal] = useState(false);
@@ -297,6 +300,45 @@ const UserManagement: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Tab Bar */}
+      <div className="flex border-b border-navy-100 gap-0">
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`flex items-center gap-2 px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${
+            activeTab === 'users'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-navy-400 hover:text-navy-700'
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">group</span> Users
+        </button>
+        <button
+          onClick={() => setActiveTab('access')}
+          className={`flex items-center gap-2 px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${
+            activeTab === 'access'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-navy-400 hover:text-navy-700'
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">admin_panel_settings</span> Access Control
+        </button>
+      </div>
+
+      {/* Access Control Tab */}
+      {activeTab === 'access' && (
+        <Suspense fallback={
+          <div className="p-16 flex flex-col items-center gap-4">
+            <div className="w-8 h-8 rounded-full border-3 border-navy-100 border-t-primary animate-spin" />
+            <p className="text-sm font-bold text-navy-400">Loading…</p>
+          </div>
+        }>
+          <DashboardAccessControl />
+        </Suspense>
+      )}
+
+      {/* Users Tab — all existing content below */}
+      {activeTab === 'users' && (<>
 
       {/* Status Messages */}
       {error && (
@@ -796,6 +838,7 @@ const UserManagement: React.FC = () => {
           </div>
         </div>
       )}
+      </>)}
     </div>
   );
 };

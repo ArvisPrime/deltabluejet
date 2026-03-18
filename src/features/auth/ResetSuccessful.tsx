@@ -74,9 +74,9 @@ const ResetSuccessful: React.FC = () => {
         {/* Legal Footer */}
         <div className="mt-16 flex flex-col items-center gap-6">
           <div className="flex flex-wrap items-center justify-center gap-10 opacity-30">
-            <a className="text-[9px] font-black text-navy-950 uppercase tracking-widest hover:text-primary transition-colors" href="#">Support</a>
-            <a className="text-[9px] font-black text-navy-950 uppercase tracking-widest hover:text-primary transition-colors" href="#">Ops Protocols</a>
-            <a className="text-[9px] font-black text-navy-950 uppercase tracking-widest hover:text-primary transition-colors" href="#">Triage Support</a>
+            <button className="text-[9px] font-black text-navy-950 uppercase tracking-widest hover:text-primary transition-colors" onClick={() => navigate(ROUTES.ABOUT)}>Support</button>
+            <button className="text-[9px] font-black text-navy-950 uppercase tracking-widest hover:text-primary transition-colors" onClick={() => navigate(ROUTES.ABOUT)}>Ops Protocols</button>
+            <button className="text-[9px] font-black text-navy-950 uppercase tracking-widest hover:text-primary transition-colors" onClick={() => navigate(ROUTES.ABOUT)}>Triage Support</button>
           </div>
           <p className="text-[8px] font-black text-navy-200 uppercase tracking-[0.4em]">{BRAND.copyright} Operations Center</p>
         </div>

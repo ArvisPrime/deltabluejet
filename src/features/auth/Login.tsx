@@ -106,12 +106,12 @@ const Login: React.FC = () => {
       <div className="w-full lg:w-1/2 flex flex-col relative bg-white overflow-y-auto">
         {/* Top Nav */}
         <div className="flex justify-between items-center p-6 sm:p-8 shrink-0">
-          <div className="flex items-center gap-3 lg:hidden">
+          <Link to={ROUTES.HOME} className="flex items-center gap-3 lg:hidden no-underline">
             <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white">
               <span className="material-symbols-outlined text-xl font-black">airlines</span>
             </div>
             <span className="font-black text-xl tracking-tighter uppercase text-navy-950">{BRAND.shortName}</span>
-          </div>
+          </Link>
           <div className="flex items-center gap-4 ml-auto">
             <p className="text-[10px] font-black uppercase tracking-widest text-navy-400">
               New here?

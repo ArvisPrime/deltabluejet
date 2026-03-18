@@ -4,11 +4,13 @@ import { useNavigate, Link, useLocation } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
+import { useToastStore } from '../../stores/toastStore';
 
 const StaffLogin: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, googleLogin } = useAuth();
+  const addToast = useToastStore(s => s.addToast);
 
   const [step, setStep] = useState<'CREDENTIALS' | 'MFA'>('CREDENTIALS');
   const [showPass, setShowPass] = useState(false);
@@ -106,7 +108,7 @@ const StaffLogin: React.FC = () => {
         {/* Top Nav */}
         <div className="flex justify-end p-8 shrink-0">
           <div className="flex items-center gap-6">
-            <a className="text-[10px] font-black uppercase tracking-widest text-navy-300 hover:text-primary transition-colors" href="#">IT Support</a>
+            <button className="text-[10px] font-black uppercase tracking-widest text-navy-300 hover:text-primary transition-colors" onClick={() => addToast('IT Support portal coming soon', 'info')}>IT Support</button>
             <span className="h-4 w-px bg-navy-50"></span>
             <p className="text-[10px] font-black uppercase tracking-widest text-navy-400">
               {step === 'CREDENTIALS' ? "Passenger?" : "Wrong Account?"}
@@ -300,7 +302,7 @@ const StaffLogin: React.FC = () => {
           <p className="text-[9px] font-black text-navy-300 uppercase tracking-widest leading-loose">
             {BRAND.copyright} Operations Center. Authorized Access Only. <br className="sm:hidden" />
             <Link to={ROUTES.FLIGHT_TRACKER} className="hover:text-primary hover:underline mx-4 transition-colors">Flight Status</Link>
-            <a className="hover:text-primary hover:underline mx-4 transition-colors" href="#">Privacy Protocol</a>
+            <button className="hover:text-primary hover:underline mx-4 transition-colors" onClick={() => addToast('Privacy Protocol page coming soon', 'info')}>Privacy Protocol</button>
           </p>
         </div>
       </div>
