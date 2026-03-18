@@ -174,9 +174,7 @@ const withAuth = (Component: React.ComponentType<any>, allowedRoles?: AuthRole[]
 );
 
 type AuthRole = 'super_admin' | 'ops_manager' | 'crew_sched' | 'cs_agent' | 'customer';
-const OPS_ROLES: AuthRole[] = ['super_admin', 'ops_manager', 'crew_sched'];
-const ADMIN_ROLES: AuthRole[] = ['super_admin'];
-const AGENT_ROLES: AuthRole[] = ['super_admin', 'ops_manager', 'cs_agent'];
+const OPS_ROLES: AuthRole[] = ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent'];
 
 export const router = createBrowserRouter([
     // ═══ PUBLIC ROUTES (wrapped in PublicLayout) ═══════════════

@@ -48,9 +48,14 @@ const POLICIES_COL = collection(db, 'groupPolicies');
 
 /* ── Roles CRUD ────────────────────────────────────────────── */
 export async function getRoles(): Promise<RoleDoc[]> {
-  const snap = await getDocs(query(ROLES_COL, orderBy('label')));
-  const custom: RoleDoc[] = snap.docs.map(d => ({ ...d.data(), id: d.id, isBuiltIn: false } as RoleDoc));
-  return [...BUILT_IN_ROLES, ...custom];
+  try {
+    const snap = await getDocs(query(ROLES_COL, orderBy('label')));
+    const custom: RoleDoc[] = snap.docs.map(d => ({ ...d.data(), id: d.id, isBuiltIn: false } as RoleDoc));
+    return [...BUILT_IN_ROLES, ...custom];
+  } catch (err) {
+    console.error('[rolesPolicyService] getRoles error:', err);
+    return [...BUILT_IN_ROLES];
+  }
 }
 
 export async function createRole(data: Omit<RoleDoc, 'id' | 'isBuiltIn' | 'createdAt' | 'updatedAt'>): Promise<string> {
@@ -74,8 +79,13 @@ export async function deleteRole(id: string): Promise<void> {
 
 /* ── Policies CRUD ─────────────────────────────────────────── */
 export async function getPolicies(): Promise<GroupPolicyDoc[]> {
-  const snap = await getDocs(query(POLICIES_COL, orderBy('name')));
-  return snap.docs.map(d => ({ ...d.data(), id: d.id } as GroupPolicyDoc));
+  try {
+    const snap = await getDocs(query(POLICIES_COL, orderBy('name')));
+    return snap.docs.map(d => ({ ...d.data(), id: d.id } as GroupPolicyDoc));
+  } catch (err) {
+    console.error('[rolesPolicyService] getPolicies error:', err);
+    return [];
+  }
 }
 
 export async function createPolicy(data: Omit<GroupPolicyDoc, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {

@@ -300,5 +300,23 @@ service cloud.firestore {
     match /webauthn_challenges/{challengeId} {
       allow read, write: if false;  // Only Cloud Functions can read/write
     }
+
+    // ─── App Config (Dashboard Access Control) ──────────────
+    match /appConfig/{configId} {
+      allow read: if isAuthenticated();  // All logged-in users read access config for sidebar filtering
+      allow write: if isAdmin();
+    }
+
+    // ─── Custom Roles ──────────────────────────────────────
+    match /roles/{roleId} {
+      allow read: if isOpsStaff();
+      allow write: if isAdmin();
+    }
+
+    // ─── Group Policies ────────────────────────────────────
+    match /groupPolicies/{policyId} {
+      allow read: if isOpsStaff();
+      allow write: if isAdmin();
+    }
   }
 }

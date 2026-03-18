@@ -6,6 +6,7 @@ import { db, functions } from '../../config/firebase.config';
 import type { UserDoc } from '../../types/firestore';
 
 const DashboardAccessControl = lazy(() => import('./DashboardAccessControl'));
+const RolesAndPolicies = lazy(() => import('./RolesAndPolicies'));
 
 /* ── Constants ──────────────────────────────────────────────── */
 const PAGE_SIZE = 20;
@@ -88,7 +89,7 @@ const UserManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
-  const [activeTab, setActiveTab] = useState<'users' | 'access'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'access' | 'roles'>('users');
 
   /* ── Modal state ───────────────────────────────────────────── */
   const [showNewUserModal, setShowNewUserModal] = useState(false);
@@ -323,6 +324,16 @@ const UserManagement: React.FC = () => {
         >
           <span className="material-symbols-outlined text-lg">admin_panel_settings</span> Access Control
         </button>
+        <button
+          onClick={() => setActiveTab('roles')}
+          className={`flex items-center gap-2 px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 ${
+            activeTab === 'roles'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-navy-400 hover:text-navy-700'
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">policy</span> Roles & Policies
+        </button>
       </div>
 
       {/* Access Control Tab */}
@@ -334,6 +345,18 @@ const UserManagement: React.FC = () => {
           </div>
         }>
           <DashboardAccessControl />
+        </Suspense>
+      )}
+
+      {/* Roles & Policies Tab */}
+      {activeTab === 'roles' && (
+        <Suspense fallback={
+          <div className="p-16 flex flex-col items-center gap-4">
+            <div className="w-8 h-8 rounded-full border-3 border-navy-100 border-t-primary animate-spin" />
+            <p className="text-sm font-bold text-navy-400">Loading…</p>
+          </div>
+        }>
+          <RolesAndPolicies />
         </Suspense>
       )}
 

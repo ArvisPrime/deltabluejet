@@ -7,6 +7,7 @@ import { useAdminAction } from '../../hooks/useAdminAction';
 import { getFlights, getAuditLogs } from '../../services/firestore';
 import type { FlightDoc, AuditLogDoc } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
+import { useAuthStore } from '../../stores/authStore';
 
 // ─── Helper to build 24-hour OTP chart from live flight data ─────────
 function buildPerformanceData(flights: FlightDoc[]) {
@@ -51,6 +52,8 @@ function buildPerformanceData(flights: FlightDoc[]) {
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const action = useAdminAction();
+  const user = useAuthStore(s => s.user);
+  const userRole = user?.role || 'ops_manager';
 
   // ─── State ───────────────────────────────
   const [flights, setFlights] = useState<FlightDoc[]>([]);
@@ -228,14 +231,35 @@ const Dashboard: React.FC = () => {
               <h3 className="text-lg font-bold">Quick Actions</h3>
               <p className="text-blue-100 text-sm mt-1 mb-6 uppercase tracking-widest font-black text-[10px]">Manage your station efficiently.</p>
               <div className="flex flex-col gap-3">
-                <button onClick={() => navigate(ROUTES.FLIGHT_SEARCH)} className="bg-white text-primary w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-                  <span className="material-symbols-outlined text-[18px]">add</span>
-                  Create Booking
-                </button>
-                <button onClick={() => navigate(ROUTES.USER_MANAGEMENT)} className="bg-blue-600 text-white w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 border border-blue-500 shadow-sm">
-                  <span className="material-symbols-outlined text-[18px]">person_add</span>
-                  Add New User
-                </button>
+                {(userRole === 'cs_agent') ? (
+                  <button onClick={() => navigate(ROUTES.BOOKINGS)} className="bg-white text-primary w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+                    <span className="material-symbols-outlined text-[18px]">confirmation_number</span>
+                    View Bookings
+                  </button>
+                ) : (
+                  <button onClick={() => navigate(ROUTES.FLIGHT_SEARCH)} className="bg-white text-primary w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2 shadow-sm">
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                    Create Booking
+                  </button>
+                )}
+                {userRole === 'super_admin' && (
+                  <button onClick={() => navigate(ROUTES.USER_MANAGEMENT)} className="bg-blue-600 text-white w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 border border-blue-500 shadow-sm">
+                    <span className="material-symbols-outlined text-[18px]">person_add</span>
+                    Manage Users
+                  </button>
+                )}
+                {userRole === 'crew_sched' && (
+                  <button onClick={() => navigate(ROUTES.CREW_SCHEDULING)} className="bg-blue-600 text-white w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 border border-blue-500 shadow-sm">
+                    <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+                    Crew Schedule
+                  </button>
+                )}
+                {userRole === 'ops_manager' && (
+                  <button onClick={() => navigate(ROUTES.FLIGHT_SCHEDULING)} className="bg-blue-600 text-white w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 border border-blue-500 shadow-sm">
+                    <span className="material-symbols-outlined text-[18px]">schedule</span>
+                    Flight Schedule
+                  </button>
+                )}
               </div>
             </div>
             <div className="absolute -right-10 -top-10 size-40 bg-white/10 rounded-full blur-2xl"></div>
