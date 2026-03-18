@@ -88,13 +88,37 @@ const SessionMonitor: React.FC = () => {
       setLoading(true);
       try {
          // Load real-time sessions from Firestore
-         const sessSnap = await getDocs(query(collection(db, 'active_sessions'), orderBy('startedAt', 'desc')));
-         setSessions(sessSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Session));
+         try {
+            const sessSnap = await getDocs(query(collection(db, 'active_sessions'), orderBy('startedAt', 'desc')));
+            setSessions(sessSnap.docs.map(d => {
+               const raw = d.data();
+               return {
+                  id: d.id,
+                  name: raw.name || 'Unknown',
+                  adminId: raw.adminId || '',
+                  location: raw.location || 'Unknown',
+                  ip: raw.ip || '0.0.0.0',
+                  activity: raw.activity || 'Idle',
+                  duration: raw.duration || '0h 0m',
+                  risk: raw.risk || 'safe',
+                  riskLabel: raw.riskLabel || 'Safe',
+                  avatar: raw.avatar || '',
+                  startedAt: raw.startedAt || null,
+               } as Session;
+            }));
+         } catch (sessErr) {
+            console.warn('[Sessions] Could not load active sessions:', sessErr);
+            setSessions([]);
+         }
 
          // Load policy
-         const polSnap = await getDoc(doc(db, 'security_policies', 'session'));
-         if (polSnap.exists()) {
-            setPolicy({ ...DEFAULT_POLICY, ...polSnap.data() } as PolicyConfig);
+         try {
+            const polSnap = await getDoc(doc(db, 'security_policies', 'session'));
+            if (polSnap.exists()) {
+               setPolicy({ ...DEFAULT_POLICY, ...polSnap.data() } as PolicyConfig);
+            }
+         } catch (polErr) {
+            console.warn('[Sessions] Could not load policies:', polErr);
          }
       } catch (err) {
          console.error('[Sessions] Load error:', err);
@@ -163,10 +187,10 @@ const SessionMonitor: React.FC = () => {
       if (searchQuery.trim()) {
          const q = searchQuery.toLowerCase();
          result = result.filter(s =>
-            s.name.toLowerCase().includes(q) ||
-            s.adminId.toLowerCase().includes(q) ||
-            s.ip.includes(q) ||
-            s.location.toLowerCase().includes(q)
+            (s.name || '').toLowerCase().includes(q) ||
+            (s.adminId || '').toLowerCase().includes(q) ||
+            (s.ip || '').includes(q) ||
+            (s.location || '').toLowerCase().includes(q)
          );
       }
       return result;
@@ -181,7 +205,7 @@ const SessionMonitor: React.FC = () => {
       highRisk: sessions.filter(s => s.risk === 'high').length,
       avgDuration: sessions.length > 0
          ? Math.round(sessions.reduce((sum, s) => {
-            const m = s.duration.match(/(\d+)h\s*(\d+)m/);
+            const m = (s.duration || '').match(/(\d+)h\s*(\d+)m/);
             return sum + (m ? parseInt(m[1]) * 60 + parseInt(m[2]) : 0);
          }, 0) / sessions.length)
          : 0,
