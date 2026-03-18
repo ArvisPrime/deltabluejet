@@ -25,6 +25,7 @@ export const ROUTES = {
     PASSENGER_DETAILS: '/book/passengers',
     SEAT_SELECTION: '/book/seats',
     PAYMENT: '/book/payment',
+    PAYMENT_CALLBACK: '/booking/payment-callback',
     TICKET_CONFIRMATION: '/book/confirmation',
     MULTI_CITY: '/book/multi-city',
 

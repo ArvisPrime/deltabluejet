@@ -175,7 +175,8 @@ export type BookingStatus =
     | 'boarded'
     | 'completed'
     | 'cancelled'
-    | 'refunded';
+    | 'refunded'
+    | 'payment_failed';
 
 // ─── Passengers (sub-collection of bookings) ──────────────
 
@@ -196,14 +197,24 @@ export interface PassengerDoc {
 // ─── Payments ──────────────────────────────────────────────
 
 export type PaymentStatus = 'pending' | 'processing' | 'succeeded' | 'failed' | 'refunded' | 'partially_refunded';
+export type PaymentGateway = 'stripe' | 'flutterwave';
+export type PaymentMethodType = 'card' | 'mobilemoney' | 'banktransfer';
 
 export interface PaymentDoc {
     id: string;
     bookingId: string;
     amount: number;                       // Total in smallest currency unit (cents)
-    currency: string;                     // "USD"
+    currency: string;                     // "USD" or "GMD"
     status: PaymentStatus;
-    stripePaymentIntentId: string | null; // null in dev-mode
+    gateway: PaymentGateway;              // Which payment gateway processed this
+    paymentMethod: PaymentMethodType;     // Card, mobile money, or bank transfer
+    // Stripe-specific
+    stripePaymentIntentId: string | null; // null when gateway !== 'stripe'
+    // Flutterwave-specific
+    flutterwaveTxRef: string | null;            // Transaction reference
+    flutterwaveTransactionId: string | null;    // Flutterwave transaction ID
+    mobileMoneyProvider: string | null;         // 'wave' | 'orange_money' | 'afrimoney' | 'qmoney'
+    // Card details
     last4: string | null;                 // Last 4 digits of card
     cardBrand: string | null;             // "visa", "mastercard"
     refundedAmount: number;               // Total refunded (cents)
@@ -216,6 +227,33 @@ export interface PaymentDoc {
     };
     createdAt: Timestamp;
     updatedAt: Timestamp;
+}
+
+// ─── Payment Reconciliation ────────────────────────────────
+
+export interface ReconciliationIssue {
+    bookingId: string;
+    pnr: string;
+    type: 'amount_mismatch' | 'missing_payment' | 'status_mismatch' | 'orphaned_charge' | 'gateway_mismatch';
+    expected: number;
+    actual: number;
+    currency: string;
+    gateway?: string;
+    details: string;
+}
+
+export interface ReconciliationDoc {
+    date: string;                          // YYYY-MM-DD
+    totalBookingsChecked: number;
+    matched: number;
+    mismatches: number;
+    missingPayment: number;
+    issues: ReconciliationIssue[];
+    gatewayBreakdown: {
+        stripe: { checked: number; matched: number; issues: number };
+        flutterwave: { checked: number; matched: number; issues: number };
+    };
+    createdAt: Timestamp;
 }
 
 // ─── Destinations ──────────────────────────────────────────

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, Legend,
+    PieChart, Pie, Cell, Legend, BarChart, Bar,
 } from 'recharts';
 import { BRAND } from '../../config/brand';
 import {
@@ -15,12 +15,34 @@ import {
     type RoutePerformance,
     type SalesSummary,
 } from '../../services/salesService';
+import {
+    getGatewayBreakdown,
+    getPaymentMethodBreakdown,
+    getMobileMoneyProviderStats,
+    getPaymentHealthStats,
+    type GatewayBreakdown,
+    type PaymentMethodBreakdown,
+    type MobileMoneyProviderStats,
+    type PaymentHealthStats,
+} from '../../services/paymentAnalyticsService';
+import { formatCurrency, getExchangeRates } from '../../services/currencyService';
 import { useToastStore } from '../../stores/toastStore';
 
 const CLASS_COLORS: Record<string, string> = {
     economy: '#137fec',
     business: '#8b5cf6',
     first: '#f59e0b',
+};
+
+const GATEWAY_COLORS: Record<string, string> = {
+    stripe: '#635BFF',
+    flutterwave: '#F5A623',
+};
+
+const METHOD_COLORS: Record<string, string> = {
+    card: '#137fec',
+    mobilemoney: '#10b981',
+    banktransfer: '#8b5cf6',
 };
 
 const SalesDashboard: React.FC = () => {
@@ -31,20 +53,34 @@ const SalesDashboard: React.FC = () => {
     const [routes, setRoutes] = useState<RoutePerformance[]>([]);
     const [exporting, setExporting] = useState(false);
 
+    // Gateway analytics state
+    const [gatewayData, setGatewayData] = useState<GatewayBreakdown[]>([]);
+    const [methodData, setMethodData] = useState<PaymentMethodBreakdown[]>([]);
+    const [momoProviders, setMomoProviders] = useState<MobileMoneyProviderStats[]>([]);
+    const [healthStats, setHealthStats] = useState<PaymentHealthStats | null>(null);
+
     useEffect(() => {
         const load = async () => {
             setLoading(true);
             try {
-                const [s, d, c, r] = await Promise.all([
+                const [s, d, c, r, gw, pm, momo, health] = await Promise.all([
                     getSalesSummary(),
                     getDailySalesData(30),
                     getRevenueByClass(30),
                     getRoutePerformance(30),
+                    getGatewayBreakdown(30),
+                    getPaymentMethodBreakdown(30),
+                    getMobileMoneyProviderStats(30),
+                    getPaymentHealthStats(30),
                 ]);
                 setSummary(s);
                 setDaily(d);
                 setClassSplit(c);
                 setRoutes(r);
+                setGatewayData(gw);
+                setMethodData(pm);
+                setMomoProviders(momo);
+                setHealthStats(health);
             } catch (err) {
                 console.error('Sales dashboard load error:', err);
                 useToastStore.getState().addToast("Sales dashboard load error", "error");
@@ -61,6 +97,7 @@ const SalesDashboard: React.FC = () => {
     };
 
     const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    const rates = getExchangeRates();
 
     return (
         <div className="p-4 md:p-8 space-y-6 md:space-y-10 animate-in fade-in duration-700 max-w-[1600px] mx-auto">
@@ -207,6 +244,308 @@ const SalesDashboard: React.FC = () => {
                             </div>
                         ))}
                     </div>
+                </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════════
+                GATEWAY ANALYTICS — Phase 3
+                ═══════════════════════════════════════════════════════════ */}
+
+            {/* Section Divider */}
+            <div className="flex items-center gap-4 pt-2">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-navy-200 to-transparent" />
+                <h2 className="text-lg md:text-xl font-black text-navy-950 uppercase tracking-tighter whitespace-nowrap flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">account_balance_wallet</span>
+                    Payment Gateway Analytics
+                </h2>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-navy-200 to-transparent" />
+            </div>
+
+            {/* Currency & Exchange Rate KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                {[
+                    {
+                        label: 'USD Revenue',
+                        val: loading ? '...' : formatCurrency(healthStats?.totalRevenueUSD || 0, 'USD'),
+                        icon: 'attach_money',
+                        color: 'text-emerald-500',
+                        bg: 'bg-emerald-50',
+                    },
+                    {
+                        label: 'GMD Revenue',
+                        val: loading ? '...' : formatCurrency(healthStats?.totalRevenueGMD || 0, 'GMD'),
+                        icon: 'currency_exchange',
+                        color: 'text-blue-500',
+                        bg: 'bg-blue-50',
+                    },
+                    {
+                        label: 'Exchange Rate',
+                        val: loading ? '...' : `1 USD = ${rates.GMD_PER_USD} GMD`,
+                        icon: 'swap_horiz',
+                        color: 'text-purple-500',
+                        bg: 'bg-purple-50',
+                    },
+                    {
+                        label: 'Success Rate',
+                        val: loading ? '...' : `${healthStats?.overallSuccessRate || 0}%`,
+                        icon: 'verified',
+                        color: (healthStats?.overallSuccessRate || 0) >= 95 ? 'text-emerald-500' : 'text-amber-500',
+                        bg: (healthStats?.overallSuccessRate || 0) >= 95 ? 'bg-emerald-50' : 'bg-amber-50',
+                    },
+                ].map((stat, i) => (
+                    <div key={i} className="bg-white border border-navy-100 rounded-2xl md:rounded-[2.5rem] p-6 md:p-8 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+                        <div className="flex justify-between items-start mb-6">
+                            <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl ${stat.bg} ${stat.color} shadow-inner group-hover:scale-110 transition-transform`}>
+                                <span className="material-symbols-outlined text-2xl md:text-3xl font-black">{stat.icon}</span>
+                            </div>
+                        </div>
+                        <p className="text-[10px] font-black text-navy-400 uppercase tracking-[0.2em] mb-1">{stat.label}</p>
+                        <h3 className="text-xl md:text-2xl font-black text-navy-950 tracking-tighter">{stat.val}</h3>
+                    </div>
+                ))}
+            </div>
+
+            {/* Gateway Breakdown + Payment Methods Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
+                {/* Gateway Revenue Donut */}
+                <div className="bg-white rounded-2xl md:rounded-[3.5rem] border border-navy-100 p-6 md:p-10 shadow-sm">
+                    <div className="mb-6">
+                        <h3 className="text-lg font-black text-navy-950 uppercase tracking-tighter">Revenue by Gateway</h3>
+                        <p className="text-[10px] text-navy-400 font-bold uppercase tracking-widest opacity-60">Stripe vs Flutterwave — last 30 days</p>
+                    </div>
+                    <div className="h-56">
+                        {loading ? (
+                            <div className="flex items-center justify-center h-full">
+                                <div className="animate-spin size-8 border-3 border-navy-200 border-t-primary rounded-full" />
+                            </div>
+                        ) : gatewayData.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-navy-300 text-xs font-bold uppercase">No payment data</div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={gatewayData}
+                                        dataKey="revenue"
+                                        nameKey="gateway"
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={45}
+                                        outerRadius={75}
+                                        paddingAngle={4}
+                                        stroke="none"
+                                    >
+                                        {gatewayData.map((entry) => (
+                                            <Cell key={entry.gateway} fill={GATEWAY_COLORS[entry.gateway] || '#94a3b8'} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                                        formatter={(v: number | string | undefined) => [`$${Number(v || 0).toLocaleString()}`, 'Revenue']}
+                                    />
+                                    <Legend
+                                        verticalAlign="bottom"
+                                        formatter={(value: string) => (
+                                            <span className="text-[10px] font-black text-navy-600 uppercase tracking-widest">{value}</span>
+                                        )}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                    {/* Gateway breakdown list */}
+                    <div className="space-y-3 mt-4">
+                        {gatewayData.map((gw) => (
+                            <div key={gw.gateway} className="flex items-center justify-between p-3 bg-navy-50/50 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                    <div className="size-3 rounded-full" style={{ background: GATEWAY_COLORS[gw.gateway] || '#94a3b8' }} />
+                                    <span className="text-[10px] font-black text-navy-700 uppercase tracking-widest">{gw.gateway}</span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-[10px] font-bold text-navy-400">{gw.transactions} txns</span>
+                                    <span className="text-xs font-black text-navy-950">{gw.percentage}%</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Payment Method Distribution Bar Chart */}
+                <div className="bg-white rounded-2xl md:rounded-[3.5rem] border border-navy-100 p-6 md:p-10 shadow-sm">
+                    <div className="mb-6">
+                        <h3 className="text-lg font-black text-navy-950 uppercase tracking-tighter">Payment Methods</h3>
+                        <p className="text-[10px] text-navy-400 font-bold uppercase tracking-widest opacity-60">Card vs Mobile Money vs Bank Transfer</p>
+                    </div>
+                    <div className="h-56">
+                        {loading ? (
+                            <div className="flex items-center justify-center h-full">
+                                <div className="animate-spin size-8 border-3 border-navy-200 border-t-primary rounded-full" />
+                            </div>
+                        ) : methodData.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-navy-300 text-xs font-bold uppercase">No data</div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={methodData} layout="vertical" barCategoryGap="30%">
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                    <XAxis
+                                        type="number"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 900 }}
+                                        tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                                    />
+                                    <YAxis
+                                        type="category"
+                                        dataKey="label"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#64748b', fontSize: 9, fontWeight: 900 }}
+                                        width={120}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                                        formatter={(v: number | string | undefined) => [`$${Number(v || 0).toLocaleString()}`, 'Revenue']}
+                                    />
+                                    <Bar dataKey="revenue" radius={[0, 8, 8, 0]}>
+                                        {methodData.map((entry) => (
+                                            <Cell key={entry.method} fill={METHOD_COLORS[entry.method] || '#94a3b8'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+                    {/* Method breakdown list */}
+                    <div className="space-y-3 mt-4">
+                        {methodData.map((m) => (
+                            <div key={m.method} className="flex items-center justify-between p-3 bg-navy-50/50 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                    <div className="size-3 rounded-full" style={{ background: METHOD_COLORS[m.method] || '#94a3b8' }} />
+                                    <span className="text-[10px] font-black text-navy-700 uppercase tracking-widest">{m.label}</span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-[10px] font-bold text-navy-400">{m.transactions} txns</span>
+                                    <span className="text-xs font-black text-navy-950">{m.percentage}%</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Payment Health + Mobile Money Providers */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
+                {/* Payment Health Status */}
+                <div className="lg:col-span-2 bg-white rounded-2xl md:rounded-[3.5rem] border border-navy-100 p-6 md:p-10 shadow-sm">
+                    <div className="mb-8">
+                        <h3 className="text-lg font-black text-navy-950 uppercase tracking-tighter flex items-center gap-2">
+                            <span className="material-symbols-outlined text-emerald-500">monitor_heart</span>
+                            Payment Health
+                        </h3>
+                        <p className="text-[10px] text-navy-400 font-bold uppercase tracking-widest opacity-60">Transaction status and gateway health — last 30 days</p>
+                    </div>
+                    {loading ? (
+                        <div className="flex items-center justify-center h-40">
+                            <div className="animate-spin size-8 border-3 border-navy-200 border-t-primary rounded-full" />
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {/* Status summary */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {[
+                                    { label: 'Successful', val: healthStats?.successfulTransactions || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+                                    { label: 'Pending', val: healthStats?.pendingTransactions || 0, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+                                    { label: 'Failed', val: healthStats?.failedTransactions || 0, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
+                                    { label: 'Total', val: healthStats?.totalTransactions || 0, color: 'text-navy-700', bg: 'bg-navy-50', border: 'border-navy-100' },
+                                ].map((s) => (
+                                    <div key={s.label} className={`p-4 rounded-2xl ${s.bg} border ${s.border}`}>
+                                        <p className="text-[9px] font-black text-navy-400 uppercase tracking-widest mb-1">{s.label}</p>
+                                        <p className={`text-2xl font-black ${s.color} tracking-tighter`}>{s.val}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Per-gateway success rates */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {[
+                                    { gateway: 'Stripe', rate: healthStats?.stripeSuccessRate || 0, color: '#635BFF' },
+                                    { gateway: 'Flutterwave', rate: healthStats?.flutterwaveSuccessRate || 0, color: '#F5A623' },
+                                ].map((gw) => (
+                                    <div key={gw.gateway} className="flex items-center gap-4 p-4 bg-navy-50/50 rounded-2xl border border-navy-100">
+                                        <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${gw.color}15` }}>
+                                            <div className="size-3 rounded-full" style={{ backgroundColor: gw.color }} />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-[10px] font-black text-navy-500 uppercase tracking-widest">{gw.gateway}</p>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <div className="flex-1 h-2 bg-navy-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-700"
+                                                        style={{ width: `${gw.rate}%`, backgroundColor: gw.rate >= 90 ? '#10b981' : gw.rate >= 70 ? '#f59e0b' : '#ef4444' }}
+                                                    />
+                                                </div>
+                                                <span className="text-sm font-black text-navy-950">{gw.rate}%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Last reconciliation */}
+                            <div className="flex items-center gap-3 p-3 bg-navy-50/30 rounded-xl border border-navy-50">
+                                <span className="material-symbols-outlined text-navy-400 text-lg">schedule</span>
+                                <p className="text-[10px] font-bold text-navy-400 uppercase tracking-widest">
+                                    Last Reconciliation: {healthStats?.lastReconciliationDate || 'Not yet run'}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Mobile Money Providers */}
+                <div className="bg-white rounded-2xl md:rounded-[3.5rem] border border-navy-100 p-6 md:p-10 shadow-sm">
+                    <div className="mb-6">
+                        <h3 className="text-lg font-black text-navy-950 uppercase tracking-tighter">Mobile Money</h3>
+                        <p className="text-[10px] text-navy-400 font-bold uppercase tracking-widest opacity-60">Provider breakdown</p>
+                    </div>
+                    {loading ? (
+                        <div className="flex items-center justify-center h-40">
+                            <div className="animate-spin size-8 border-3 border-navy-200 border-t-primary rounded-full" />
+                        </div>
+                    ) : momoProviders.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-40 text-center">
+                            <span className="material-symbols-outlined text-4xl text-navy-200 mb-3">phone_android</span>
+                            <p className="text-xs font-bold text-navy-300 uppercase tracking-widest">No mobile money transactions yet</p>
+                            <p className="text-[10px] text-navy-300 mt-1">Transactions will appear here once customers use Wave, Orange Money, AfriMoney, or QMoney</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {momoProviders.map((p) => (
+                                <div key={p.provider} className="p-4 bg-navy-50/50 rounded-2xl border border-navy-100 hover:shadow-sm transition-all">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="size-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${p.color}15` }}>
+                                                <div className="size-3 rounded-full" style={{ backgroundColor: p.color }} />
+                                            </div>
+                                            <span className="text-xs font-black text-navy-800 uppercase tracking-widest">{p.label}</span>
+                                        </div>
+                                        <span className="text-[10px] font-bold text-navy-400">{p.transactions} txns</span>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-lg font-black text-navy-950 tracking-tighter">{fmt(p.revenue)}</span>
+                                        <div className="h-1.5 w-16 bg-navy-100 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full"
+                                                style={{
+                                                    backgroundColor: p.color,
+                                                    width: `${Math.min(100, (p.transactions / Math.max(1, ...momoProviders.map(mp => mp.transactions))) * 100)}%`,
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 

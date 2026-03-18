@@ -53,6 +53,7 @@ const FareClassSelection = lazyRetry(() => import('../features/booking/FareClass
 const PassengerDetails = lazyRetry(() => import('../features/booking/PassengerDetails'));
 const SeatSelection = lazyRetry(() => import('../features/booking/SeatSelection'));
 const PaymentProcessing = lazyRetry(() => import('../features/booking/PaymentProcessing'));
+const PaymentCallback = lazyRetry(() => import('../features/booking/PaymentCallback'));
 const TicketConfirmation = lazyRetry(() => import('../features/booking/TicketConfirmation'));
 const ManageBookingRetrieval = lazyRetry(() => import('../features/booking/ManageBookingRetrieval'));
 const BookingDetail = lazyRetry(() => import('../features/booking/BookingDetail'));
@@ -197,6 +198,7 @@ export const router = createBrowserRouter([
             { path: ROUTES.PASSENGER_DETAILS, element: withSuspense(PassengerDetails) },
             { path: ROUTES.SEAT_SELECTION, element: withSuspense(SeatSelection) },
             { path: ROUTES.PAYMENT, element: withSuspense(PaymentProcessing) },
+            { path: ROUTES.PAYMENT_CALLBACK, element: withSuspense(PaymentCallback) },
             { path: ROUTES.TICKET_CONFIRMATION, element: withSuspense(TicketConfirmation) },
             { path: ROUTES.MULTI_CITY, element: withSuspense(MultiCitySearch) },
 
