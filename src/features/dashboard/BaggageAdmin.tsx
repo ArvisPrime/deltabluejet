@@ -8,11 +8,13 @@ import {
 } from '../../services/baggageService';
 import type { BaggageClaimDoc } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
+import { useCurrency } from '../../hooks/useCurrency';
 
 type Tab = 'policies' | 'claims' | 'specials';
 
 const BaggageAdmin: React.FC = () => {
     const addToast = useToastStore(s => s.addToast);
+    const { display } = useCurrency();
     const [tab, setTab] = useState<Tab>('policies');
     const [claims, setClaims] = useState<(BaggageClaimDoc & { id: string })[]>([]);
     const [loading, setLoading] = useState(false);
@@ -210,7 +212,7 @@ const BaggageAdmin: React.FC = () => {
                                 </div>
                                 <p className="text-[10px] font-bold text-navy-400 leading-relaxed">{item.description}</p>
                                 <p className="text-sm font-black text-navy-900 mt-2">
-                                    {item.feeCents === 0 ? <span className="text-emerald-600">Complimentary</span> : `$${(item.feeCents / 100).toFixed(2)}`}
+                                    {item.feeCents === 0 ? <span className="text-emerald-600">Complimentary</span> : display(item.feeCents / 100)}
                                 </p>
                             </div>
                         </div>

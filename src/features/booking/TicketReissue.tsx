@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { getBookingByPNR, getBookingWithPassengers, modifyBooking } from '../../services/booking';
 import { getFlightById } from '../../services/firestore';
+import { useCurrency } from '../../hooks/useCurrency';
 import type { BookingDoc, PassengerDoc, FlightDoc } from '../../types/firestore';
 
 /* ── Fare-class display map ─────────────────────────────────── */
@@ -27,14 +28,13 @@ function formatDate(ts: any): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase();
 }
 
-function formatCurrency(amount: number, currency = 'USD'): string {
-  return `${currency} ${amount.toFixed(2)}`;
-}
+
 
 /* ═══════════════════════════════════════════════════════════════
    Ticket Reissue / Change Component
    ═══════════════════════════════════════════════════════════════ */
 const TicketReissue: React.FC = () => {
+  const { display } = useCurrency();
   /* ── Search state ──────────────────────────────────────────── */
   const [pnr, setPnr] = useState('');
   const [ticketNum, setTicketNum] = useState('');
@@ -162,7 +162,7 @@ const TicketReissue: React.FC = () => {
       // Clear draft if exists
       sessionStorage.removeItem(`reissue_draft_${booking.pnr}`);
 
-      setSuccessMsg(`New ticket issued successfully for booking ${booking.pnr}. The updated fare is ${formatCurrency(newAmount + (parseFloat(penaltyFee) || 0), currency)}.`);
+      setSuccessMsg(`New ticket issued successfully for booking ${booking.pnr}. The updated fare is ${display(newAmount + (parseFloat(penaltyFee) || 0))}.`);
 
       // Refresh booking data
       const refreshed = await getBookingByPNR(booking.pnr);
@@ -438,7 +438,7 @@ const TicketReissue: React.FC = () => {
                 <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Original Fare</p>
                 <div className="flex justify-between text-sm font-medium">
                   <span className="text-navy-500">Total Paid</span>
-                  <span className="text-navy-900">{formatCurrency(originalTotal, currency)}</span>
+                  <span className="text-navy-900">{display(originalTotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-medium">
                   <span className="text-navy-500">Travel Class</span>
@@ -492,7 +492,7 @@ const TicketReissue: React.FC = () => {
                 <div className="flex justify-between items-end">
                   <span className="text-xs font-bold text-navy-400">Amount Due</span>
                   <span className="text-2xl font-black text-navy-950">
-                    {formatCurrency(totalDifference, currency)}
+                    {display(totalDifference)}
                   </span>
                 </div>
                 {totalDifference === 0 && (

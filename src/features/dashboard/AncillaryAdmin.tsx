@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToastStore } from '../../stores/toastStore';
+import { useCurrency } from '../../hooks/useCurrency';
 import {
     getAllProducts,
     createProduct,
@@ -17,6 +18,7 @@ const EMPTY: Omit<AncillaryProduct, 'id'> = {
 
 const AncillaryAdmin: React.FC = () => {
     const addToast = useToastStore(s => s.addToast);
+    const { display } = useCurrency();
     const [products, setProducts] = useState<AncillaryProduct[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -134,7 +136,7 @@ const AncillaryAdmin: React.FC = () => {
                                         </div>
                                         <div>
                                             <p className="text-xs font-black text-navy-950 uppercase tracking-tight">{p.name}</p>
-                                            <p className="text-[9px] font-bold text-navy-400 tracking-widest">{meta.label} • ${(p.price / 100).toFixed(2)}</p>
+                                            <p className="text-[9px] font-bold text-navy-400 tracking-widest">{meta.label} • {display(p.price / 100)}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">

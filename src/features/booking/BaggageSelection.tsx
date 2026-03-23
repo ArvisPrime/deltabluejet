@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { useBookingStore } from '../../stores/bookingStore';
+import { useCurrency } from '../../hooks/useCurrency';
 import {
     getDefaultAllowance,
     calculateExcessFee,
@@ -15,6 +16,7 @@ const BaggageSelection: React.FC = () => {
     const selectedFlight = useBookingStore(s => s.selectedFlight);
     const fareClass = selectedFlight?.fareClass || 'economy';
     const allowance: BaggageAllowance = getDefaultAllowance(fareClass);
+    const { display } = useCurrency();
 
     // ── State ────────────────────────────────────────────
     const [checkedBags, setCheckedBags] = useState(allowance.checked.count);
@@ -165,7 +167,7 @@ const BaggageSelection: React.FC = () => {
                                             </div>
                                             <p className="text-[10px] font-bold text-navy-400 mt-1 leading-relaxed">{item.description}</p>
                                             <p className="text-sm font-black text-navy-900 mt-2">
-                                                {item.feeCents === 0 ? <span className="text-emerald-600">Free</span> : `$${(item.feeCents / 100).toFixed(2)}`}
+                                                {item.feeCents === 0 ? <span className="text-emerald-600">Free</span> : display(item.feeCents / 100)}
                                             </p>
                                         </div>
                                         {isSelected && <span className="material-symbols-outlined text-primary">check_circle</span>}
@@ -215,7 +217,7 @@ const BaggageSelection: React.FC = () => {
                                     <hr className="border-dashed border-navy-100" />
                                     <div className="flex justify-between font-bold">
                                         <span className="text-amber-600">Excess Baggage Fee</span>
-                                        <span className="text-amber-600">${(excessResult.totalFee / 100).toFixed(2)}</span>
+                                        <span className="text-amber-600">{display(excessResult.totalFee / 100)}</span>
                                     </div>
                                 </>
                             )}
@@ -228,7 +230,7 @@ const BaggageSelection: React.FC = () => {
                                         return item ? (
                                             <div key={id} className="flex justify-between font-bold text-xs">
                                                 <span className="text-navy-500">{item.name}</span>
-                                                <span className="text-navy-900">{item.feeCents === 0 ? 'Free' : `$${(item.feeCents / 100).toFixed(2)}`}</span>
+                                                <span className="text-navy-900">{item.feeCents === 0 ? 'Free' : display(item.feeCents / 100)}</span>
                                             </div>
                                         ) : null;
                                     })}
@@ -239,7 +241,7 @@ const BaggageSelection: React.FC = () => {
                             <div className="flex justify-between items-end pt-2">
                                 <span className="text-xs font-black text-navy-400 uppercase tracking-widest">Additional Cost</span>
                                 <span className={`text-2xl font-black ${grandTotal > 0 ? 'text-primary' : 'text-emerald-600'}`}>
-                                    {grandTotal === 0 ? 'Free' : `$${(grandTotal / 100).toFixed(2)}`}
+                                    {grandTotal === 0 ? 'Free' : display(grandTotal / 100)}
                                 </span>
                             </div>
                         </div>

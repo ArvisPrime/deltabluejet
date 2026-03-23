@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { useToastStore } from '../../stores/toastStore';
 import { calculateMilesCashSplit, getLoyaltyStatus } from '../../services/loyaltyService';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface Props {
     totalPrice: number;
@@ -12,6 +13,7 @@ interface Props {
 const MilesCashPayment: React.FC<Props> = ({ totalPrice, currency = 'USD', onPaymentSplit }) => {
     const user = useAuthStore(s => s.user);
     const addToast = useToastStore(s => s.addToast);
+    const { display } = useCurrency();
     const [milesPercentage, setMilesPercentage] = useState(50);
     const [milesAvailable, setMilesAvailable] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -84,11 +86,11 @@ const MilesCashPayment: React.FC<Props> = ({ totalPrice, currency = 'USD', onPay
                 <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 text-center">
                     <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">Miles</p>
                     <p className="text-2xl font-black text-navy-950 tracking-tighter">{split.milesUsed.toLocaleString()}</p>
-                    <p className="text-[10px] text-navy-400">= ${split.milesValue.toFixed(2)}</p>
+                    <p className="text-[10px] text-navy-400">= {display(split.milesValue)}</p>
                 </div>
                 <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-center">
                     <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Cash</p>
-                    <p className="text-2xl font-black text-navy-950 tracking-tighter">${split.cashAmount.toFixed(2)}</p>
+                    <p className="text-2xl font-black text-navy-950 tracking-tighter">{display(split.cashAmount)}</p>
                     <p className="text-[10px] text-navy-400">{currency}</p>
                 </div>
             </div>
@@ -96,7 +98,7 @@ const MilesCashPayment: React.FC<Props> = ({ totalPrice, currency = 'USD', onPay
             {/* Total */}
             <div className="flex justify-between items-center p-4 bg-navy-950 text-white rounded-xl">
                 <span className="text-xs font-black uppercase tracking-widest">Total Fare</span>
-                <span className="text-xl font-black tracking-tighter">${totalPrice.toFixed(2)}</span>
+                <span className="text-xl font-black tracking-tighter">{display(totalPrice)}</span>
             </div>
 
             {/* Quick Presets */}

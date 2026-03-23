@@ -3,6 +3,7 @@ import type { PaymentDoc, BookingDoc } from '../../types/firestore';
 import { calculateRefund, processRefund, type RefundCalculation } from '../../services/paymentService';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuth } from '../../hooks/useAuth';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface RefundPanelProps {
     payment: PaymentDoc;
@@ -20,6 +21,7 @@ const RefundPanel: React.FC<RefundPanelProps> = ({
     onClose,
 }) => {
     const { user } = useAuth();
+    const { display } = useCurrency();
     const [reason, setReason] = useState('');
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState('');
@@ -54,7 +56,7 @@ const RefundPanel: React.FC<RefundPanelProps> = ({
         }
     };
 
-    const displayAmount = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+    const displayAmount = (cents: number) => display(cents / 100);
     const hoursUntil = Math.max(0, Math.round((departureDate.getTime() - Date.now()) / (1000 * 60 * 60)));
 
     return (

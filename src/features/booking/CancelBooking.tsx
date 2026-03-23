@@ -3,11 +3,13 @@ import { useParams, Link, useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { getBookingByPNR } from '../../services/booking';
 import { calculateCancellationFee, getFareRules, type CancellationResult } from '../../services/fareRulesService';
+import { useCurrency } from '../../hooks/useCurrency';
 import type { BookingDoc } from '../../types/firestore';
 
 const CancelBooking: React.FC = () => {
     const { pnr } = useParams<{ pnr: string }>();
     const navigate = useNavigate();
+    const { display } = useCurrency();
 
     const [booking, setBooking] = useState<BookingDoc | null>(null);
     const [loading, setLoading] = useState(true);
@@ -98,9 +100,9 @@ const CancelBooking: React.FC = () => {
                     <span className="material-symbols-outlined text-emerald-500 text-5xl">check_circle</span>
                     <h2 className="text-xl font-black text-navy-900 uppercase tracking-wider">Cancellation Confirmed</h2>
                     <p className="text-sm text-navy-600 font-medium max-w-md mx-auto">
-                        {voucherOption
-                            ? `A travel voucher of $${((cancelResult?.refundAmount || 0) / 100).toFixed(2)} has been issued to your account. It is valid for 12 months.`
-                            : `A refund of $${((cancelResult?.refundAmount || 0) / 100).toFixed(2)} will be processed to your original payment method within 7–14 business days.`
+                         {voucherOption
+                            ? `A travel voucher of ${display((cancelResult?.refundAmount || 0) / 100)} has been issued to your account. It is valid for 12 months.`
+                            : `A refund of ${display((cancelResult?.refundAmount || 0) / 100)} will be processed to your original payment method within 7–14 business days.`
                         }
                     </p>
                     <div className="pt-4 flex justify-center gap-3">
@@ -151,7 +153,7 @@ const CancelBooking: React.FC = () => {
                         </div>
                         <div>
                             <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Total Paid</span>
-                            <p className="text-sm font-black text-primary mt-1">${booking.totalAmount?.toFixed(2)}</p>
+                            <p className="text-sm font-black text-primary mt-1">{display(booking.totalAmount ?? 0)}</p>
                         </div>
                     </div>
                 </div>
@@ -175,22 +177,22 @@ const CancelBooking: React.FC = () => {
                         <div className="bg-navy-50 rounded-2xl p-5 space-y-3">
                             <div className="flex justify-between text-sm font-bold">
                                 <span className="text-navy-500">Original Amount</span>
-                                <span className="text-navy-900">${(booking?.totalAmount || 0).toFixed(2)}</span>
+                                <span className="text-navy-900">{display(booking?.totalAmount || 0)}</span>
                             </div>
                             {cancelResult.adminFee > 0 && (
                                 <div className="flex justify-between text-sm font-bold">
                                     <span className="text-navy-500">Administrative Fee</span>
-                                    <span className="text-red-500">-${(cancelResult.adminFee / 100).toFixed(2)}</span>
+                                    <span className="text-red-500">-{display(cancelResult.adminFee / 100)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between text-sm font-bold">
                                 <span className="text-navy-500">Cancellation Fee</span>
-                                <span className="text-red-500">-${(cancelResult.cancellationFee / 100).toFixed(2)}</span>
+                                <span className="text-red-500">-{display(cancelResult.cancellationFee / 100)}</span>
                             </div>
                             <hr className="border-dashed border-navy-200" />
                             <div className="flex justify-between text-sm font-black">
                                 <span className="text-navy-800">Refund Amount</span>
-                                <span className="text-emerald-600 text-lg">${(cancelResult.refundAmount / 100).toFixed(2)}</span>
+                                <span className="text-emerald-600 text-lg">{display(cancelResult.refundAmount / 100)}</span>
                             </div>
                         </div>
                     </div>
@@ -227,7 +229,7 @@ const CancelBooking: React.FC = () => {
                     <div>
                         <h4 className="text-sm font-black text-navy-900 uppercase tracking-wider">Receive as Travel Voucher Instead</h4>
                         <p className="text-xs text-navy-500 font-bold mt-1">
-                            Get a <span className="text-primary">10% bonus</span> — receive ${((cancelResult.refundAmount * 1.1) / 100).toFixed(2)} as a travel voucher
+                            Get a <span className="text-primary">10% bonus</span> — receive {display((cancelResult.refundAmount * 1.1) / 100)} as a travel voucher
                             valid for 12 months, usable on any DeltaBlue Jet Air flight.
                         </p>
                     </div>
@@ -265,8 +267,8 @@ const CancelBooking: React.FC = () => {
                             <p className="text-sm text-navy-600 font-medium">
                                 Are you sure you want to cancel booking <span className="font-black">{pnr}</span>?
                                 {voucherOption
-                                    ? ` A travel voucher of $${((cancelResult?.refundAmount || 0) * 1.1 / 100).toFixed(2)} will be issued.`
-                                    : ` A refund of $${((cancelResult?.refundAmount || 0) / 100).toFixed(2)} will be processed.`
+                                    ? ` A travel voucher of ${display((cancelResult?.refundAmount || 0) * 1.1 / 100)} will be issued.`
+                                    : ` A refund of ${display((cancelResult?.refundAmount || 0) / 100)} will be processed.`
                                 }
                             </p>
                             <p className="text-[10px] text-red-500 font-black uppercase tracking-widest">This action cannot be undone.</p>

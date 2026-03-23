@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useToastStore } from '../../stores/toastStore';
 import { getReconciliationData, exportToCSV, type ReconRow } from '../../services/reportingService';
+import { useCurrency } from '../../hooks/useCurrency';
 
 const FinancialReconciliation: React.FC = () => {
     const addToast = useToastStore(s => s.addToast);
+    const { display } = useCurrency();
     const [data, setData] = useState<ReconRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('all');
@@ -54,9 +56,9 @@ const FinancialReconciliation: React.FC = () => {
 
             <div className="grid grid-cols-4 gap-4 mb-6">
                 {[
-                    { label: 'Total Charged', value: `$${totalCharged.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: 'payments', color: 'text-primary bg-primary/10' },
-                    { label: 'Total Refunded', value: `$${totalRefunded.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: 'money_off', color: 'text-red-600 bg-red-50' },
-                    { label: 'Net Revenue', value: `$${netRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, icon: 'account_balance', color: 'text-emerald-600 bg-emerald-50' },
+                    { label: 'Total Charged', value: display(totalCharged), icon: 'payments', color: 'text-primary bg-primary/10' },
+                    { label: 'Total Refunded', value: display(totalRefunded), icon: 'money_off', color: 'text-red-600 bg-red-50' },
+                    { label: 'Net Revenue', value: display(netRevenue), icon: 'account_balance', color: 'text-emerald-600 bg-emerald-50' },
                     { label: 'Transactions', value: filtered.length.toString(), icon: 'receipt_long', color: 'text-amber-600 bg-amber-50' },
                 ].map(m => (
                     <div key={m.label} className="bg-white rounded-2xl border border-navy-100 p-5">
@@ -96,9 +98,9 @@ const FinancialReconciliation: React.FC = () => {
                                 <td className="px-4 py-2.5 text-xs font-black text-primary">{r.bookingRef}</td>
                                 <td className="px-4 py-2.5 text-xs font-bold text-navy-700">{r.passenger}</td>
                                 <td className="px-4 py-2.5 text-xs text-navy-600">{r.route}</td>
-                                <td className="px-4 py-2.5 text-xs font-bold text-navy-900">${r.totalCharged.toFixed(2)}</td>
-                                <td className="px-4 py-2.5 text-xs text-red-500">{r.refunded > 0 ? `-$${r.refunded.toFixed(2)}` : '—'}</td>
-                                <td className="px-4 py-2.5 text-xs font-black text-navy-950">${r.netRevenue.toFixed(2)}</td>
+                                <td className="px-4 py-2.5 text-xs font-bold text-navy-900">{display(r.totalCharged)}</td>
+                                <td className="px-4 py-2.5 text-xs text-red-500">{r.refunded > 0 ? `-${display(r.refunded)}` : '—'}</td>
+                                <td className="px-4 py-2.5 text-xs font-black text-navy-950">{display(r.netRevenue)}</td>
                                 <td className="px-4 py-2.5"><span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${statusColor(r.paymentStatus)}`}>{r.paymentStatus}</span></td>
                                 <td className="px-4 py-2.5 text-xs text-navy-400">{r.date}</td>
                             </tr>

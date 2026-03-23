@@ -5,6 +5,7 @@ import { BRAND } from '../../config/brand';
 import { ROUTES } from '../../config/routes';
 import { useBookingStore } from '../../stores/bookingStore';
 import { searchFlights, getAllScheduledFlights } from '../../services/firestore';
+import { useCurrency } from '../../hooks/useCurrency';
 import type { FlightDoc } from '../../types/firestore';
 
 const BookingStepper: React.FC<{ current: number }> = ({ current }) => {
@@ -77,6 +78,7 @@ const FlightResults: React.FC = () => {
    const navigate = useNavigate();
    const searchCriteria = useBookingStore((s) => s.searchCriteria);
    const setSelectedFlight = useBookingStore((s) => s.setSelectedFlight);
+   const { currency, display } = useCurrency();
 
    const onBack = () => navigate(ROUTES.FLIGHT_SEARCH);
    const [activeFilter, setActiveFilter] = useState('Recommended');
@@ -372,8 +374,8 @@ const FlightResults: React.FC = () => {
                                              <div className="text-right">
                                                 <p className="text-[9px] font-black text-navy-300 uppercase tracking-widest mb-1">Starting Price</p>
                                                 <div className="flex items-baseline justify-end gap-1">
-                                                   <span className="text-xs font-black text-navy-400">USD</span>
-                                                   <span className="text-4xl font-black text-navy-950 tracking-tighter">${economyPrice}</span>
+                                                   <span className="text-xs font-black text-navy-400">{currency}</span>
+                                                   <span className="text-4xl font-black text-navy-950 tracking-tighter">{display(economyPrice)}</span>
                                                 </div>
                                              </div>
                                              <button className="px-12 py-5 bg-navy-950 text-white font-black uppercase text-[11px] tracking-[0.25em] rounded-[1.5rem] shadow-2xl shadow-navy-950/20 group-hover:bg-primary group-hover:shadow-primary/30 transition-all hover:scale-105 active:scale-95">Select Flight</button>
@@ -470,8 +472,8 @@ const FlightResults: React.FC = () => {
                                     <div className="text-right">
                                        <p className="text-[9px] font-black text-navy-300 uppercase tracking-widest mb-1">Starting Price</p>
                                        <div className="flex items-baseline justify-end gap-1">
-                                          <span className="text-xs font-black text-navy-400">USD</span>
-                                          <span className="text-4xl font-black text-navy-950 tracking-tighter">${economyPrice}</span>
+                                          <span className="text-xs font-black text-navy-400">{currency}</span>
+                                          <span className="text-4xl font-black text-navy-950 tracking-tighter">{display(economyPrice)}</span>
                                        </div>
                                     </div>
                                     <button className="px-12 py-5 bg-navy-950 text-white font-black uppercase text-[11px] tracking-[0.25em] rounded-[1.5rem] shadow-2xl shadow-navy-950/20 group-hover:bg-primary group-hover:shadow-primary/30 transition-all hover:scale-105 active:scale-95">Select Flight</button>

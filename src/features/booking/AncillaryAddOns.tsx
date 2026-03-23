@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToastStore } from '../../stores/toastStore';
+import { useCurrency } from '../../hooks/useCurrency';
 import {
     getAvailableProducts,
     addAncillaryToBooking,
@@ -15,6 +16,7 @@ interface AncillaryAddOnsProps {
 
 const AncillaryAddOns: React.FC<AncillaryAddOnsProps> = ({ bookingId, onComplete }) => {
     const addToast = useToastStore(s => s.addToast);
+    const { display } = useCurrency();
     const [products, setProducts] = useState<AncillaryProduct[]>([]);
     const [loading, setLoading] = useState(true);
     const [selected, setSelected] = useState<Map<string, number>>(new Map());
@@ -112,7 +114,7 @@ const AncillaryAddOns: React.FC<AncillaryAddOnsProps> = ({ bookingId, onComplete
                             <p className="text-[9px] font-bold text-navy-400 uppercase tracking-widest leading-relaxed mb-4">{product.description}</p>
                             <div className="flex items-center justify-between pt-4 border-t border-navy-50">
                                 <span className={`text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${meta.color}`}>{meta.label}</span>
-                                <span className="text-lg font-black text-navy-950 tracking-tighter">${(product.price / 100).toFixed(2)}</span>
+                                <span className="text-lg font-black text-navy-950 tracking-tighter">{display(product.price / 100)}</span>
                             </div>
                         </button>
                     );
@@ -125,7 +127,7 @@ const AncillaryAddOns: React.FC<AncillaryAddOnsProps> = ({ bookingId, onComplete
                     <div className="max-w-7xl mx-auto flex items-center justify-between">
                         <div>
                             <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest">{selected.size} add-on(s) selected</p>
-                            <p className="text-2xl font-black text-navy-950 tracking-tighter">${(totalPrice / 100).toFixed(2)}</p>
+                            <p className="text-2xl font-black text-navy-950 tracking-tighter">{display(totalPrice / 100)}</p>
                         </div>
                         <button onClick={handleConfirm} disabled={adding} className="px-10 py-4 bg-primary text-white font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
                             {adding ? 'Adding…' : 'Confirm Add-ons'}
