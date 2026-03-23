@@ -30,6 +30,7 @@ export interface FlightDoc {
     delayReason: string | null;
     newDepartureTime: Timestamp | null;
     cancellationReason: string | null;
+    bookedSeats?: number;           // Total booked seats count (used in overbooking)
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
@@ -42,7 +43,8 @@ export type FlightStatus =
     | 'landed'
     | 'arrived'
     | 'delayed'
-    | 'cancelled';
+    | 'cancelled'
+    | 'diverted';
 
 export interface AirportRef {
     code: string;     // IATA 3-letter
@@ -56,6 +58,7 @@ export interface AircraftRef {
     id: string;
     type: string;      // e.g. "Boeing 737-800"
     registration: string;
+    capacity?: number;  // Total passenger capacity
 }
 
 // ─── Aircraft ──────────────────────────────────────────────
@@ -182,16 +185,162 @@ export type BookingStatus =
 
 export interface PassengerDoc {
     id: string;
+    title?: string;
     firstName: string;
     lastName: string;
+    gender?: string;
     dateOfBirth: string;
     nationality: string;
     documentType: 'passport' | 'national_id';
     documentNumber: string;
+    passportExpiry?: string | null;
+    issuingCountry?: string | null;
     seatNumber: string | null;
     boardingPassUrl: string | null;
     checkedIn: boolean;
     specialRequests: string[];
+}
+
+// ─── Fare Rules ────────────────────────────────────────────
+
+export interface FareRuleDoc {
+    id: string;
+    fareClass: string;                    // 'economy' | 'business' | 'first'
+    cancellation: {
+        tiered: {
+            hoursThreshold: number;       // e.g. 72, 24
+            refundPercent: number;        // 0–100
+        }[];
+    };
+    change: {
+        allowed: boolean;
+        fee: number;
+    };
+    description: string;
+    active: boolean;
+    updatedAt: Timestamp;
+}
+
+// ─── Vouchers / Credits ────────────────────────────────────
+
+export type VoucherStatus = 'active' | 'redeemed' | 'expired' | 'revoked';
+
+export interface VoucherDoc {
+    id: string;
+    userId: string;
+    amount: number;                       // value in smallest unit
+    currency: string;
+    status: VoucherStatus;
+    reason: string;
+    bookingId: string | null;             // source booking (cancellation)
+    redeemedBookingId: string | null;     // booking that used this voucher
+    code: string;                         // unique voucher code
+    expiresAt: Timestamp;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+// ─── Baggage Allowances ────────────────────────────────────
+
+export interface BaggageAllowanceDoc {
+    id: string;
+    fareClass: string;                              // 'economy' | 'business' | 'first'
+    cabin: { count: number; maxWeightKg: number };  // e.g. { count: 1, maxWeightKg: 8 }
+    checked: { count: number; maxWeightKg: number }; // e.g. { count: 1, maxWeightKg: 23 }
+    personalItem: boolean;                           // small bag under seat
+    description: string;
+    active: boolean;
+    updatedAt: Timestamp;
+}
+
+export interface ExcessPricingTier {
+    minKg: number;
+    maxKg: number | null;          // null = unlimited
+    pricePerKgCents: number;       // e.g. 1500 = $15/kg
+    flatFeeCents: number;          // e.g. 5000 = $50 per extra bag
+}
+
+export interface BaggagePolicyDoc {
+    id: string;
+    routeId: string | null;        // null = global default
+    fareClass: string;
+    overrideAllowance: Partial<BaggageAllowanceDoc> | null;
+    excessPricing: ExcessPricingTier[];
+    specialItems: {
+        sportsEquipment: { allowed: boolean; feeCents: number };
+        musicalInstruments: { allowed: boolean; feeCents: number };
+        pets: { allowed: boolean; feeCents: number; cabinAllowed: boolean };
+        wheelchair: { allowed: boolean; feeCents: number };  // usually free
+    };
+    maxTotalBags: number;          // hard limit per passenger
+    updatedAt: Timestamp;
+}
+
+export type BaggageClaimType = 'lost' | 'delayed' | 'damaged';
+export type BaggageClaimStatus = 'submitted' | 'investigating' | 'found' | 'resolved' | 'compensation_issued' | 'closed';
+
+export interface BaggageClaimDoc {
+    id: string;
+    bookingId: string;
+    userId: string;
+    pnr: string;
+    tagNumber: string;             // baggage tag e.g. "DB-123456"
+    type: BaggageClaimType;
+    status: BaggageClaimStatus;
+    description: string;
+    contactPhone: string;
+    contactEmail: string;
+    deliveryAddress?: string;      // for delayed bags
+    compensationAmount?: number;   // cents
+    resolution?: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+// ─── Meal Options ──────────────────────────────────────────
+
+export type DietaryType = 'standard' | 'vegetarian' | 'vegan' | 'halal' | 'kosher' | 'gluten_free' | 'diabetic' | 'child' | 'baby';
+
+export interface MealOptionDoc {
+    id: string;
+    name: string;
+    dietaryType: DietaryType;
+    description: string;
+    priceCents: number;             // 0 for included meals
+    available: boolean;
+    routeIds: string[] | null;      // null = all routes
+    fareClasses: string[] | null;   // null = all
+    imageUrl?: string;
+    updatedAt: Timestamp;
+}
+
+// ─── Lounge Passes ─────────────────────────────────────────
+
+export interface LoungePassDoc {
+    id: string;
+    userId: string;
+    bookingId: string;
+    airportCode: string;
+    loungeName: string;
+    date: string;                   // YYYY-MM-DD
+    status: 'active' | 'used' | 'expired' | 'cancelled';
+    priceCents: number;
+    createdAt: Timestamp;
+}
+
+// ─── Insurance Quotes ──────────────────────────────────────
+
+export interface InsuranceQuoteDoc {
+    id: string;
+    userId: string;
+    bookingId: string;
+    planName: string;
+    coverageType: 'basic' | 'standard' | 'premium';
+    premiumCents: number;
+    coverageAmountCents: number;
+    status: 'quoted' | 'purchased' | 'cancelled' | 'claimed';
+    coverageDetails: string[];
+    createdAt: Timestamp;
 }
 
 // ─── Payments ──────────────────────────────────────────────

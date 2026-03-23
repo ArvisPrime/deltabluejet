@@ -1,0 +1,111 @@
+/*
+ * RTL (Right-to-Left) Layout Support — Deltablue Jet Air
+ *
+ * Applied when <html dir="rtl"> is set (e.g., Arabic).
+ * Uses CSS logical properties where possible.
+ */
+
+/* ─── Global Direction ──────────────────────────────────── */
+
+[dir="rtl"] {
+    text-align: right;
+}
+
+/* Flex direction mirroring */
+[dir="rtl"] .flex-row,
+[dir="rtl"] .flex {
+    /* Auto-mirrors via logical properties; override specific cases above if needed */
+    direction: rtl;
+}
+
+/* ─── Navigation & Layout ───────────────────────────────── */
+
+[dir="rtl"] .space-x-2 > :not(:first-child),
+[dir="rtl"] .space-x-3 > :not(:first-child),
+[dir="rtl"] .space-x-4 > :not(:first-child) {
+    margin-left: 0;
+    margin-right: 0.5rem;
+}
+
+[dir="rtl"] .space-x-3 > :not(:first-child) {
+    margin-right: 0.75rem;
+}
+
+[dir="rtl"] .space-x-4 > :not(:first-child) {
+    margin-right: 1rem;
+}
+
+/* ─── Form Elements ─────────────────────────────────────── */
+
+[dir="rtl"] input,
+[dir="rtl"] select,
+[dir="rtl"] textarea {
+    text-align: right;
+}
+
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="number"] {
+    /* Keep these LTR for proper data entry */
+    direction: ltr;
+    text-align: left;
+}
+
+/* ─── Icons & Arrows ────────────────────────────────────── */
+
+[dir="rtl"] .material-symbols-outlined[class*="arrow_forward"],
+[dir="rtl"] .material-symbols-outlined[class*="arrow_back"],
+[dir="rtl"] .material-symbols-outlined[class*="chevron_left"],
+[dir="rtl"] .material-symbols-outlined[class*="chevron_right"] {
+    transform: scaleX(-1);
+}
+
+/* ─── Rounded Corners ───────────────────────────────────── */
+
+[dir="rtl"] .rounded-l-xl {
+    border-radius: 0 0.75rem 0.75rem 0;
+}
+
+[dir="rtl"] .rounded-r-xl {
+    border-radius: 0.75rem 0 0 0.75rem;
+}
+
+/* ─── Positioning Overrides ─────────────────────────────── */
+
+[dir="rtl"] .left-0 {
+    left: auto;
+    right: 0;
+}
+
+[dir="rtl"] .right-0 {
+    right: auto;
+    left: 0;
+}
+
+/* ─── Scrollbar Position ────────────────────────────────── */
+
+[dir="rtl"] ::-webkit-scrollbar {
+    direction: rtl;
+}
+
+/* ─── Tables ────────────────────────────────────────────── */
+
+[dir="rtl"] th,
+[dir="rtl"] td {
+    text-align: right;
+}
+
+[dir="rtl"] th.text-right,
+[dir="rtl"] td.text-right {
+    text-align: left;
+}
+
+/* ─── Animation Direction ───────────────────────────────── */
+
+[dir="rtl"] .animate-in.slide-in-from-right {
+    --tw-enter-translate-x: -100%;
+}
+
+[dir="rtl"] .animate-in.slide-in-from-left {
+    --tw-enter-translate-x: 100%;
+}

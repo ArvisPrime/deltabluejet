@@ -10,6 +10,16 @@ export const ROUTES = {
     ABOUT: '/about',
     CAREERS: '/careers',
 
+    // Legal
+    TERMS: '/terms',
+    PRIVACY_POLICY: '/privacy',
+    DANGEROUS_GOODS: '/dangerous-goods',
+    TARMAC_DELAY_PLAN: '/tarmac-delay-plan',
+    VISA_CHECKER: '/visa-requirements',
+
+    // Booking — Cancel
+    CANCEL_BOOKING: '/manage-booking/:pnr/cancel',
+
     // Auth
     LOGIN: '/login',
     STAFF_LOGIN: '/staff-login',
@@ -24,6 +34,7 @@ export const ROUTES = {
     FARE_SELECTION: '/book/fare',
     PASSENGER_DETAILS: '/book/passengers',
     SEAT_SELECTION: '/book/seats',
+    BAGGAGE_SELECTION: '/book/baggage',
     PAYMENT: '/book/payment',
     PAYMENT_CALLBACK: '/booking/payment-callback',
     TICKET_CONFIRMATION: '/book/confirmation',
@@ -31,10 +42,14 @@ export const ROUTES = {
 
     // Manage booking
     MANAGE_BOOKING: '/manage-booking',
+    BAGGAGE_TRACKING: '/manage-booking/baggage',
     BOOKING_DETAIL: '/manage-booking/:pnr',
     MODIFY_BOOKING: '/manage-booking/:pnr/modify',
     REVIEW_CHANGE: '/manage-booking/:pnr/review-change',
     CHANGE_SUCCESS: '/manage-booking/:pnr/change-success',
+
+    // Group booking (public)
+    GROUP_BOOKING: '/group-booking',
 
     // Check-in flow
     CHECKIN: '/checkin',
@@ -119,8 +134,51 @@ export const ROUTES = {
 
     // Admin — Ancillary Revenue
     ANCILLARY_ADMIN: '/admin/ancillary',
+    BAGGAGE_ADMIN: '/admin/baggage',
 
     // Admin — Crew
     CREW_MANAGEMENT: '/admin/crew',
     CREW_SCHEDULING: '/admin/crew/scheduling',
+
+    // Admin — IROP & Revenue
+    MASS_REBOOKING: '/admin/mass-rebooking',
+    OVERBOOKING: '/admin/overbooking',
+    CORPORATE_FARES: '/admin/corporate-fares',
+
+    // Support
+    HELP_CENTER: '/help',
+    SUPPORT_TICKETS: '/support/tickets',
+    CALLBACK_REQUEST: '/support/callback',
+
+    // Admin — Support
+    COMPLAINT_MANAGEMENT: '/admin/complaints',
+
+    // Booking — Special Assistance
+    SPECIAL_ASSISTANCE: '/special-assistance',
+
+    // Destinations — Health
+    HEALTH_REQUIREMENTS: '/health-requirements',
+
+    // Legal — Accessibility
+    ACCESSIBILITY_STATEMENT: '/accessibility',
+
+    // ─── Phase 4: Growth & Alliance ───────────────────────────
+
+    // Loyalty v2
+    TIER_BENEFITS: '/loyalty/benefits',
+    AWARD_BOOKING: '/book/award',
+    MILES_CASH: '/book/miles-cash',
+    FAMILY_POOLING: '/loyalty/family',
+    STATUS_MATCH: '/loyalty/status-match',
+
+    // Interline & Codeshare
+    CODESHARE_FLIGHTS: '/codeshare',
+    INTERLINE_ADMIN: '/admin/interline',
+
+    // Reporting & BI
+    REVENUE_REPORTS: '/admin/reports/revenue',
+    LOAD_FACTOR_REPORTS: '/admin/reports/load-factor',
+    OTP_REPORTS: '/admin/reports/otp',
+    PASSENGER_STATS: '/admin/reports/passengers',
+    FINANCIAL_RECONCILIATION: '/admin/reports/finance',
 } as const;

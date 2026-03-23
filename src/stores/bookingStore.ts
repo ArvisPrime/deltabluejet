@@ -27,12 +27,16 @@ export interface SelectedFlight {
 }
 
 export interface PassengerInfo {
+    title?: string;
     firstName: string;
     lastName: string;
+    gender?: string;
     dateOfBirth: string;
     nationality: string;
     documentType: string;
     documentNumber: string;
+    passportExpiry?: string;
+    issuingCountry?: string;
     email?: string;
     phone?: string;
 }

@@ -95,12 +95,16 @@ export async function createBooking(input: CreateBookingInput): Promise<{
         const pax = input.passengers[i];
         const paxRef = doc(collection(db, 'bookings', bookingRef.id, 'passengers'));
         const paxData: Omit<PassengerDoc, 'id'> = {
+            title: pax.title || undefined,
             firstName: pax.firstName,
             lastName: pax.lastName,
+            gender: pax.gender || undefined,
             dateOfBirth: pax.dateOfBirth,
             nationality: pax.nationality,
             documentType: (pax.documentType as 'passport' | 'national_id') || 'passport',
             documentNumber: pax.documentNumber,
+            passportExpiry: pax.passportExpiry || null,
+            issuingCountry: pax.issuingCountry || null,
             seatNumber: input.selectedSeats[`pax-${i}`] || null,
             boardingPassUrl: null,
             checkedIn: false,

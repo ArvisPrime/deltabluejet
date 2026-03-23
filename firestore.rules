@@ -347,5 +347,37 @@ service cloud.firestore {
       allow read: if isOpsStaff();
       allow write: if isAdmin();
     }
+
+    // ─── Fare Rules ────────────────────────────────────────
+    match /fare_rules/{ruleId} {
+      allow read: if true;           // Public — passengers view refund policies
+      allow write: if isAdmin();
+    }
+
+    // ─── Vouchers / Credits ────────────────────────────────
+    match /vouchers/{voucherId} {
+      allow read: if isOpsStaff()
+                  || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();    // Status changes via Cloud Functions or admin
+      allow delete: if isAdmin();
+    }
+
+    // ─── Visa Requirements ─────────────────────────────────
+    match /visa_requirements/{reqId} {
+      allow read: if true;           // Public reference data
+      allow write: if isAdmin();
+    }
+
+    // ─── Baggage Claims ────────────────────────────────────
+    match /baggage_claims/{claimId} {
+      allow read: if isOpsStaff()
+                  || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if isOpsStaff();   // Status changes by ops
+      allow delete: if isAdmin();
+    }
   }
 }

@@ -64,38 +64,28 @@ export interface RefundCalculation {
 }
 
 /**
- * Calculate refund amount based on fare rules:
- * - > 48h before departure: 100% refund
- * - 24–48h before departure: 50% refund
- * - < 24h before departure: No refund
+ * Calculate refund amount based on fare rules.
+ * Delegates to fareRulesService for fare-class-aware policies.
+ * Falls back to basic tiered refund if no fare class provided.
  */
-export function calculateRefund(amountPaid: number, departureDate: Date): RefundCalculation {
+export function calculateRefund(
+    amountPaid: number,
+    departureDate: Date,
+    fareClass: string = 'economy',
+): RefundCalculation {
     const now = new Date();
     const hoursUntilDeparture = (departureDate.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (hoursUntilDeparture > 48) {
-        return {
-            eligible: true,
-            percentage: 100,
-            refundAmount: amountPaid,
-            reason: 'Full refund — more than 48 hours before departure',
-        };
-    }
-
-    if (hoursUntilDeparture >= 24) {
-        return {
-            eligible: true,
-            percentage: 50,
-            refundAmount: Math.round(amountPaid / 2),
-            reason: '50% refund — 24 to 48 hours before departure',
-        };
-    }
+    // Use the fare rules engine for fare-class-aware calculation
+    // Inline import to avoid circular deps at module level
+    const { calculateCancellationFee } = require('./fareRulesService');
+    const result = calculateCancellationFee(fareClass, amountPaid, hoursUntilDeparture);
 
     return {
-        eligible: false,
-        percentage: 0,
-        refundAmount: 0,
-        reason: 'No refund — less than 24 hours before departure',
+        eligible: result.eligible,
+        percentage: result.refundPercent,
+        refundAmount: result.refundAmount,
+        reason: `${result.fareDisplayName} fare — ${result.tierLabel}. ${result.refundPercent}% refund.`,
     };
 }
 

@@ -35,6 +35,125 @@ export const CLASS_MULTIPLIERS: Record<string, number> = {
     first: 3,
 };
 
+// ─── Tier Benefits ────────────────────────────────────────
+
+export interface TierBenefit {
+    label: string;
+    blue: string | boolean;
+    silver: string | boolean;
+    gold: string | boolean;
+    platinum: string | boolean;
+}
+
+export const TIER_BENEFITS: TierBenefit[] = [
+    { label: 'Points earning multiplier',        blue: '1×', silver: '1.5×', gold: '2×', platinum: '3×' },
+    { label: 'Free checked bags',                blue: '1 × 23 kg', silver: '2 × 23 kg', gold: '2 × 32 kg', platinum: '3 × 32 kg' },
+    { label: 'Priority boarding',                blue: false, silver: true, gold: true, platinum: true },
+    { label: 'Lounge access',                    blue: false, silver: false, gold: true, platinum: true },
+    { label: 'Priority check-in',                blue: false, silver: true, gold: true, platinum: true },
+    { label: 'Seat selection fee waiver',         blue: false, silver: false, gold: true, platinum: true },
+    { label: 'Upgrade vouchers (per year)',       blue: '0', silver: '1', gold: '2', platinum: '4' },
+    { label: 'Companion fare discount',           blue: false, silver: false, gold: '15%', platinum: '25%' },
+    { label: 'Miles never expire',               blue: false, silver: false, gold: false, platinum: true },
+    { label: 'Guaranteed economy seating',        blue: false, silver: false, gold: false, platinum: true },
+    { label: 'Fast track security',              blue: false, silver: false, gold: true, platinum: true },
+    { label: 'Dedicated phone line',             blue: false, silver: false, gold: false, platinum: true },
+];
+
+// ─── Distance-Based Miles ─────────────────────────────────
+
+export const ROUTE_DISTANCES: Record<string, number> = {
+    'BJL-DSS': 180, 'DSS-BJL': 180,
+    'BJL-LHR': 3100, 'LHR-BJL': 3100,
+    'BJL-JFK': 4800, 'JFK-BJL': 4800,
+    'BJL-DXB': 5800, 'DXB-BJL': 5800,
+    'BJL-ACC': 1100, 'ACC-BJL': 1100,
+    'LHR-JFK': 3450, 'JFK-LHR': 3450,
+    'LHR-DXB': 3400, 'DXB-LHR': 3400,
+    'DSS-LHR': 2900, 'LHR-DSS': 2900,
+    'DSS-ACC': 1200, 'ACC-DSS': 1200,
+};
+
+const TIER_EARN_MULTIPLIER: Record<LoyaltyTier, number> = {
+    blue: 1, silver: 1.5, gold: 2, platinum: 3,
+};
+
+export function calculateMilesForFlight(
+    origin: string, destination: string, fareClass: string, tier: LoyaltyTier,
+): number {
+    const key = `${origin}-${destination}`;
+    const baseMiles = ROUTE_DISTANCES[key] || 1000;
+    const classMultiplier = CLASS_MULTIPLIERS[fareClass.toLowerCase()] || 1;
+    const tierMultiplier = TIER_EARN_MULTIPLIER[tier] || 1;
+    return Math.round(baseMiles * classMultiplier * tierMultiplier);
+}
+
+// ─── Award Booking (Miles-for-Flights) ────────────────────
+
+export const AWARD_PRICING: Record<string, Record<string, number>> = {
+    short:   { economy: 8_000, business: 16_000, first: 30_000 },
+    medium:  { economy: 15_000, business: 30_000, first: 55_000 },
+    long:    { economy: 25_000, business: 50_000, first: 90_000 },
+};
+
+function getRouteCategory(origin: string, destination: string): 'short' | 'medium' | 'long' {
+    const key = `${origin}-${destination}`;
+    const dist = ROUTE_DISTANCES[key] || 3000;
+    if (dist <= 1500) return 'short';
+    if (dist <= 4000) return 'medium';
+    return 'long';
+}
+
+export function getAwardMilesCost(origin: string, destination: string, fareClass: string): number {
+    const cat = getRouteCategory(origin, destination);
+    return AWARD_PRICING[cat][fareClass.toLowerCase()] || AWARD_PRICING[cat].economy;
+}
+
+export async function createAwardBooking(
+    uid: string, origin: string, destination: string, fareClass: string,
+): Promise<{ success: boolean; message: string; milesDeducted: number }> {
+    const cost = getAwardMilesCost(origin, destination, fareClass);
+    const loyalty = await getLoyaltyStatus(uid);
+
+    if (loyalty.totalPoints < cost) {
+        return { success: false, message: `Need ${cost} miles, you have ${loyalty.totalPoints}`, milesDeducted: 0 };
+    }
+
+    const entry: PointsHistoryEntry = {
+        date: Timestamp.now(),
+        amount: cost,
+        type: 'redeem' as any,
+        bookingRef: `AWARD-${Date.now()}`,
+        description: `Award booking: ${origin}→${destination} ${fareClass}`,
+    };
+
+    const ref = doc(loyaltyRef, uid);
+    await updateDoc(ref, {
+        totalPoints: loyalty.totalPoints - cost,
+        pointsHistory: [...loyalty.pointsHistory, entry],
+        updatedAt: Timestamp.now(),
+    });
+
+    return { success: true, message: `Booked! ${cost} miles deducted.`, milesDeducted: cost };
+}
+
+// ─── Miles + Cash Split ───────────────────────────────────
+
+const MILES_TO_CASH_RATE = 0.01; // 1 mile = $0.01
+
+export function calculateMilesCashSplit(
+    totalPrice: number, milesAvailable: number, milesPercentage: number,
+): { milesUsed: number; cashAmount: number; milesValue: number } {
+    const fraction = Math.max(0, Math.min(100, milesPercentage)) / 100;
+    const milesValue = totalPrice * fraction;
+    const milesNeeded = Math.ceil(milesValue / MILES_TO_CASH_RATE);
+    const milesUsed = Math.min(milesNeeded, milesAvailable);
+    const actualMilesValue = milesUsed * MILES_TO_CASH_RATE;
+    const cashAmount = parseFloat((totalPrice - actualMilesValue).toFixed(2));
+
+    return { milesUsed, cashAmount, milesValue: actualMilesValue };
+}
+
 const loyaltyRef = collection(db, 'loyalty');
 
 // ─── Helpers ──────────────────────────────────────────────

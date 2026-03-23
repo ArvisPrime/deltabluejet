@@ -4,6 +4,9 @@ import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
 import { useCmsHeaderStore } from '../../stores/cmsHeaderStore';
 import { useToastStore } from '../../stores/toastStore';
+import CookieConsent from '../common/CookieConsent';
+import LanguageSwitcher from '../common/LanguageSwitcher';
+import CurrencySelector from '../common/CurrencySelector';
 
 /**
  * Public layout for customer-facing pages.
@@ -142,12 +145,13 @@ const PublicLayout: React.FC = () => {
                     {/* Actions */}
                     <div className="flex items-center gap-3 sm:gap-4">
                         {showLanguageSwitcher !== false && (
-                            <div className="hidden md:flex items-center gap-1 text-xs font-bold text-navy-500 uppercase tracking-widest cursor-pointer hover:text-navy-800 transition-colors">
-                                <span className="material-symbols-outlined text-lg">public</span>
-                                EN
-                                <span className="material-symbols-outlined text-sm">expand_more</span>
+                            <div className="hidden md:block">
+                                <LanguageSwitcher />
                             </div>
                         )}
+                        <div className="hidden md:block">
+                            <CurrencySelector />
+                        </div>
                         {showSearch !== false && (
                             <button className="text-navy-500 hover:text-navy-800 transition-colors hidden md:block">
                                 <span className="material-symbols-outlined text-xl">search</span>
@@ -190,7 +194,7 @@ const PublicLayout: React.FC = () => {
             {/* Footer */}
             <footer className="bg-navy-950 text-white pt-16 md:pt-20 pb-10 md:pb-12 px-4 sm:px-6 md:px-12">
                 <div className="max-w-7xl mx-auto">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-12 md:mb-16">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-12 mb-12 md:mb-16">
                         {[
                             {
                                 title: 'Travel',
@@ -221,8 +225,16 @@ const PublicLayout: React.FC = () => {
                                 title: 'Support',
                                 links: [
                                     { label: 'Help Center', path: ROUTES.ABOUT },
-                                    { label: 'Baggage Info', path: ROUTES.ABOUT },
-                                    { label: 'Accessible Travel', path: ROUTES.ABOUT },
+                                    { label: 'Dangerous Goods', path: ROUTES.DANGEROUS_GOODS },
+                                    { label: 'Visa Requirements', path: ROUTES.VISA_CHECKER },
+                                ],
+                            },
+                            {
+                                title: 'Legal',
+                                links: [
+                                    { label: 'Terms & Conditions', path: ROUTES.TERMS },
+                                    { label: 'Privacy Policy', path: ROUTES.PRIVACY_POLICY },
+                                    { label: 'Tarmac Delay Plan', path: ROUTES.TARMAC_DELAY_PLAN },
                                 ],
                             },
                         ].map((col) => (
@@ -261,13 +273,16 @@ const PublicLayout: React.FC = () => {
                             {BRAND.copyright}
                         </p>
                         <div className="flex gap-6 md:gap-8 text-[9px] md:text-[10px] font-bold text-navy-500 uppercase tracking-widest">
-                            <button onClick={() => addToast('Privacy Policy page coming soon', 'info')} className="hover:text-primary transition-colors">Privacy</button>
-                            <button onClick={() => addToast('Terms of Service page coming soon', 'info')} className="hover:text-primary transition-colors">Terms</button>
+                            <Link to={ROUTES.PRIVACY_POLICY} className="hover:text-primary transition-colors">Privacy</Link>
+                            <Link to={ROUTES.TERMS} className="hover:text-primary transition-colors">Terms</Link>
                             <Link to={ROUTES.STAFF_LOGIN} className="text-primary font-black">Staff Login</Link>
                         </div>
                     </div>
                 </div>
             </footer>
+
+            {/* Cookie Consent Banner */}
+            <CookieConsent />
         </div>
     );
 };

@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { APP_CONFIG } from '../../config/app';
+import { useBookingStore } from '../../stores/bookingStore';
+import { validatePassportExpiry, validateDocumentFormat, type ExpiryValidation } from '../../services/travelDocService';
 
 // ── Common countries list ──────────────────────────────────
 const COUNTRIES = [
@@ -26,25 +28,50 @@ const PassengerDetails: React.FC = () => {
   const [gender, setGender] = useState('Male');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [nationality, setNationality] = useState('');
   const [passportNumber, setPassportNumber] = useState('');
+  const [passportExpiry, setPassportExpiry] = useState('');
+  const [issuingCountry, setIssuingCountry] = useState('');
   const [email, setEmail] = useState('');
   const [phoneCode, setPhoneCode] = useState(APP_CONFIG.phoneCodes?.[0]?.code || '+1');
   const [phone, setPhone] = useState('');
   const [attempted, setAttempted] = useState(false);
 
+  const setPassengers = useBookingStore(s => s.setPassengers);
+
   // ── Validation ──────────────────────────────────────────
   const isEmailValid = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), [email]);
+
+  const passportExpiryCheck: ExpiryValidation | null = useMemo(() => {
+    if (!passportExpiry) return null;
+    // Use a reasonable future travel date (30 days from now if not known)
+    const travelDate = new Date();
+    travelDate.setDate(travelDate.getDate() + 30);
+    return validatePassportExpiry(passportExpiry, travelDate.toISOString());
+  }, [passportExpiry]);
+
+  const passportFormatCheck = useMemo(() => {
+    if (!passportNumber) return null;
+    return validateDocumentFormat(passportNumber);
+  }, [passportNumber]);
 
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
     if (!firstName.trim()) e.firstName = 'First name is required';
     if (!lastName.trim()) e.lastName = 'Last name is required';
+    if (!dateOfBirth) e.dateOfBirth = 'Date of birth is required';
+    if (!nationality) e.nationality = 'Nationality is required';
+    if (!passportNumber.trim()) e.passportNumber = 'Passport number is required';
+    else if (passportFormatCheck && !passportFormatCheck.valid) e.passportNumber = passportFormatCheck.message;
+    if (!passportExpiry) e.passportExpiry = 'Passport expiry date is required';
+    else if (passportExpiryCheck && !passportExpiryCheck.valid) e.passportExpiry = passportExpiryCheck.message;
+    if (!issuingCountry) e.issuingCountry = 'Issuing country is required';
     if (!email.trim()) e.email = 'Email is required';
     else if (!isEmailValid) e.email = 'Please enter a valid email address';
     if (!phone.trim()) e.phone = 'Phone number is required';
     return e;
-  }, [firstName, lastName, email, phone, isEmailValid]);
+  }, [firstName, lastName, dateOfBirth, nationality, passportNumber, passportExpiry, issuingCountry, email, phone, isEmailValid, passportExpiryCheck, passportFormatCheck]);
 
   const isValid = Object.keys(errors).length === 0;
 
@@ -53,6 +80,21 @@ const PassengerDetails: React.FC = () => {
   const onNext = () => {
     setAttempted(true);
     if (isValid) {
+      // Persist to booking store
+      setPassengers([{
+        title,
+        firstName,
+        lastName,
+        gender,
+        dateOfBirth,
+        nationality,
+        documentType: 'passport',
+        documentNumber: passportNumber,
+        passportExpiry,
+        issuingCountry,
+        email,
+        phone: `${phoneCode}${phone}`,
+      }]);
       navigate(ROUTES.SEAT_SELECTION);
     }
   };
@@ -128,15 +170,41 @@ const PassengerDetails: React.FC = () => {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Nationality</label>
-                  <select value={nationality} onChange={e => setNationality(e.target.value)} className="w-full h-12 rounded-xl border-2 border-transparent bg-navy-50 px-4 font-bold text-navy-900 focus:ring-2 focus:ring-primary/20 appearance-none">
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Date of Birth {requiredMark}</label>
+                  <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} className={fieldClass('dateOfBirth')} />
+                  {attempted && errors.dateOfBirth && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.dateOfBirth}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Nationality {requiredMark}</label>
+                  <select value={nationality} onChange={e => setNationality(e.target.value)} className={fieldClass('nationality')}>
                     <option value="">Select country</option>
                     {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
+                  {attempted && errors.nationality && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.nationality}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Passport Number</label>
-                  <input value={passportNumber} onChange={e => setPassportNumber(e.target.value.toUpperCase())} className="w-full h-12 rounded-xl border-2 border-transparent bg-navy-50 px-4 font-bold text-navy-900 focus:ring-2 focus:ring-primary/20 uppercase" placeholder="Enter passport number" />
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Passport Number {requiredMark}</label>
+                  <input value={passportNumber} onChange={e => setPassportNumber(e.target.value.toUpperCase())} className={fieldClass('passportNumber')} placeholder="Enter passport number" />
+                  {attempted && errors.passportNumber && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.passportNumber}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Passport Expiry Date {requiredMark}</label>
+                  <input type="date" value={passportExpiry} onChange={e => setPassportExpiry(e.target.value)} className={fieldClass('passportExpiry')} />
+                  {passportExpiryCheck && passportExpiryCheck.severity === 'warning' && (
+                    <div className="flex items-start gap-2 mt-1 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                      <span className="material-symbols-outlined text-amber-500 text-sm mt-0.5">warning</span>
+                      <p className="text-[10px] text-amber-700 font-bold">{passportExpiryCheck.message}</p>
+                    </div>
+                  )}
+                  {attempted && errors.passportExpiry && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.passportExpiry}</p>}
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Issuing Country {requiredMark}</label>
+                  <select value={issuingCountry} onChange={e => setIssuingCountry(e.target.value)} className={fieldClass('issuingCountry')}>
+                    <option value="">Select issuing country</option>
+                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  {attempted && errors.issuingCountry && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.issuingCountry}</p>}
                 </div>
               </div>
             </section>
