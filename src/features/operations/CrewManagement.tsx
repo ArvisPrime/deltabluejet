@@ -5,6 +5,7 @@ import {
     ROLE_META, type CrewMember, type CrewRole, type CrewStatus,
 } from '../../services/crewService';
 import { Timestamp } from 'firebase/firestore';
+import { downloadCSV, printTable } from '../../utils/tableExport';
 
 const ROLES: CrewRole[] = ['captain', 'first_officer', 'purser', 'cabin_crew', 'engineer'];
 const STATUSES: CrewStatus[] = ['active', 'on_leave', 'training', 'inactive'];
@@ -61,6 +62,50 @@ const CrewManagement: React.FC = () => {
     }, [crew, filter, searchQuery]);
 
     const activeCrew = crew.filter(c => c.status === 'active').length;
+
+    // ── Export Handlers ─────────────────────────────────────
+    const handleExportCSV = () => {
+        const rows = filtered.map(m => ({
+            'Employee ID': m.employeeId,
+            'Name': m.name,
+            'Role': ROLE_META[m.role].label,
+            'Status': m.status.replace('_', ' '),
+            'Base Airport': m.baseAirport || '',
+            'Flight Hours': m.totalFlightHours || 0,
+            'Email': m.email || '',
+            'Phone': m.phone || '',
+        }));
+        downloadCSV(rows, 'crew_roster');
+        addToast(`Exported ${rows.length} crew members`, 'success');
+    };
+
+    const handlePrint = () => {
+        const tableRows = filtered.map(m =>
+            `<tr>
+                <td>${m.employeeId}</td>
+                <td><strong>${m.name}</strong></td>
+                <td>${ROLE_META[m.role].label}</td>
+                <td><span class="badge badge-${m.status}">${m.status.replace('_', ' ')}</span></td>
+                <td>${m.baseAirport || '—'}</td>
+                <td>${(m.totalFlightHours || 0).toLocaleString()}h</td>
+                <td>${m.email || '—'}</td>
+                <td>${m.phone || '—'}</td>
+            </tr>`
+        ).join('');
+
+        printTable('Crew Roster', `
+            <table>
+                <thead><tr>
+                    <th>ID</th><th>Name</th><th>Role</th><th>Status</th>
+                    <th>Base</th><th>Hours</th><th>Email</th><th>Phone</th>
+                </tr></thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+            <div style="margin-top:12px;font-size:10px;color:#6b7280;">
+                Total: ${filtered.length} crew members • ${activeCrew} active
+            </div>
+        `);
+    };
 
     const openEditForm = (m: CrewMember) => {
         setEditId(m.id);
@@ -145,12 +190,28 @@ const CrewManagement: React.FC = () => {
                     <h1 className="text-3xl font-black text-navy-950 tracking-tighter uppercase">Crew Management</h1>
                     <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest mt-1">{activeCrew} active of {crew.length} total crew</p>
                 </div>
-                <button
-                    onClick={() => { resetForm(); setShowForm(!showForm); }}
-                    className="px-6 py-3 bg-primary text-white font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-lg hover:scale-105 transition-all flex items-center gap-2"
-                >
-                    <span className="material-symbols-outlined text-lg">person_add</span> Add Crew
-                </button>
+            <div className="flex items-center gap-3">
+                    <button
+                        onClick={handlePrint}
+                        className="px-4 py-3 bg-navy-50 text-navy-600 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-navy-100 transition-all flex items-center gap-2"
+                        title="Print to PDF"
+                    >
+                        <span className="material-symbols-outlined text-lg">print</span> Print
+                    </button>
+                    <button
+                        onClick={handleExportCSV}
+                        className="px-4 py-3 bg-navy-50 text-navy-600 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-navy-100 transition-all flex items-center gap-2"
+                        title="Download CSV"
+                    >
+                        <span className="material-symbols-outlined text-lg">download</span> CSV
+                    </button>
+                    <button
+                        onClick={() => { resetForm(); setShowForm(!showForm); }}
+                        className="px-6 py-3 bg-primary text-white font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-lg hover:scale-105 transition-all flex items-center gap-2"
+                    >
+                        <span className="material-symbols-outlined text-lg">person_add</span> Add Crew
+                    </button>
+                </div>
             </div>
 
             {/* Role Stats */}

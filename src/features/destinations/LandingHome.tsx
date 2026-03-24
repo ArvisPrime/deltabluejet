@@ -6,10 +6,12 @@ import { ROUTES } from '../../config/routes';
 import { useBookingStore, type SearchCriteria } from '../../stores/bookingStore';
 import { getLandingPageConfig } from '../../services/cms';
 import type { CmsLandingPageDoc } from '../../types/firestore';
+import { useCurrency } from '../../hooks/useCurrency';
 
 const LandingHome: React.FC = () => {
    const navigate = useNavigate();
    const setSearchCriteria = useBookingStore(s => s.setSearchCriteria);
+   const { display } = useCurrency();
 
    // Navigation helpers (replace old callback props)
    const onBookingStart = () => navigate(ROUTES.FLIGHT_SEARCH);
@@ -86,10 +88,10 @@ const LandingHome: React.FC = () => {
       sectionLabel: 'Curated Collections', sectionTitle: 'Experience', sectionTitleHighlight: 'Absolute Luxury.', ctaLabel: 'View All Offers',
       featuredPromo: { title: 'Winter in The Maldives', tag: 'Seasonal Feature', description: 'Escape the cold with our non-stop premium routes.', imageUrl: 'https://images.unsplash.com/photo-1544321689-d499ec24467c?auto=format&fit=crop&q=80', ctaLabel: 'Book Now' },
       gridPromos: [
-         { title: 'The London Connection', imageUrl: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&q=80', tag: 'City Break', price: '$450' },
-         { title: 'Tokyo Neons', imageUrl: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&q=80', tag: 'Asia Corridor', price: '$820' },
-         { title: 'Dubai Luxury', imageUrl: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80', tag: 'Executive Station', price: '$610' },
-         { title: 'Parisian Spring', imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80', tag: 'Europe', price: '$490' },
+         { title: 'The London Connection', imageUrl: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&q=80', tag: 'City Break', price: 450 },
+         { title: 'Tokyo Neons', imageUrl: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&q=80', tag: 'Asia Corridor', price: 820 },
+         { title: 'Dubai Luxury', imageUrl: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80', tag: 'Executive Station', price: 610 },
+         { title: 'Parisian Spring', imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80', tag: 'Europe', price: 490 },
       ],
    };
    const destData = cms?.destinations ?? {
@@ -378,7 +380,7 @@ const LandingHome: React.FC = () => {
                               <h4 className="text-xl font-black uppercase tracking-tight mb-4">{p.title}</h4>
                               <div className="flex items-center justify-between border-t border-white/10 pt-4">
                                  <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Fares from</span>
-                                 <span className="text-lg font-black tracking-tighter">{p.price}</span>
+                                 <span className="text-lg font-black tracking-tighter">{display(typeof p.price === 'number' ? p.price : parseFloat(String(p.price).replace(/[^0-9.]/g, '')) || 0)}</span>
                               </div>
                            </div>
                         </div>

@@ -10,6 +10,7 @@ import {
     type AncillaryProduct,
     type AncillaryCategory,
 } from '../../services/ancillaryService';
+import { downloadCSV, printTable } from '../../utils/tableExport';
 
 const EMPTY: Omit<AncillaryProduct, 'id'> = {
     name: '', description: '', category: 'baggage',
@@ -59,6 +60,44 @@ const AncillaryAdmin: React.FC = () => {
         await load();
     };
 
+    // ── Export Handlers ─────────────────────────────────────
+    const handleExportCSV = () => {
+        const rows = products.map(p => ({
+            'Name': p.name,
+            'Category': getCategoryMeta(p.category).label,
+            'Price (USD)': (p.price / 100).toFixed(2),
+            'Status': p.available ? 'Active' : 'Disabled',
+            'Description': p.description || '',
+        }));
+        downloadCSV(rows, 'ancillary_products');
+        addToast(`Exported ${rows.length} products`, 'success');
+    };
+
+    const handlePrint = () => {
+        const tableRows = products.map(p => {
+            const meta = getCategoryMeta(p.category);
+            return `<tr>
+                <td><strong>${p.name}</strong></td>
+                <td>${meta.label}</td>
+                <td>$${(p.price / 100).toFixed(2)}</td>
+                <td><span class="badge badge-${p.available ? 'active' : 'inactive'}">${p.available ? 'Active' : 'Disabled'}</span></td>
+                <td style="max-width:250px;font-size:10px;color:#6b7280">${p.description || '\u2014'}</td>
+            </tr>`;
+        }).join('');
+
+        printTable('Ancillary Products', `
+            <table>
+                <thead><tr>
+                    <th>Product</th><th>Category</th><th>Price</th><th>Status</th><th>Description</th>
+                </tr></thead>
+                <tbody>${tableRows}</tbody>
+            </table>
+            <div style="margin-top:12px;font-size:10px;color:#6b7280;">
+                Total: ${products.length} products \u2022 ${products.filter(p => p.available).length} active
+            </div>
+        `);
+    };
+
     if (loading) return (
         <div className="flex items-center justify-center h-96">
             <span className="material-symbols-outlined text-5xl text-primary animate-spin">progress_activity</span>
@@ -74,9 +113,25 @@ const AncillaryAdmin: React.FC = () => {
                     <h1 className="text-3xl font-black text-navy-950 tracking-tighter uppercase">Ancillary Products</h1>
                     <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest mt-1">Manage add-on products for passenger bookings</p>
                 </div>
-                <button onClick={() => setShowForm(!showForm)} className="px-6 py-3 bg-primary text-white font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-lg hover:scale-105 transition-all flex items-center gap-2">
-                    <span className="material-symbols-outlined text-lg">add</span> Add Product
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handlePrint}
+                        className="px-4 py-3 bg-navy-50 text-navy-600 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-navy-100 transition-all flex items-center gap-2"
+                        title="Print to PDF"
+                    >
+                        <span className="material-symbols-outlined text-lg">print</span> Print
+                    </button>
+                    <button
+                        onClick={handleExportCSV}
+                        className="px-4 py-3 bg-navy-50 text-navy-600 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-navy-100 transition-all flex items-center gap-2"
+                        title="Download CSV"
+                    >
+                        <span className="material-symbols-outlined text-lg">download</span> CSV
+                    </button>
+                    <button onClick={() => setShowForm(!showForm)} className="px-6 py-3 bg-primary text-white font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-lg hover:scale-105 transition-all flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg">add</span> Add Product
+                    </button>
+                </div>
             </div>
 
             {/* Stats */}

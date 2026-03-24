@@ -9,6 +9,7 @@ import { getLoyaltyStatus, getTierInfo, getNextTierInfo, TIER_THRESHOLDS } from 
 import { checkEligibility } from '../../services/checkin';
 import type { CustomerDoc, BookingDoc, LoyaltyDoc } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
+import { useCurrency } from '../../hooks/useCurrency';
 
 type ModalType = 'book' | 'manage' | 'checkin' | 'flight' | null;
 
@@ -22,6 +23,7 @@ const MyDashboard: React.FC = () => {
     const navigate = useNavigate();
     const addToast = useToastStore(s => s.addToast);
     const [activeModal, setActiveModal] = useState<ModalType>(null);
+    const { display } = useCurrency();
 
     const [customer, setCustomer] = useState<CustomerDoc | null>(null);
     const [bookings, setBookings] = useState<BookingDoc[]>([]);
@@ -462,9 +464,9 @@ const MyDashboard: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
-                        { title: 'Banjul → London', subtitle: 'From $449 one-way', badge: 'Hot Deal', icon: 'flight_takeoff', gradient: 'from-blue-500 to-indigo-600' },
-                        { title: 'Double Points Week', subtitle: 'Earn 2x points on all flights', badge: 'Limited', icon: 'stars', gradient: 'from-amber-500 to-orange-600' },
-                        { title: 'Business Class Sale', subtitle: 'Up to 30% off select routes', badge: 'Premium', icon: 'airline_seat_flat', gradient: 'from-emerald-500 to-teal-600' },
+                        { title: 'Banjul → London', priceUsd: 449, label: 'one-way', badge: 'Hot Deal', icon: 'flight_takeoff', gradient: 'from-blue-500 to-indigo-600' },
+                        { title: 'Double Points Week', priceUsd: 0, label: 'Earn 2x points on all flights', badge: 'Limited', icon: 'stars', gradient: 'from-amber-500 to-orange-600' },
+                        { title: 'Business Class Sale', priceUsd: 0, label: 'Up to 30% off select routes', badge: 'Premium', icon: 'airline_seat_flat', gradient: 'from-emerald-500 to-teal-600' },
                     ].map((offer, i) => (
                         <Link key={i} to={ROUTES.FLIGHT_SEARCH} className="group relative overflow-hidden rounded-xl p-4 no-underline transition-all hover:scale-[1.02] hover:shadow-lg">
                             <div className={`absolute inset-0 bg-gradient-to-br ${offer.gradient} opacity-90`} />
@@ -474,7 +476,7 @@ const MyDashboard: React.FC = () => {
                                     <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[8px] font-black uppercase tracking-wider">{offer.badge}</span>
                                 </div>
                                 <p className="text-sm font-black text-white">{offer.title}</p>
-                                <p className="text-[10px] font-bold text-white/80">{offer.subtitle}</p>
+                                <p className="text-[10px] font-bold text-white/80">{offer.priceUsd > 0 ? `From ${display(offer.priceUsd)} ${offer.label}` : offer.label}</p>
                             </div>
                         </Link>
                     ))}

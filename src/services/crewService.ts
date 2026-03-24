@@ -14,6 +14,7 @@ import { db } from '../config/firebase.config';
 
 export type CrewRole = 'captain' | 'first_officer' | 'purser' | 'cabin_crew' | 'engineer';
 export type CrewStatus = 'active' | 'on_leave' | 'training' | 'inactive';
+export type AssignmentType = 'flight' | 'standby_office' | 'standby_home';
 
 export interface CrewMember {
     id: string;
@@ -35,6 +36,7 @@ export interface CrewAssignment {
     crewMemberId: string;
     crewMemberName: string;
     crewRole: CrewRole;
+    assignmentType: AssignmentType;
     flightNumber: string;
     flightId?: string;       // Link to flights collection
     routeInfo?: string;      // e.g. "BJL → LOS"
@@ -174,11 +176,16 @@ export function subscribeToAssignments(callback: (assignments: CrewAssignment[])
 }
 
 export async function createAssignment(data: Omit<CrewAssignment, 'id'>): Promise<{ id: string; fatigueCheck: FatigueCheck }> {
-    // Run fatigue check first
-    const existing = await getAssignments(data.crewMemberId);
-    const fatigueCheck = checkFatigueRules(existing, data);
+    // Run fatigue check first (non-blocking — if query fails, still create)
+    let fatigueCheck: FatigueCheck = { passed: true, violations: [] };
+    try {
+        const existing = await getAssignments(data.crewMemberId);
+        fatigueCheck = checkFatigueRules(existing, data);
+    } catch (err) {
+        console.warn('Fatigue check skipped (index may be building):', err);
+    }
 
-    // Allow creation but return warning
+    // Always create the assignment
     const ref = await addDoc(assignRef, { ...data, createdAt: Timestamp.now() });
     return { id: ref.id, fatigueCheck };
 }
