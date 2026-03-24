@@ -83,6 +83,42 @@ const MyTrips: React.FC = () => {
         return styles[status] || 'bg-navy-50 text-navy-500';
     };
 
+    const downloadETicket = (b: BookingDoc) => {
+        const depDate = formatDate(b.departureTime, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        const depTime = formatTime(b.departureTime);
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>E-Ticket ${b.pnr || ''}</title>
+<style>body{font-family:Arial,sans-serif;max-width:650px;margin:40px auto;padding:20px;color:#1a1a2e}
+.header{text-align:center;border-bottom:3px solid #0066ff;padding-bottom:20px;margin-bottom:30px}
+.header h1{font-size:24px;color:#0066ff;margin:0 0 5px}
+.route{text-align:center;font-size:28px;font-weight:800;letter-spacing:2px;margin:20px 0}
+table{width:100%;border-collapse:collapse;margin:20px 0}td,th{padding:10px 14px;text-align:left;border-bottom:1px solid #eee;font-size:13px}
+th{font-size:9px;text-transform:uppercase;color:#999;letter-spacing:1px}
+.footer{text-align:center;margin-top:40px;font-size:11px;color:#999}
+</style></head><body>
+<div class="header"><h1>DeltaBlue Jet Air</h1><p style="font-size:12px;color:#666">Electronic Ticket / Itinerary Receipt</p></div>
+<p class="route">${b.origin?.code || '—'} → ${b.destination?.code || '—'}</p>
+<table><tr><th>Detail</th><th>Value</th></tr>
+<tr><td>PNR / Reference</td><td><strong>${b.pnr || '—'}</strong></td></tr>
+<tr><td>Flight</td><td>${b.flightNumber || '—'}</td></tr>
+<tr><td>Route</td><td>${b.origin?.city || '—'} → ${b.destination?.city || '—'}</td></tr>
+<tr><td>Date</td><td>${depDate}</td></tr>
+<tr><td>Departure</td><td>${depTime}</td></tr>
+<tr><td>Class</td><td>${(b as any).cabinClass || 'Economy'}</td></tr>
+<tr><td>Status</td><td>${(b.status || 'pending').replace('_', ' ').toUpperCase()}</td></tr>
+</table>
+<div class="footer"><p>This is an electronic ticket. Please present this at check-in along with valid photo identification.</p><p>© ${new Date().getFullYear()} DeltaBlue Jet Air. All rights reserved.</p></div>
+</body></html>`;
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ETicket-${b.pnr || 'booking'}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-32">
@@ -197,18 +233,26 @@ const MyTrips: React.FC = () => {
                                 {/* Actions */}
                                 {tab === 'upcoming' && (
                                     <div className="flex gap-2 shrink-0">
-                                        <Link to={ROUTES.MANAGE_BOOKING} className="h-9 px-4 rounded-lg bg-primary text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:opacity-90 transition-opacity no-underline">
+                                        <Link to={b.pnr ? `/manage-booking/${b.pnr}` : ROUTES.MANAGE_BOOKING} className="h-9 px-4 rounded-lg bg-primary text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:opacity-90 transition-opacity no-underline">
                                             Manage
                                         </Link>
                                         <Link to={ROUTES.CHECKIN} className="h-9 px-4 rounded-lg border-2 border-primary text-primary text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary/5 transition-colors no-underline">
                                             Check In
                                         </Link>
+                                        <button onClick={() => downloadETicket(b)} className="h-9 px-3 rounded-lg border-2 border-navy-100 text-navy-400 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:border-primary hover:text-primary transition-all" title="Download E-Ticket">
+                                            <span className="material-symbols-outlined text-sm">download</span>
+                                        </button>
                                     </div>
                                 )}
                                 {tab === 'past' && (
-                                    <Link to={ROUTES.FLIGHT_SEARCH} className="h-9 px-4 rounded-lg border-2 border-navy-100 text-navy-500 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:border-primary hover:text-primary transition-all no-underline shrink-0">
-                                        Rebook
-                                    </Link>
+                                    <div className="flex gap-2 shrink-0">
+                                        <Link to={ROUTES.FLIGHT_SEARCH} className="h-9 px-4 rounded-lg border-2 border-navy-100 text-navy-500 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:border-primary hover:text-primary transition-all no-underline">
+                                            Rebook
+                                        </Link>
+                                        <button onClick={() => downloadETicket(b)} className="h-9 px-3 rounded-lg border-2 border-navy-100 text-navy-400 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:border-primary hover:text-primary transition-all" title="Download Receipt">
+                                            <span className="material-symbols-outlined text-sm">receipt_long</span>
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         </div>

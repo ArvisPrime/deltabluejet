@@ -79,6 +79,30 @@ const MyDashboard: React.FC = () => {
         });
     }, [bookings]);
 
+    // ── Departure countdown (updates every minute) ──────────
+    const [countdown, setCountdown] = useState('');
+    const [checkinOpen, setCheckinOpen] = useState(false);
+    useEffect(() => {
+        if (!upcomingTrip) return;
+        const calcCountdown = () => {
+            try {
+                const dep = upcomingTrip.departureTime?.toDate
+                    ? upcomingTrip.departureTime.toDate()
+                    : new Date(upcomingTrip.departureTime as any);
+                const diff = dep.getTime() - Date.now();
+                if (diff <= 0) { setCountdown('Departed'); setCheckinOpen(false); return; }
+                const days = Math.floor(diff / 86400000);
+                const hrs = Math.floor((diff % 86400000) / 3600000);
+                const mins = Math.floor((diff % 3600000) / 60000);
+                setCountdown(days > 0 ? `${days}d ${hrs}h ${mins}m` : `${hrs}h ${mins}m`);
+                setCheckinOpen(diff <= 86400000); // 24h
+            } catch { setCountdown(''); }
+        };
+        calcCountdown();
+        const id = setInterval(calcCountdown, 60000);
+        return () => clearInterval(id);
+    }, [upcomingTrip]);
+
     // ── Loyalty helpers ────────────────────────────────────
     const currentTier = loyalty?.tier || 'blue';
     const tier = getTierInfo(currentTier);
@@ -94,6 +118,14 @@ const MyDashboard: React.FC = () => {
     }, [loyalty, currentTier, nextTierResult]);
 
     const firstName = user?.displayName?.split(' ')[0] || 'Traveler';
+
+    // ── Time-aware greeting ─────────────────────────────────
+    const greeting = useMemo(() => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good Morning';
+        if (hour < 17) return 'Good Afternoon';
+        return 'Good Evening';
+    }, []);
 
     // ── Quick Actions ──────────────────────────────────────
     const quickActions: { label: string; icon: string; modal: ModalType; color: string }[] = [
@@ -134,7 +166,7 @@ const MyDashboard: React.FC = () => {
                 <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-4">
                         <span className="material-symbols-outlined text-white/60 text-3xl">waving_hand</span>
-                        <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.3em]">Welcome Back</p>
+                        <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.3em]">{greeting}</p>
                     </div>
                     <h1 className="text-4xl lg:text-5xl font-black tracking-tight leading-none mb-3">{firstName}</h1>
                     <p className="text-white/70 text-sm font-bold max-w-lg leading-relaxed">
@@ -221,10 +253,15 @@ const MyDashboard: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-3 bg-navy-50/50 rounded-xl p-4">
+                            {/* Flight Details Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-navy-50/50 rounded-xl p-4">
                                 <div>
                                     <p className="text-[9px] font-black text-navy-400 uppercase tracking-wider">PNR</p>
                                     <p className="text-sm font-black text-navy-950 font-mono">{upcomingTrip.pnr || '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black text-navy-400 uppercase tracking-wider">Flight</p>
+                                    <p className="text-sm font-black text-navy-950">{upcomingTrip.flightNumber || '—'}</p>
                                 </div>
                                 <div>
                                     <p className="text-[9px] font-black text-navy-400 uppercase tracking-wider">Date</p>
@@ -236,34 +273,81 @@ const MyDashboard: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* Departure Countdown */}
+                            {countdown && (
+                                <div className="flex items-center gap-3 bg-gradient-to-r from-primary/5 to-blue-500/5 rounded-xl p-4 border border-primary/10">
+                                    <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                        <span className="material-symbols-outlined text-primary text-lg">timer</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[9px] font-black text-navy-400 uppercase tracking-wider">Departure In</p>
+                                        <p className="text-lg font-black text-navy-950 tracking-tight font-mono">{countdown}</p>
+                                    </div>
+                                    {checkinOpen && (
+                                        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase tracking-wider animate-pulse">Check-in Open</span>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="flex gap-3">
-                                <Link to={ROUTES.MANAGE_BOOKING} className="flex-1 h-10 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity no-underline">
+                                {/* Boarding Pass — visible when checked in */}
+                                {(upcomingTrip.status === 'checked_in' || checkinOpen) && (
+                                    <Link to={ROUTES.CHECKIN} className="flex-1 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity no-underline shadow-lg shadow-amber-500/20">
+                                        <span className="material-symbols-outlined text-sm">qr_code_2</span>
+                                        Boarding Pass
+                                    </Link>
+                                )}
+                                <Link to={`/manage-booking/${upcomingTrip.pnr}`} className="flex-1 h-10 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity no-underline">
                                     Manage
                                 </Link>
-                                <Link to={ROUTES.CHECKIN} className="flex-1 h-10 rounded-xl border-2 border-primary text-primary text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors no-underline">
-                                    Check In
-                                </Link>
+                                {!(upcomingTrip.status === 'checked_in') && (
+                                    <Link to={ROUTES.CHECKIN} className="flex-1 h-10 rounded-xl border-2 border-primary text-primary text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-primary/5 transition-colors no-underline">
+                                        Check In
+                                    </Link>
+                                )}
                             </div>
                         </div>
                     ) : (
-                        <div className="text-center py-8 space-y-4">
-                            <div className="size-16 rounded-2xl bg-navy-50 flex items-center justify-center mx-auto">
-                                <span className="material-symbols-outlined text-navy-200 text-3xl">flight_takeoff</span>
+                        <div className="text-center py-6 space-y-5">
+                            {/* Illustrated empty state */}
+                            <div className="relative mx-auto w-48 h-32">
+                                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-blue-400/5 rounded-3xl" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="relative">
+                                        <span className="material-symbols-outlined text-6xl text-primary/20">public</span>
+                                        <span className="material-symbols-outlined text-2xl text-primary absolute -top-1 -right-3 rotate-45 animate-bounce">flight</span>
+                                    </div>
+                                </div>
                             </div>
                             <div>
-                                <p className="text-sm font-black text-navy-400 uppercase tracking-wider">No Upcoming Trips</p>
-                                <p className="text-[10px] font-bold text-navy-300 mt-1">Ready to explore? Book your next adventure.</p>
+                                <p className="text-base font-black text-navy-700">Your Next Adventure Awaits</p>
+                                <p className="text-[11px] font-bold text-navy-400 mt-1 max-w-xs mx-auto">Discover amazing destinations and book your dream flight today.</p>
                             </div>
-                            <Link to={ROUTES.FLIGHT_SEARCH} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-opacity no-underline">
+                            <Link to={ROUTES.FLIGHT_SEARCH} className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-opacity no-underline shadow-lg shadow-primary/20">
                                 <span className="material-symbols-outlined text-sm">search</span>
-                                Search Flights
+                                Explore Flights
                             </Link>
+                            {/* Mini destination cards */}
+                            <div className="grid grid-cols-3 gap-2 pt-2">
+                                {[{ city: 'London', code: 'LHR', emoji: '🇬🇧' }, { city: 'Dubai', code: 'DXB', emoji: '🇦🇪' }, { city: 'New York', code: 'JFK', emoji: '🇺🇸' }].map(d => (
+                                    <Link key={d.code} to={ROUTES.FLIGHT_SEARCH} className="p-2 rounded-lg bg-navy-50/60 hover:bg-primary/5 transition-colors text-center no-underline group">
+                                        <p className="text-lg">{d.emoji}</p>
+                                        <p className="text-[9px] font-black text-navy-600 uppercase tracking-wide group-hover:text-primary transition-colors">{d.city}</p>
+                                        <p className="text-[8px] font-bold text-navy-300">{d.code}</p>
+                                    </Link>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
 
-                {/* ── Loyalty Widget ─────────────────────────── */}
-                <div className="bg-white rounded-2xl border border-navy-100 p-6 space-y-5">
+                {/* ── Loyalty Widget (Tier-Colored) ───────────── */}
+                <div className={`rounded-2xl border p-6 space-y-5 ${
+                    currentTier === 'gold' ? 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200' :
+                    currentTier === 'silver' ? 'bg-gradient-to-br from-gray-50 to-slate-100 border-gray-200' :
+                    currentTier === 'platinum' ? 'bg-gradient-to-br from-slate-50 to-zinc-100 border-slate-300' :
+                    'bg-white border-navy-100'
+                }`}>
                     <div className="flex items-center justify-between">
                         <p className="text-[10px] font-black text-navy-500 uppercase tracking-[0.25em] flex items-center gap-2">
                             <span className="material-symbols-outlined text-sm text-primary">stars</span>
@@ -273,8 +357,18 @@ const MyDashboard: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-5">
-                        <div className="size-16 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center shadow-inner">
-                            <span className="material-symbols-outlined text-primary text-3xl font-black">workspace_premium</span>
+                        <div className={`size-16 rounded-2xl flex items-center justify-center shadow-inner ${
+                            currentTier === 'gold' ? 'bg-gradient-to-br from-amber-400/20 to-yellow-500/20' :
+                            currentTier === 'silver' ? 'bg-gradient-to-br from-gray-300/20 to-slate-400/20' :
+                            currentTier === 'platinum' ? 'bg-gradient-to-br from-slate-400/20 to-zinc-500/20' :
+                            'bg-gradient-to-br from-primary/10 to-primary/5'
+                        }`}>
+                            <span className={`material-symbols-outlined text-3xl font-black ${
+                                currentTier === 'gold' ? 'text-amber-500' :
+                                currentTier === 'silver' ? 'text-gray-500' :
+                                currentTier === 'platinum' ? 'text-slate-600' :
+                                'text-primary'
+                            }`}>workspace_premium</span>
                         </div>
                         <div>
                             <p className="text-2xl font-black text-navy-950 tracking-tight capitalize">{tier.label}</p>
@@ -282,7 +376,7 @@ const MyDashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="bg-navy-50/50 rounded-xl p-4 flex items-center justify-between">
+                    <div className="bg-white/60 rounded-xl p-4 flex items-center justify-between">
                         <div>
                             <p className="text-[9px] font-black text-navy-400 uppercase tracking-wider">Available Points</p>
                             <p className="text-3xl font-black text-navy-950 tracking-tight">{pointsBalance.toLocaleString()}</p>
@@ -296,11 +390,20 @@ const MyDashboard: React.FC = () => {
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <p className="text-[9px] font-black text-navy-400 uppercase tracking-wider">Progress to {nextTierResult.nextTier}</p>
-                                <p className="text-[9px] font-black text-primary tracking-wider">{tierProgress}%</p>
+                                <p className={`text-[9px] font-black tracking-wider ${
+                                    currentTier === 'gold' ? 'text-amber-600' :
+                                    currentTier === 'silver' ? 'text-gray-600' :
+                                    'text-primary'
+                                }`}>{tierProgress}%</p>
                             </div>
                             <div className="h-2 rounded-full bg-navy-100 overflow-hidden">
                                 <div
-                                    className="h-full rounded-full bg-gradient-to-r from-primary to-blue-500 transition-all duration-1000"
+                                    className={`h-full rounded-full transition-all duration-1000 ${
+                                        currentTier === 'gold' ? 'bg-gradient-to-r from-amber-400 to-yellow-500' :
+                                        currentTier === 'silver' ? 'bg-gradient-to-r from-gray-400 to-slate-500' :
+                                        currentTier === 'platinum' ? 'bg-gradient-to-r from-slate-500 to-zinc-600' :
+                                        'bg-gradient-to-r from-primary to-blue-500'
+                                    }`}
                                     style={{ width: `${tierProgress}%` }}
                                 />
                             </div>
@@ -324,7 +427,7 @@ const MyDashboard: React.FC = () => {
                     </p>
                     <div className="divide-y divide-navy-50">
                         {bookings.slice(0, 5).map((b, i) => (
-                            <div key={b.id || i} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                            <Link key={b.id || i} to={b.pnr ? `/manage-booking/${b.pnr}` : ROUTES.MANAGE_BOOKING} className="flex items-center justify-between py-3 first:pt-0 last:pb-0 hover:bg-navy-50/50 -mx-2 px-2 rounded-lg transition-colors cursor-pointer no-underline">
                                 <div className="flex items-center gap-4">
                                     <div className="size-9 rounded-xl bg-navy-50 flex items-center justify-center">
                                         <span className="material-symbols-outlined text-navy-400 text-sm">flight</span>
@@ -342,11 +445,41 @@ const MyDashboard: React.FC = () => {
                                                     'bg-navy-50 text-navy-500'}`}>
                                     {b.status || 'pending'}
                                 </span>
-                            </div>
+                            </Link>
                         ))}
                     </div>
                 </div>
             )}
+
+            {/* ═══ Special Offers & Deals ═══════════════════════════ */}
+            <div className="bg-white rounded-2xl border border-navy-100 p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-black text-navy-500 uppercase tracking-[0.25em] flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm text-primary">local_offer</span>
+                        Special Offers
+                    </p>
+                    <Link to={ROUTES.FLIGHT_SEARCH} className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline no-underline">View All</Link>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                        { title: 'Banjul → London', subtitle: 'From $449 one-way', badge: 'Hot Deal', icon: 'flight_takeoff', gradient: 'from-blue-500 to-indigo-600' },
+                        { title: 'Double Points Week', subtitle: 'Earn 2x points on all flights', badge: 'Limited', icon: 'stars', gradient: 'from-amber-500 to-orange-600' },
+                        { title: 'Business Class Sale', subtitle: 'Up to 30% off select routes', badge: 'Premium', icon: 'airline_seat_flat', gradient: 'from-emerald-500 to-teal-600' },
+                    ].map((offer, i) => (
+                        <Link key={i} to={ROUTES.FLIGHT_SEARCH} className="group relative overflow-hidden rounded-xl p-4 no-underline transition-all hover:scale-[1.02] hover:shadow-lg">
+                            <div className={`absolute inset-0 bg-gradient-to-br ${offer.gradient} opacity-90`} />
+                            <div className="relative z-10 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="material-symbols-outlined text-white/80 text-lg">{offer.icon}</span>
+                                    <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[8px] font-black uppercase tracking-wider">{offer.badge}</span>
+                                </div>
+                                <p className="text-sm font-black text-white">{offer.title}</p>
+                                <p className="text-[10px] font-bold text-white/80">{offer.subtitle}</p>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
+            </div>
 
             {/* ═══ Quick Action Popup Modals ═══════════════════════ */}
             {activeModal && (
@@ -551,7 +684,7 @@ const CheckinForm: React.FC<{ navigate: (path: string, opts?: any) => void; onCl
 const FlightStatusForm: React.FC<{ navigate: (path: string) => void; onClose: () => void }> = ({ navigate, onClose }) => {
     const [flightId, setFlightId] = useState('');
     return (
-        <form className="space-y-6" onSubmit={e => { e.preventDefault(); if (flightId.trim()) { onClose(); navigate(ROUTES.FLIGHT_TRACKER_RESULTS); } }}>
+        <form className="space-y-6" onSubmit={e => { e.preventDefault(); if (flightId.trim()) { onClose(); navigate(`${ROUTES.FLIGHT_TRACKER_RESULTS}?flight=${flightId.trim()}`); } }}>
             <p className="text-xs font-bold text-navy-400 italic leading-relaxed">
                 Track real-time flight status, gate assignments, and estimated arrival times.
             </p>

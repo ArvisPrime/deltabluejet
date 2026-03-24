@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
@@ -13,6 +13,13 @@ const NAV_ITEMS = [
     { path: ROUTES.LOYALTY, label: 'Loyalty', icon: 'stars' },
 ];
 
+// Sample notifications — in production these would come from Firestore
+const SAMPLE_NOTIFICATIONS = [
+    { id: '1', type: 'info' as const, title: 'Welcome to DeltaBlue!', body: 'Complete your profile to speed up future bookings.', time: 'Just now', read: false },
+    { id: '2', type: 'promo' as const, title: 'Exclusive Member Offer', body: 'Earn 2x points on flights booked this week.', time: '2h ago', read: false },
+    { id: '3', type: 'info' as const, title: 'Travel Document Reminder', body: 'Keep your passport details up to date for seamless travel.', time: '1d ago', read: true },
+];
+
 /**
  * Layout wrapper for the passenger portal (/my/*).
  * Uses a horizontal tab navigation at the top with the public header/footer.
@@ -22,10 +29,32 @@ const PassengerLayout: React.FC = () => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const logoUrl = useCmsHeaderStore(s => s.logoUrl);
+    const [notifOpen, setNotifOpen] = useState(false);
+    const [notifications, setNotifications] = useState(SAMPLE_NOTIFICATIONS);
+    const notifRef = useRef<HTMLDivElement>(null);
+
+    const unreadCount = notifications.filter(n => !n.read).length;
+
+    const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     const handleLogout = async () => {
         await logout();
         navigate(ROUTES.HOME, { replace: true });
+    };
+
+    const notifIcon = (type: 'info' | 'warning' | 'promo') => {
+        if (type === 'warning') return { icon: 'warning', cls: 'bg-red-50 text-red-500' };
+        if (type === 'promo') return { icon: 'local_offer', cls: 'bg-amber-50 text-amber-500' };
+        return { icon: 'info', cls: 'bg-primary/10 text-primary' };
     };
 
     return (
@@ -70,7 +99,54 @@ const PassengerLayout: React.FC = () => {
                         </nav>
 
                         {/* User Menu */}
-                        <div className="flex items-center gap-4 shrink-0">
+                        <div className="flex items-center gap-3 shrink-0">
+                            {/* Notifications Bell */}
+                            <div className="relative" ref={notifRef}>
+                                <button
+                                    onClick={() => setNotifOpen(!notifOpen)}
+                                    className="relative size-9 rounded-xl flex items-center justify-center text-navy-400 hover:bg-navy-50 hover:text-navy-700 transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-lg">notifications</span>
+                                    {unreadCount > 0 && (
+                                        <span className="absolute -top-0.5 -right-0.5 size-4 rounded-full bg-red-500 text-white text-[8px] font-black flex items-center justify-center animate-pulse">
+                                            {unreadCount}
+                                        </span>
+                                    )}
+                                </button>
+
+                                {/* Dropdown */}
+                                {notifOpen && (
+                                    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-navy-100 shadow-2xl shadow-navy-950/10 z-50 overflow-hidden" style={{ animation: 'modalSlideUp 0.2s ease-out' }}>
+                                        <div className="px-4 py-3 border-b border-navy-50 flex items-center justify-between">
+                                            <p className="text-[10px] font-black text-navy-700 uppercase tracking-widest">Notifications</p>
+                                            {unreadCount > 0 && (
+                                                <button onClick={markAllRead} className="text-[9px] font-black text-primary uppercase tracking-wider hover:underline">
+                                                    Mark All Read
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="max-h-72 overflow-y-auto divide-y divide-navy-50">
+                                            {notifications.map(n => {
+                                                const { icon, cls } = notifIcon(n.type);
+                                                return (
+                                                    <div key={n.id} className={`px-4 py-3 flex items-start gap-3 transition-colors ${!n.read ? 'bg-primary/[0.02]' : ''}`}>
+                                                        <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${cls}`}>
+                                                            <span className="material-symbols-outlined text-sm">{icon}</span>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className={`text-[11px] font-bold text-navy-800 leading-snug ${!n.read ? 'font-black' : ''}`}>{n.title}</p>
+                                                            <p className="text-[10px] text-navy-400 mt-0.5 leading-snug">{n.body}</p>
+                                                            <p className="text-[9px] text-navy-300 mt-1">{n.time}</p>
+                                                        </div>
+                                                        {!n.read && <div className="size-2 rounded-full bg-primary shrink-0 mt-1.5" />}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="hidden sm:flex items-center gap-3">
                                 <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-black uppercase">
                                     {user?.displayName?.charAt(0) || user?.email?.charAt(0) || '?'}
