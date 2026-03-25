@@ -7,8 +7,10 @@
  * tiers after points changes.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onBookingRefundedLoyalty = exports.onBookingConfirmedLoyalty = exports.onUserCreatedLoyalty = void 0;
+exports.createAwardBookingSecure = exports.redeemPointsSecure = exports.onBookingRefundedLoyalty = exports.onBookingConfirmedLoyalty = exports.onUserCreatedLoyalty = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
+const https_1 = require("firebase-functions/v2/https");
+const rateLimit_1 = require("./rateLimit");
 const firestore_2 = require("firebase-admin/firestore");
 const app_1 = require("firebase-admin/app");
 if (!(0, app_1.getApps)().length)
@@ -187,5 +189,123 @@ exports.onBookingRefundedLoyalty = (0, firestore_1.onDocumentUpdated)('bookings/
         createdAt: firestore_2.FieldValue.serverTimestamp(),
     });
     console.log(`↩️ Deducted ${pointsAwarded} pts from user ${userId} (booking ${event.params.bookingId} refunded)`);
+});
+// ─── Callable: Redeem Points for a Reward ─────────────────
+const ROUTE_DISTANCES = {
+    'BJL-DSS': 180, 'DSS-BJL': 180,
+    'BJL-LHR': 3100, 'LHR-BJL': 3100,
+    'BJL-JFK': 4800, 'JFK-BJL': 4800,
+    'BJL-DXB': 5800, 'DXB-BJL': 5800,
+    'BJL-ACC': 1100, 'ACC-BJL': 1100,
+    'LHR-JFK': 3450, 'JFK-LHR': 3450,
+    'LHR-DXB': 3400, 'DXB-LHR': 3400,
+    'DSS-LHR': 2900, 'LHR-DSS': 2900,
+    'DSS-ACC': 1200, 'ACC-DSS': 1200,
+};
+const AWARD_PRICING = {
+    short: { economy: 8_000, business: 16_000, first: 30_000 },
+    medium: { economy: 15_000, business: 30_000, first: 55_000 },
+    long: { economy: 25_000, business: 50_000, first: 90_000 },
+};
+exports.redeemPointsSecure = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be logged in.');
+    }
+    const uid = request.auth.uid;
+    await (0, rateLimit_1.enforceRateLimit)(uid, 'redeemPoints', { maxRequests: 10, windowMs: 60 * 60 * 1000 });
+    const { rewardId, rewardName, pointsCost } = request.data;
+    if (!rewardId || !pointsCost || pointsCost <= 0) {
+        throw new https_1.HttpsError('invalid-argument', 'Invalid reward data.');
+    }
+    // Validate reward exists and matches cost
+    const rewardDoc = await db.doc(`loyalty_rewards/${rewardId}`).get();
+    if (!rewardDoc.exists) {
+        throw new https_1.HttpsError('not-found', 'Reward not found.');
+    }
+    const rewardData = rewardDoc.data();
+    if (!rewardData.available) {
+        throw new https_1.HttpsError('failed-precondition', 'This reward is no longer available.');
+    }
+    if (rewardData.pointsCost !== pointsCost) {
+        throw new https_1.HttpsError('invalid-argument', 'Points cost does not match.');
+    }
+    // Check balance
+    const loyaltyRef = db.doc(`loyalty/${uid}`);
+    const loyaltyDoc = await loyaltyRef.get();
+    if (!loyaltyDoc.exists) {
+        throw new https_1.HttpsError('failed-precondition', 'No loyalty account found.');
+    }
+    const loyaltyData = loyaltyDoc.data();
+    const currentPoints = loyaltyData.currentPoints || loyaltyData.totalPoints || 0;
+    if (currentPoints < pointsCost) {
+        throw new https_1.HttpsError('failed-precondition', `Not enough points. You need ${pointsCost - currentPoints} more.`);
+    }
+    // Atomic: deduct points + create redemption
+    const batch = db.batch();
+    batch.update(loyaltyRef, {
+        currentPoints: firestore_2.FieldValue.increment(-pointsCost),
+        updatedAt: firestore_2.FieldValue.serverTimestamp(),
+    });
+    const redemptionRef = db.collection('loyalty_redemptions').doc();
+    batch.set(redemptionRef, {
+        userId: uid,
+        rewardId,
+        rewardName: rewardName || rewardData.name,
+        pointsSpent: pointsCost,
+        status: 'completed',
+        redeemedAt: firestore_2.FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+    // Points history
+    await db.collection(`loyalty/${uid}/points_history`).add({
+        type: 'redeem',
+        points: -pointsCost,
+        reason: `Redeemed: ${rewardName || rewardData.name}`,
+        balanceAfter: currentPoints - pointsCost,
+        createdAt: firestore_2.FieldValue.serverTimestamp(),
+    });
+    return { success: true, message: `Successfully redeemed ${rewardName || rewardData.name}!` };
+});
+// ─── Callable: Award Booking (Miles-for-Flights) ──────────
+exports.createAwardBookingSecure = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be logged in.');
+    }
+    const uid = request.auth.uid;
+    await (0, rateLimit_1.enforceRateLimit)(uid, 'awardBooking', { maxRequests: 10, windowMs: 60 * 60 * 1000 });
+    const { origin, destination, fareClass } = request.data;
+    if (!origin || !destination || !fareClass) {
+        throw new https_1.HttpsError('invalid-argument', 'Missing origin, destination, or fareClass.');
+    }
+    // Calculate cost server-side
+    const key = `${origin}-${destination}`;
+    const dist = ROUTE_DISTANCES[key] || 3000;
+    const cat = dist <= 1500 ? 'short' : dist <= 4000 ? 'medium' : 'long';
+    const cost = AWARD_PRICING[cat][fareClass.toLowerCase()] || AWARD_PRICING[cat].economy;
+    // Check balance
+    const loyaltyRef = db.doc(`loyalty/${uid}`);
+    const loyaltyDoc = await loyaltyRef.get();
+    if (!loyaltyDoc.exists) {
+        throw new https_1.HttpsError('failed-precondition', 'No loyalty account found.');
+    }
+    const data = loyaltyDoc.data();
+    const currentPoints = data.currentPoints || data.totalPoints || 0;
+    if (currentPoints < cost) {
+        throw new https_1.HttpsError('failed-precondition', `Need ${cost} miles, you have ${currentPoints}.`);
+    }
+    // Deduct miles
+    await loyaltyRef.update({
+        currentPoints: firestore_2.FieldValue.increment(-cost),
+        updatedAt: firestore_2.FieldValue.serverTimestamp(),
+    });
+    // History
+    await db.collection(`loyalty/${uid}/points_history`).add({
+        type: 'redeem',
+        points: -cost,
+        reason: `Award booking: ${origin}→${destination} ${fareClass}`,
+        balanceAfter: currentPoints - cost,
+        createdAt: firestore_2.FieldValue.serverTimestamp(),
+    });
+    return { success: true, message: `Booked! ${cost} miles deducted.`, milesDeducted: cost };
 });
 //# sourceMappingURL=loyalty.js.map

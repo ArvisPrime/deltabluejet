@@ -28,6 +28,11 @@ const StaffLogin: React.FC = () => {
 
     try {
       const authUser = await login(email, password);
+      // If admin has a registered YubiKey, redirect to verification gate
+      if (authUser.requiresYubikeyVerification) {
+        navigate(ROUTES.YUBIKEY_VERIFY, { replace: true });
+        return;
+      }
       // Staff login always redirects to admin, never to passenger dashboard
       const target = intendedPath || ROUTES.DASHBOARD;
       navigate(target, { replace: true });
@@ -50,6 +55,11 @@ const StaffLogin: React.FC = () => {
     setIsSubmitting(true);
     try {
       const authUser = await googleLogin();
+      // If admin has a registered YubiKey, redirect to verification gate
+      if (authUser.requiresYubikeyVerification) {
+        navigate(ROUTES.YUBIKEY_VERIFY, { replace: true });
+        return;
+      }
       const target = intendedPath || ROUTES.DASHBOARD;
       navigate(target, { replace: true });
     } catch (err: any) {

@@ -18,6 +18,17 @@ export default function YubiKeyVerify() {
     const { user } = useAuthStore();
     const [verifying, setVerifying] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [noKeysDetected, setNoKeysDetected] = useState(false);
+
+    const handleBypass = useCallback(async () => {
+        // Force token refresh and clear the verification flag
+        await auth.currentUser?.getIdToken(true);
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser) {
+            useAuthStore.getState().setUser({ ...currentUser, requiresYubikeyVerification: false });
+        }
+        navigate('/admin/security/keys', { replace: true });
+    }, [navigate]);
 
     const handleVerify = useCallback(async () => {
         try {
@@ -28,6 +39,17 @@ export default function YubiKeyVerify() {
             const genAuth = httpsCallable(functions, 'webauthnGenerateAuthentication');
             const optionsResult = await genAuth();
             const options = optionsResult.data as any;
+
+            // Handle case where credentials were deleted but claims remained (self-healing)
+            if (options.noKeysFound) {
+                await auth.currentUser?.getIdToken(true);
+                const currentUser = useAuthStore.getState().user;
+                if (currentUser) {
+                    useAuthStore.getState().setUser({ ...currentUser, requiresYubikeyVerification: false });
+                }
+                navigate('/admin', { replace: true });
+                return;
+            }
 
             // Step 2: Prompt user's YubiKey via browser WebAuthn API
             const credential = await startAuthentication({ optionsJSON: options });
@@ -40,13 +62,22 @@ export default function YubiKeyVerify() {
             if (data.verified) {
                 // Force token refresh to pick up the new custom claim
                 await auth.currentUser?.getIdToken(true);
+                // Clear the verification flag in the store so ProtectedRoute permits access
+                const currentUser = useAuthStore.getState().user;
+                if (currentUser) {
+                    useAuthStore.getState().setUser({ ...currentUser, requiresYubikeyVerification: false });
+                }
                 navigate('/admin', { replace: true });
             }
         } catch (err: any) {
-            if (err.name === 'NotAllowedError') {
+            const msg = err?.message || '';
+            if (msg.includes('No security keys registered') || msg.includes('not-found')) {
+                setNoKeysDetected(true);
+                setError('No security keys registered for this account. Use the button below to register one.');
+            } else if (err.name === 'NotAllowedError') {
                 setError('Security key verification was cancelled or timed out. Please try again.');
             } else {
-                setError(err.message || 'Verification failed. Please ensure your security key is connected.');
+                setError(msg || 'Verification failed. Please ensure your security key is connected.');
             }
         } finally {
             setVerifying(false);
@@ -80,10 +111,21 @@ export default function YubiKeyVerify() {
 
                     {/* Error Message */}
                     {error && (
-                        <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-200 text-sm text-left">
-                            <span className="material-symbols-outlined text-sm align-middle mr-1">error</span>
+                        <div className={`mb-4 p-3 rounded-lg text-sm text-left ${noKeysDetected ? 'bg-amber-500/20 border border-amber-500/30 text-amber-200' : 'bg-red-500/20 border border-red-500/30 text-red-200'}`}>
+                            <span className="material-symbols-outlined text-sm align-middle mr-1">{noKeysDetected ? 'info' : 'error'}</span>
                             {error}
                         </div>
+                    )}
+
+                    {/* No Keys — Bypass to Register */}
+                    {noKeysDetected && (
+                        <button
+                            onClick={handleBypass}
+                            className="w-full mb-3 py-3.5 px-6 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+                        >
+                            <span className="material-symbols-outlined text-lg">add_circle</span>
+                            Proceed to Register a Security Key
+                        </button>
                     )}
 
                     {/* Verify Button */}

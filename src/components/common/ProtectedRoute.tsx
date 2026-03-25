@@ -44,6 +44,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
         }
     }
 
+    // YubiKey enforcement: admin users with a registered key must verify before accessing admin routes
+    if (user?.requiresYubikeyVerification && location.pathname !== ROUTES.YUBIKEY_VERIFY) {
+        return <Navigate to={ROUTES.YUBIKEY_VERIFY} replace />;
+    }
+
     return <>{children}</>;
 };
 

@@ -24,15 +24,22 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Returns true if the user either has no registered YubiKey, or has verified it this session
+    function isYubikeyVerifiedOrNotRequired() {
+      return !('yubikey_registered' in request.auth.token)
+             || request.auth.token.yubikey_registered == false
+             || request.auth.token.yubikey_verified == true;
+    }
+
     // ─── Users ─────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isOwner(userId) || isOpsStaff();
       allow create: if (isAuthenticated() && request.auth.uid == userId)
                     || isAdmin();
-      allow update: if isAdmin()
+      allow update: if (isAdmin() && isYubikeyVerifiedOrNotRequired())
                     || (isOwner(userId)
                         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status']));
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() && isYubikeyVerifiedOrNotRequired();
     }
 
     // ─── Customers ────────────────────────────────────────
@@ -92,12 +99,12 @@ service cloud.firestore {
       allow read: if isOpsStaff()
                   || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow create: if false;  // Only Cloud Functions (createBookingSecure)
-      allow update: if isOpsStaff()
+      allow update: if (isOpsStaff() && isYubikeyVerifiedOrNotRequired())
                     || (isAuthenticated()
                         && resource.data.userId == request.auth.uid
                         && !request.resource.data.diff(resource.data).affectedKeys()
                             .hasAny(['status', 'totalAmount', 'fareClass', 'paymentIntentId', 'pnr', 'flightId', 'passengerCount']));
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() && isYubikeyVerifiedOrNotRequired();
 
       // Passengers sub-collection
       match /passengers/{passengerId} {
@@ -194,13 +201,13 @@ service cloud.firestore {
     // ─── Email Templates ───────────────────────────────────
     match /email_templates/{templateId} {
       allow read: if isOpsStaff();
-      allow write: if isAdmin();
+      allow write: if isAdmin() && isYubikeyVerifiedOrNotRequired();
     }
 
     // ─── SMS Templates ─────────────────────────────────────
     match /sms_templates/{templateId} {
       allow read: if isOpsStaff();
-      allow write: if isAdmin();
+      allow write: if isAdmin() && isYubikeyVerifiedOrNotRequired();
     }
 
     // ─── Notification Logs ─────────────────────────────────
@@ -227,7 +234,7 @@ service cloud.firestore {
     // ─── Admin Config (MFA, SSO, Password Policy) ──────────
     match /admin_config/{configId} {
       allow read: if isOpsStaff();
-      allow write: if isAdmin();
+      allow write: if isAdmin() && isYubikeyVerifiedOrNotRequired();
     }
 
     // ─── Loyalty Tiers ─────────────────────────────────────
@@ -359,7 +366,7 @@ service cloud.firestore {
     // ─── Fare Rules ────────────────────────────────────────
     match /fare_rules/{ruleId} {
       allow read: if true;           // Public — passengers view refund policies
-      allow write: if isAdmin();
+      allow write: if isAdmin() && isYubikeyVerifiedOrNotRequired();
     }
 
     // ─── Vouchers / Credits ────────────────────────────────

@@ -6,6 +6,8 @@ export interface AuthUser {
     displayName: string | null;
     photoURL: string | null;
     role: 'super_admin' | 'ops_manager' | 'crew_sched' | 'cs_agent' | 'customer';
+    /** True when admin has a registered key but hasn't verified this session */
+    requiresYubikeyVerification?: boolean;
 }
 
 interface AuthState {

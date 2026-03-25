@@ -10,7 +10,7 @@
  * authenticators (Touch ID, Windows Hello).
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.webauthnRemoveKey = exports.webauthnListKeys = exports.webauthnVerifyAuthentication = exports.webauthnGenerateAuthentication = exports.webauthnVerifyRegistration = exports.webauthnGenerateRegistration = void 0;
+exports.getSecurityKeyStatus = exports.assignSecurityKeyRequirement = exports.clearYubikeyVerified = exports.webauthnRemoveKey = exports.webauthnListKeys = exports.webauthnVerifyAuthentication = exports.webauthnGenerateAuthentication = exports.webauthnVerifyRegistration = exports.webauthnGenerateRegistration = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const auth_1 = require("firebase-admin/auth");
@@ -66,10 +66,10 @@ exports.webauthnGenerateRegistration = (0, https_1.onCall)(async (request) => {
         userDisplayName: userEmail,
         attestationType: 'none',
         authenticatorSelection: {
-            // Prefer cross-platform (USB YubiKey) but allow platform (Touch ID)
-            authenticatorAttachment: undefined,
+            // Force cross-platform: only USB/NFC hardware keys (YubiKey), no passkeys
+            authenticatorAttachment: 'cross-platform',
             userVerification: 'preferred',
-            residentKey: 'preferred',
+            residentKey: 'discouraged',
             requireResidentKey: false,
         },
         excludeCredentials,
@@ -126,14 +126,45 @@ exports.webauthnVerifyRegistration = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('invalid-argument', 'Security key verification failed.');
     }
     const { credential: regCred, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
-    // Store credential in Firestore
-    const credDocId = Buffer.from(regCred.id).toString('base64url');
-    await db.collection('webauthn_credentials').doc(credDocId).set({
+    // CRITICAL: regCred.id may be a Uint8Array that contains UTF-8 bytes of a base64url string
+    // (not raw credential bytes). We must detect this and avoid double-encoding.
+    let credId;
+    if (typeof regCred.id === 'string') {
+        credId = regCred.id;
+    }
+    else {
+        // Convert Uint8Array to UTF-8 string first
+        const asUtf8 = Buffer.from(regCred.id).toString('utf8');
+        // Check if it's already a base64url string (only contains base64url chars)
+        if (/^[A-Za-z0-9_-]+={0,2}$/.test(asUtf8) && asUtf8.length > 20) {
+            credId = asUtf8;
+        }
+        else {
+            credId = Buffer.from(regCred.id).toString('base64url');
+        }
+    }
+    // Same pattern for publicKey
+    let pubKey;
+    if (typeof regCred.publicKey === 'string') {
+        pubKey = regCred.publicKey;
+    }
+    else {
+        pubKey = Buffer.from(regCred.publicKey).toString('base64');
+    }
+    console.log('[WEBAUTHN_REG] credId:', credId, 'type was:', typeof regCred.id);
+    // Resolve transports — empty array is truthy in JS, so check .length explicitly
+    const rawTransports = credential.response?.transports || credential.transports;
+    const resolvedTransports = (Array.isArray(rawTransports) && rawTransports.length > 0)
+        ? rawTransports
+        : ['usb'];
+    // Use credId as Firestore doc ID (replace / with _ for safety)
+    const docId = credId.replace(/\//g, '_');
+    await db.collection('webauthn_credentials').doc(docId).set({
         userId,
-        credentialId: credDocId,
-        publicKey: Buffer.from(regCred.publicKey).toString('base64'),
+        credentialId: credId,
+        publicKey: pubKey,
         counter: regCred.counter,
-        transports: credential.response?.transports || [],
+        transports: resolvedTransports,
         deviceType: credentialDeviceType,
         backedUp: credentialBackedUp,
         keyName,
@@ -170,21 +201,37 @@ exports.webauthnGenerateAuthentication = (0, https_1.onCall)(async (request) => 
         .where('userId', '==', userId)
         .get();
     if (credsSnap.empty) {
-        throw new https_1.HttpsError('not-found', 'No security keys registered for this account.');
+        // Self-healing: clear stale yubikey claims if credentials were deleted
+        const existingClaims = (await adminAuth.getUser(userId)).customClaims || {};
+        if (existingClaims.yubikey_registered || existingClaims.yubikey_verified || existingClaims.yubikey_required) {
+            await adminAuth.setCustomUserClaims(userId, {
+                ...existingClaims,
+                yubikey_registered: false,
+                yubikey_verified: false,
+                yubikey_required: false,
+            });
+        }
+        return { noKeysFound: true, message: 'No security keys registered. Claims have been cleared.' };
     }
     const allowCredentials = credsSnap.docs.map((doc) => {
         const data = doc.data();
+        const transports = (data.transports && data.transports.length > 0)
+            ? data.transports
+            : ['usb'];
+        console.log('[WEBAUTHN_AUTH] Credential from Firestore:', data.credentialId, 'transports:', transports);
         return {
             id: data.credentialId,
             type: 'public-key',
-            transports: (data.transports || []),
+            transports,
         };
     });
+    console.log('[WEBAUTHN_AUTH] allowCredentials count:', allowCredentials.length);
     const options = await (0, server_1.generateAuthenticationOptions)({
         rpID: RP_ID,
         allowCredentials,
         userVerification: 'preferred',
     });
+    console.log('[WEBAUTHN_AUTH] Generated options.allowCredentials:', JSON.stringify(options.allowCredentials));
     // Store challenge (5 min TTL)
     await db.doc(`webauthn_challenges/${userId}`).set({
         challenge: options.challenge,
@@ -220,16 +267,19 @@ exports.webauthnVerifyAuthentication = (0, https_1.onCall)(async (request) => {
         await db.doc(`webauthn_challenges/${userId}`).delete();
         throw new https_1.HttpsError('deadline-exceeded', 'Challenge expired. Please try again.');
     }
-    // Find the matching credential
+    // Find the matching credential by credentialId field
     const credId = credential.id;
-    const credDoc = await db.doc(`webauthn_credentials/${credId}`).get();
-    if (!credDoc.exists) {
+    console.log('[WEBAUTHN_VERIFY_AUTH] Looking up credentialId:', credId);
+    const credQuery = await db.collection('webauthn_credentials')
+        .where('credentialId', '==', credId)
+        .where('userId', '==', userId)
+        .limit(1)
+        .get();
+    if (credQuery.empty) {
         throw new https_1.HttpsError('not-found', 'Security key not recognized.');
     }
+    const credDoc = credQuery.docs[0];
     const storedCred = credDoc.data();
-    if (storedCred.userId !== userId) {
-        throw new https_1.HttpsError('permission-denied', 'Security key does not belong to this account.');
-    }
     let verification;
     try {
         verification = await (0, server_1.verifyAuthenticationResponse)({
@@ -252,7 +302,7 @@ exports.webauthnVerifyAuthentication = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('invalid-argument', 'Security key authentication failed.');
     }
     // Update counter (replay attack prevention)
-    await db.doc(`webauthn_credentials/${credId}`).update({
+    await credDoc.ref.update({
         counter: verification.authenticationInfo.newCounter,
         lastUsedAt: firestore_1.FieldValue.serverTimestamp(),
     });
@@ -325,5 +375,107 @@ exports.webauthnRemoveKey = (0, https_1.onCall)(async (request) => {
         await adminAuth.setCustomUserClaims(userId, rest);
     }
     return { success: true };
+});
+/* ══════════════════════════════════════════════════════════════
+   Session Scoping — Clear verified status on logout
+   ══════════════════════════════════════════════════════════════ */
+/**
+ * Clear the `yubikey_verified` claim so the admin must re-verify
+ * their security key on the next login session.
+ * Called automatically during logout.
+ */
+exports.clearYubikeyVerified = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be logged in.');
+    }
+    const userId = request.auth.uid;
+    const existingClaims = (await adminAuth.getUser(userId)).customClaims || {};
+    // Only clear if the user actually has a registered key
+    if (existingClaims.yubikey_registered) {
+        await adminAuth.setCustomUserClaims(userId, {
+            ...existingClaims,
+            yubikey_verified: false,
+        });
+    }
+    return { success: true };
+});
+/* ══════════════════════════════════════════════════════════════
+   Super-Admin Key Management
+   ══════════════════════════════════════════════════════════════ */
+/**
+ * Assign or remove the security-key requirement for a target admin user.
+ * - Sets (or clears) the `yubikey_required` custom claim.
+ * - Only super_admin callers may invoke this.
+ */
+exports.assignSecurityKeyRequirement = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be logged in.');
+    }
+    // Only super_admin can assign key requirements
+    const callerClaims = (await adminAuth.getUser(request.auth.uid)).customClaims || {};
+    if (callerClaims.role !== 'super_admin') {
+        throw new https_1.HttpsError('permission-denied', 'Only super admins can assign security key requirements.');
+    }
+    const { targetUid, required } = request.data;
+    if (!targetUid || typeof required !== 'boolean') {
+        throw new https_1.HttpsError('invalid-argument', 'targetUid (string) and required (boolean) are required.');
+    }
+    // Verify target exists and is an admin role
+    const targetUser = await adminAuth.getUser(targetUid);
+    const targetClaims = targetUser.customClaims || {};
+    const adminRoles = ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent'];
+    if (!adminRoles.includes(targetClaims.role)) {
+        throw new https_1.HttpsError('failed-precondition', 'Security keys can only be assigned to admin/staff users.');
+    }
+    // Update claims
+    await adminAuth.setCustomUserClaims(targetUid, {
+        ...targetClaims,
+        yubikey_required: required,
+    });
+    // Log the action
+    await db.collection('audit_logs').add({
+        action: required ? 'security_key_required' : 'security_key_requirement_removed',
+        targetUid,
+        performedBy: request.auth.uid,
+        timestamp: firestore_1.FieldValue.serverTimestamp(),
+    });
+    return {
+        success: true,
+        message: required
+            ? `Security key requirement enabled for ${targetUser.email}`
+            : `Security key requirement removed for ${targetUser.email}`,
+    };
+});
+/**
+ * Get security key status for a target user.
+ * Returns whether the user has a registered key, is required to use one, and current verified state.
+ */
+exports.getSecurityKeyStatus = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be logged in.');
+    }
+    // Only ops staff can view key status
+    const callerClaims = (await adminAuth.getUser(request.auth.uid)).customClaims || {};
+    const opsRoles = ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent'];
+    if (!opsRoles.includes(callerClaims.role)) {
+        throw new https_1.HttpsError('permission-denied', 'Insufficient permissions.');
+    }
+    const { targetUid } = request.data;
+    if (!targetUid) {
+        throw new https_1.HttpsError('invalid-argument', 'targetUid is required.');
+    }
+    const targetUser = await adminAuth.getUser(targetUid);
+    const claims = targetUser.customClaims || {};
+    // Count registered credentials
+    const credsSnap = await db
+        .collection('webauthn_credentials')
+        .where('userId', '==', targetUid)
+        .get();
+    return {
+        yubikey_required: !!claims.yubikey_required,
+        yubikey_registered: !!claims.yubikey_registered,
+        yubikey_verified: !!claims.yubikey_verified,
+        credentialCount: credsSnap.size,
+    };
 });
 //# sourceMappingURL=webauthn.js.map

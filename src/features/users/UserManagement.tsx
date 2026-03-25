@@ -54,6 +54,16 @@ const deleteUserAccountCF = httpsCallable<
   { success: boolean; message: string }
 >(functions, 'deleteUserAccount');
 
+const assignSecurityKeyRequirementCF = httpsCallable<
+  { targetUid: string; required: boolean },
+  { success: boolean; message: string }
+>(functions, 'assignSecurityKeyRequirement');
+
+const getSecurityKeyStatusCF = httpsCallable<
+  { targetUid: string },
+  { yubikey_required: boolean; yubikey_registered: boolean; yubikey_verified: boolean; credentialCount: number }
+>(functions, 'getSecurityKeyStatus');
+
 /* ── Helpers ───────────────────────────────────────────────── */
 function formatDate(ts: any): string {
   if (!ts) return '—';
@@ -105,6 +115,10 @@ const UserManagement: React.FC = () => {
   /* ── Delete / Suspend confirm state ─────────────────────────── */
   const [confirmAction, setConfirmAction] = useState<{ type: 'delete' | 'suspend' | 'reactivate'; user: UserDoc } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  /* ── Security Key status per user ───────────────────────────── */
+  const [keyStatus, setKeyStatus] = useState<Record<string, { required: boolean; registered: boolean; verified: boolean; credentialCount: number; loading: boolean }>>({});
+  const [keyActionLoading, setKeyActionLoading] = useState<string | null>(null);
 
   /* ── Pagination ────────────────────────────────────────────── */
   const [currentPage, setCurrentPage] = useState(1);
@@ -267,6 +281,43 @@ const UserManagement: React.FC = () => {
       setActionLoading(false);
     }
   }, []);
+
+  /* ── Security Key handlers ─────────────────────────────────── */
+  const fetchKeyStatus = useCallback(async (uid: string) => {
+    setKeyStatus(prev => ({ ...prev, [uid]: { ...prev[uid], loading: true, required: false, registered: false, verified: false, credentialCount: 0 } }));
+    try {
+      const result = await getSecurityKeyStatusCF({ targetUid: uid });
+      setKeyStatus(prev => ({
+        ...prev,
+        [uid]: {
+          required: result.data.yubikey_required,
+          registered: result.data.yubikey_registered,
+          verified: result.data.yubikey_verified,
+          credentialCount: result.data.credentialCount,
+          loading: false,
+        },
+      }));
+    } catch (err) {
+      console.error('[UserManagement] Key status fetch error:', err);
+      setKeyStatus(prev => ({ ...prev, [uid]: { ...prev[uid], loading: false } }));
+    }
+  }, []);
+
+  const handleToggleKeyRequirement = useCallback(async (uid: string, currentRequired: boolean) => {
+    setKeyActionLoading(uid);
+    try {
+      const result = await assignSecurityKeyRequirementCF({ targetUid: uid, required: !currentRequired });
+      setSuccessMsg(result.data.message);
+      setTimeout(() => setSuccessMsg(null), 5000);
+      // Refresh the key status
+      await fetchKeyStatus(uid);
+    } catch (err: any) {
+      console.error('[UserManagement] Key requirement toggle error:', err);
+      setError(err?.message || 'Failed to update security key requirement.');
+    } finally {
+      setKeyActionLoading(null);
+    }
+  }, [fetchKeyStatus]);
 
   /* ── Pagination handlers ───────────────────────────────────── */
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
@@ -483,6 +534,7 @@ const UserManagement: React.FC = () => {
                   <th className="px-6 md:px-8 py-6">Role</th>
                   <th className="px-6 md:px-8 py-6">Status</th>
                   <th className="px-6 md:px-8 py-6">Two-Factor</th>
+                  <th className="px-6 md:px-8 py-6">Security Key</th>
                   <th className="px-6 md:px-8 py-6">Last Login</th>
                   <th className="px-6 md:px-10 py-6 text-right">Actions</th>
                 </tr>
@@ -490,7 +542,7 @@ const UserManagement: React.FC = () => {
               <tbody className="divide-y divide-navy-50">
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-10 py-16 text-center">
+                    <td colSpan={7} className="px-10 py-16 text-center">
                       <span className="material-symbols-outlined text-5xl text-navy-200 block mb-3">person_off</span>
                       <p className="font-bold text-navy-400">No users found</p>
                       <p className="text-xs text-navy-300 mt-1">Try adjusting your search or filter.</p>
@@ -543,6 +595,20 @@ const UserManagement: React.FC = () => {
                           </span>
                         </div>
                       </td>
+                      <td className="px-6 md:px-8 py-6">
+                        {u.role !== 'customer' ? (
+                          <div className="flex items-center gap-2">
+                            <span className={`material-symbols-outlined text-sm ${keyStatus[u.uid]?.registered ? 'text-emerald-500' : keyStatus[u.uid]?.required ? 'text-amber-500' : 'text-navy-200'}`}>
+                              {keyStatus[u.uid]?.registered ? 'key' : 'key_off'}
+                            </span>
+                            <span className="text-[10px] font-black text-navy-900 uppercase tracking-widest">
+                              {keyStatus[u.uid]?.loading ? '…' : keyStatus[u.uid]?.registered ? 'Active' : keyStatus[u.uid]?.required ? 'Required' : '—'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-navy-200 font-bold">—</span>
+                        )}
+                      </td>
                       <td className="px-6 md:px-8 py-6 text-[10px] font-black text-navy-400 uppercase tracking-widest italic opacity-70">
                         {formatDate(u.lastLoginAt)}
                       </td>
@@ -555,8 +621,8 @@ const UserManagement: React.FC = () => {
                     {/* Expanded detail row */}
                     {expandedUser === u.uid && (
                       <tr className="bg-primary/5">
-                        <td colSpan={6} className="px-6 md:px-10 py-6">
-                          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                        <td colSpan={7} className="px-6 md:px-10 py-6">
+                          <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
                             <div>
                               <p className="text-[10px] font-black text-navy-400 uppercase mb-1">User ID</p>
                               <p className="text-xs font-bold text-navy-900 font-mono">{u.uid}</p>
@@ -623,6 +689,50 @@ const UserManagement: React.FC = () => {
                                 </button>
                               </div>
                             </div>
+                            {/* Security Key Management */}
+                            {u.role !== 'customer' && (
+                              <div>
+                                <p className="text-[10px] font-black text-navy-400 uppercase mb-2">Security Key</p>
+                                {!keyStatus[u.uid] || keyStatus[u.uid].loading ? (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); fetchKeyStatus(u.uid); }}
+                                    className="text-xs font-bold text-primary hover:underline"
+                                  >
+                                    Check Status →
+                                  </button>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`material-symbols-outlined text-sm ${keyStatus[u.uid].registered ? 'text-emerald-500' : 'text-navy-300'}`}>
+                                        {keyStatus[u.uid].registered ? 'check_circle' : 'cancel'}
+                                      </span>
+                                      <span className="text-xs font-bold text-navy-800">
+                                        {keyStatus[u.uid].registered
+                                          ? `${keyStatus[u.uid].credentialCount} key${keyStatus[u.uid].credentialCount !== 1 ? 's' : ''} registered`
+                                          : 'No keys registered'}
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleToggleKeyRequirement(u.uid, keyStatus[u.uid].required); }}
+                                      disabled={keyActionLoading === u.uid}
+                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all border ${
+                                        keyStatus[u.uid].required
+                                          ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                                          : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                                      } disabled:opacity-50`}
+                                    >
+                                      {keyActionLoading === u.uid ? (
+                                        <><div className="w-3 h-3 rounded-full border-2 border-current/30 border-t-current animate-spin" /> Updating…</>
+                                      ) : keyStatus[u.uid].required ? (
+                                        <><span className="material-symbols-outlined text-xs">lock_open</span> Remove Requirement</>
+                                      ) : (
+                                        <><span className="material-symbols-outlined text-xs">lock</span> Require Security Key</>
+                                      )}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>

@@ -25,6 +25,11 @@ const Login: React.FC = () => {
 
     try {
       const authUser = await login(email, password);
+      // If admin has a registered YubiKey, redirect to verification gate
+      if (authUser.requiresYubikeyVerification) {
+        navigate(ROUTES.YUBIKEY_VERIFY, { replace: true });
+        return;
+      }
       const target = intendedPath || (authUser.role === 'customer' ? ROUTES.MY_DASHBOARD : ROUTES.DASHBOARD);
       navigate(target, { replace: true });
     } catch (err: any) {
@@ -46,6 +51,11 @@ const Login: React.FC = () => {
     setIsSubmitting(true);
     try {
       const authUser = await googleLogin();
+      // If admin has a registered YubiKey, redirect to verification gate
+      if (authUser.requiresYubikeyVerification) {
+        navigate(ROUTES.YUBIKEY_VERIFY, { replace: true });
+        return;
+      }
       const target = intendedPath || (authUser.role === 'customer' ? ROUTES.MY_DASHBOARD : ROUTES.DASHBOARD);
       navigate(target, { replace: true });
     } catch (err: any) {

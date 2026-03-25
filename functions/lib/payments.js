@@ -9,7 +9,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendBookingConfirmation = exports.processRefund = exports.createPaymentIntent = void 0;
+exports.confirmPaymentSecure = exports.sendBookingConfirmation = exports.processRefund = exports.createPaymentIntent = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const rateLimit_1 = require("./rateLimit");
 const firestore_1 = require("firebase-admin/firestore");
@@ -182,5 +182,58 @@ exports.sendBookingConfirmation = (0, https_1.onCall)(async (request) => {
         timestamp: firestore_1.FieldValue.serverTimestamp(),
     });
     return { success: true };
+});
+/**
+ * Confirm payment and update booking status (server-side only).
+ * Generates e-ticket number server-side and marks booking as confirmed.
+ */
+exports.confirmPaymentSecure = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Must be logged in.');
+    }
+    const uid = request.auth.uid;
+    const { bookingId, paymentIntentId } = request.data;
+    if (!bookingId) {
+        throw new https_1.HttpsError('invalid-argument', 'Missing bookingId.');
+    }
+    const bookingRef = db.doc(`bookings/${bookingId}`);
+    const bookingDoc = await bookingRef.get();
+    if (!bookingDoc.exists) {
+        throw new https_1.HttpsError('not-found', 'Booking not found.');
+    }
+    const booking = bookingDoc.data();
+    if (booking.userId !== uid) {
+        throw new https_1.HttpsError('permission-denied', 'This booking does not belong to you.');
+    }
+    if (booking.status !== 'pending') {
+        throw new https_1.HttpsError('failed-precondition', `Booking is already ${booking.status}.`);
+    }
+    // Generate e-ticket number server-side
+    const crypto = require('crypto');
+    const now = new Date();
+    const datePart = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, '0'),
+        String(now.getDate()).padStart(2, '0'),
+    ].join('');
+    const randomPart = crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
+    const eTicketNumber = `DBJ-${datePart}-${randomPart}`;
+    await bookingRef.update({
+        status: 'confirmed',
+        eTicketNumber,
+        paymentIntentId: paymentIntentId || booking.paymentIntentId || null,
+        updatedAt: firestore_1.FieldValue.serverTimestamp(),
+    });
+    // Audit log
+    await db.collection('audit_logs').add({
+        action: 'PAYMENT_CONFIRMED',
+        entityType: 'booking',
+        entityId: bookingId,
+        userId: uid,
+        userEmail: request.auth.token.email || '',
+        details: { eTicketNumber, paymentIntentId },
+        timestamp: firestore_1.FieldValue.serverTimestamp(),
+    });
+    return { success: true, eTicketNumber };
 });
 //# sourceMappingURL=payments.js.map

@@ -21,6 +21,7 @@ googleProvider.addScope('profile');
 
 // ─── Type Helpers ─────────────────────────────────────────
 type UserRole = AuthUser['role'];
+const ADMIN_ROLES: UserRole[] = ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent'];
 
 /**
  * Map a Firebase User to our AuthUser shape.
@@ -48,6 +49,14 @@ async function mapFirebaseUser(user: User): Promise<AuthUser> {
 export async function loginWithEmail(email: string, password: string): Promise<AuthUser> {
     const { user } = await signInWithEmailAndPassword(auth, email, password);
     const authUser = await mapFirebaseUser(user);
+
+    // Check if admin has a registered security key that needs verification
+    if (ADMIN_ROLES.includes(authUser.role)) {
+        const tokenResult = await user.getIdTokenResult();
+        if (tokenResult.claims.yubikey_registered && !tokenResult.claims.yubikey_verified) {
+            authUser.requiresYubikeyVerification = true;
+        }
+    }
 
     // Update last login in Firestore
     await setDoc(doc(db, 'users', user.uid), {
@@ -116,6 +125,14 @@ export async function loginWithGoogle(): Promise<AuthUser> {
 
     const authUser = await mapFirebaseUser(user);
 
+    // Check if admin has a registered security key that needs verification
+    if (ADMIN_ROLES.includes(authUser.role)) {
+        const tokenResult = await user.getIdTokenResult();
+        if (tokenResult.claims.yubikey_registered && !tokenResult.claims.yubikey_verified) {
+            authUser.requiresYubikeyVerification = true;
+        }
+    }
+
     // Session tracking — create active session document
     await createSessionDoc(user.uid, authUser.displayName || user.email || '', authUser.role);
 
@@ -144,8 +161,18 @@ export async function logout(): Promise<void> {
     stopIdleTimer();
     const user = auth.currentUser;
 
-    // Clean up session document before signing out
     if (user) {
+        // Clear YubiKey verified status so next login requires re-verification
+        try {
+            const { httpsCallable } = await import('firebase/functions');
+            const { functions } = await import('../config/firebase.config');
+            const clearVerified = httpsCallable(functions, 'clearYubikeyVerified');
+            await clearVerified();
+        } catch (err) {
+            console.warn('[Auth] Failed to clear YubiKey verified status:', err);
+        }
+
+        // Clean up session document before signing out
         await cleanupSessionDoc(user.uid, user.email || '');
     }
 
@@ -253,6 +280,15 @@ export function onAuthChange(callback?: (user: AuthUser | null) => void): () => 
     return onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
             const authUser = await mapFirebaseUser(firebaseUser);
+
+            // Check YubiKey claims on session resume (e.g. page refresh)
+            if (ADMIN_ROLES.includes(authUser.role)) {
+                const tokenResult = await firebaseUser.getIdTokenResult();
+                if (tokenResult.claims.yubikey_registered && !tokenResult.claims.yubikey_verified) {
+                    authUser.requiresYubikeyVerification = true;
+                }
+            }
+
             useAuthStore.getState().setUser(authUser);
             // Start idle timer for admin/staff users only
             if (authUser.role !== 'customer') {
