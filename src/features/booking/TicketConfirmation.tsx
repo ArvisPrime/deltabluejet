@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router';
+import { QRCodeSVG } from 'qrcode.react';
 import { BRAND } from '../../config/brand';
 import { ROUTES } from '../../config/routes';
 import { useBookingStore } from '../../stores/bookingStore';
@@ -147,19 +148,18 @@ const TicketConfirmation: React.FC = () => {
                   </div>
                </div>
 
-               {/* Barcode-style divider */}
+               {/* QR Code */}
                <div className="px-8 pb-6">
-                  <div className="h-12 bg-navy-50 rounded-xl flex items-center justify-center gap-0.5 overflow-hidden">
-                     {Array.from({ length: 40 }, (_, i) => (
-                        <div
-                           key={i}
-                           className="bg-navy-900"
-                           style={{
-                              width: ((i * 7 + 3) % 5) > 2 ? '2px' : '3px',
-                              height: `${20 + ((i * 13 + 7) % 20)}px`,
-                           }}
-                        />
-                     ))}
+                  <div className="bg-navy-50 rounded-xl p-4 flex flex-col items-center justify-center gap-2">
+                     <QRCodeSVG
+                        value={`PNR:${pnr}|ETKT:${eTicket}|FLT:${flightNum}|${originCode}-${destCode}|CLS:${fareClass}`}
+                        size={140}
+                        level="M"
+                        bgColor="#f8fafc"
+                        fgColor="#0a1628"
+                        includeMargin
+                     />
+                     <p className="text-[8px] font-bold text-navy-300 uppercase tracking-widest">Scan for e-Ticket</p>
                   </div>
                </div>
             </div>

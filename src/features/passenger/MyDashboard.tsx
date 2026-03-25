@@ -1,17 +1,21 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
 import { getOrCreateCustomer, getBookingHistory } from '../../services/customerService';
 import { getLoyaltyStatus, getTierInfo, getNextTierInfo, TIER_THRESHOLDS } from '../../services/loyaltyService';
 import { checkEligibility } from '../../services/checkin';
-import type { CustomerDoc, BookingDoc, LoyaltyDoc } from '../../types/firestore';
+import { encodeBCBP, fareClassToCompartment } from '../../utils/boardingPassEncoder';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../../config/firebase.config';
+import type { CustomerDoc, BookingDoc, LoyaltyDoc, CheckinDoc } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
 import { useCurrency } from '../../hooks/useCurrency';
 
-type ModalType = 'book' | 'manage' | 'checkin' | 'flight' | null;
+type ModalType = 'book' | 'manage' | 'checkin' | 'flight' | 'boardingpass' | null;
 
 /**
  * MyDashboard — Passenger home after login/registration.
@@ -28,6 +32,7 @@ const MyDashboard: React.FC = () => {
     const [customer, setCustomer] = useState<CustomerDoc | null>(null);
     const [bookings, setBookings] = useState<BookingDoc[]>([]);
     const [loyalty, setLoyalty] = useState<LoyaltyDoc | null>(null);
+    const [checkinRecord, setCheckinRecord] = useState<CheckinDoc | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -103,6 +108,65 @@ const MyDashboard: React.FC = () => {
         calcCountdown();
         const id = setInterval(calcCountdown, 60000);
         return () => clearInterval(id);
+    }, [upcomingTrip]);
+
+    // ── Fetch checkin record for boarding pass ───────────────
+    useEffect(() => {
+        if (!upcomingTrip || upcomingTrip.status !== 'checked_in') return;
+        (async () => {
+            try {
+                const snap = await getDocs(
+                    query(collection(db, 'checkins'), where('pnr', '==', upcomingTrip.pnr), limit(1))
+                );
+                if (!snap.empty) {
+                    setCheckinRecord({ id: snap.docs[0].id, ...snap.docs[0].data() } as CheckinDoc);
+                }
+            } catch { /* silent */ }
+        })();
+    }, [upcomingTrip]);
+
+    // ── Boarding pass BCBP data for modal ────────────────
+    const boardingPassBCBP = useMemo(() => {
+        if (checkinRecord?.bcbpData) return checkinRecord.bcbpData;
+        if (!upcomingTrip) return '';
+        try {
+            const name = (upcomingTrip as any).passengerName || user?.displayName || 'PASSENGER';
+            return encodeBCBP({
+                passengerName: name.toUpperCase(),
+                pnr: upcomingTrip.pnr || 'XXXXXX',
+                origin: upcomingTrip.origin?.code || '---',
+                destination: upcomingTrip.destination?.code || '---',
+                carrierCode: 'DB',
+                flightNumber: upcomingTrip.flightNumber || '0000',
+                departureDate: upcomingTrip.departureTime?.toDate?.() || new Date(),
+                compartment: fareClassToCompartment(upcomingTrip.fareClass || 'economy'),
+                seatNumber: checkinRecord?.seatNumber || '---',
+                sequenceNumber: Date.now() % 10000,
+            });
+        } catch { return `PNR:${upcomingTrip.pnr}`; }
+    }, [checkinRecord, upcomingTrip, user]);
+
+    // ── Save QR as PNG helper ───────────────────────────
+    const handleSaveQR = useCallback(() => {
+        const svgEl = document.querySelector('#boarding-pass-qr svg') as SVGSVGElement | null;
+        if (!svgEl) return;
+        const svgData = new XMLSerializer().serializeToString(svgEl);
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const img = new Image();
+        img.onload = () => {
+            canvas.width = img.width * 2;
+            canvas.height = img.height * 2;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const link = document.createElement('a');
+            link.download = `boarding-pass-${upcomingTrip?.pnr || 'QR'}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        };
+        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
     }, [upcomingTrip]);
 
     // ── Loyalty helpers ────────────────────────────────────
@@ -294,10 +358,10 @@ const MyDashboard: React.FC = () => {
                             <div className="flex gap-3">
                                 {/* Boarding Pass — visible when checked in */}
                                 {(upcomingTrip.status === 'checked_in' || checkinOpen) && (
-                                    <Link to={ROUTES.CHECKIN} className="flex-1 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity no-underline shadow-lg shadow-amber-500/20">
+                                    <button onClick={() => setActiveModal('boardingpass')} className="flex-1 h-10 rounded-xl bg-gradient-to-r from-primary to-blue-600 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-lg shadow-primary/20">
                                         <span className="material-symbols-outlined text-sm">qr_code_2</span>
                                         Boarding Pass
-                                    </Link>
+                                    </button>
                                 )}
                                 <Link to={`/manage-booking/${upcomingTrip.pnr}`} className="flex-1 h-10 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity no-underline">
                                     Manage
@@ -537,7 +601,106 @@ const MyDashboard: React.FC = () => {
                 </div>
             )}
 
-            {/* Modal Animations */}
+            {/* ── Boarding Pass Full-Screen Modal ──────────────── */}
+            {activeModal === 'boardingpass' && upcomingTrip && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={closeModal}>
+                    <div className="absolute inset-0 bg-navy-950/70 backdrop-blur-md" style={{ animation: 'fadeIn 0.2s ease-out' }} />
+                    <div
+                        className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
+                        onClick={e => e.stopPropagation()}
+                        style={{ animation: 'modalSlideUp 0.35s cubic-bezier(0.16,1,0.3,1)' }}
+                    >
+                        {/* Header */}
+                        <div className="bg-navy-950 px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-white">flight</span>
+                                <div>
+                                    <p className="text-xs font-black text-white uppercase tracking-wider">Mobile Boarding Pass</p>
+                                    <p className="text-[9px] text-white/50 uppercase tracking-widest">{BRAND.name}</p>
+                                </div>
+                            </div>
+                            <button onClick={closeModal} className="size-8 rounded-lg bg-white/10 flex items-center justify-center text-white/70 hover:bg-white/20 transition-all">
+                                <span className="material-symbols-outlined text-sm">close</span>
+                            </button>
+                        </div>
+
+                        {/* Passenger & Flight Info */}
+                        <div className="px-6 pt-5 pb-3 space-y-4">
+                            <div>
+                                <p className="text-[8px] font-bold text-navy-300 uppercase tracking-widest">Passenger</p>
+                                <p className="text-lg font-black text-navy-950 uppercase tracking-tight">
+                                    {(upcomingTrip as any)?.passengerName || user?.displayName || 'Passenger'}
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3 border-t border-dashed border-navy-100 pt-3">
+                                <div>
+                                    <p className="text-[7px] font-bold text-navy-300 uppercase tracking-widest">Flight</p>
+                                    <p className="text-sm font-black text-primary">{upcomingTrip.flightNumber || '\u2014'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[7px] font-bold text-navy-300 uppercase tracking-widest">Seat</p>
+                                    <p className="text-sm font-black text-primary">{checkinRecord?.seatNumber || '\u2014'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[7px] font-bold text-navy-300 uppercase tracking-widest">Group</p>
+                                    <p className="text-sm font-black text-navy-950">{checkinRecord?.boardingGroup || 'A'}</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 border-t border-dashed border-navy-100 pt-3">
+                                <div>
+                                    <p className="text-[7px] font-bold text-navy-300 uppercase tracking-widest">From</p>
+                                    <p className="text-sm font-black text-navy-950">{upcomingTrip.origin?.city || upcomingTrip.origin?.code || '\u2014'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[7px] font-bold text-navy-300 uppercase tracking-widest">To</p>
+                                    <p className="text-sm font-black text-navy-950">{upcomingTrip.destination?.city || upcomingTrip.destination?.code || '\u2014'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* QR Code */}
+                        <div className="px-6 py-5 flex flex-col items-center" id="boarding-pass-qr">
+                            <div className="bg-navy-50 rounded-2xl p-5">
+                                {boardingPassBCBP ? (
+                                    <QRCodeSVG
+                                        value={boardingPassBCBP}
+                                        size={200}
+                                        level="M"
+                                        bgColor="#f8fafc"
+                                        fgColor="#0a1628"
+                                        includeMargin
+                                    />
+                                ) : (
+                                    <div className="w-[200px] h-[200px] flex items-center justify-center text-navy-300">
+                                        <span className="material-symbols-outlined text-5xl animate-pulse">qr_code_2</span>
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-[8px] font-bold text-navy-300 uppercase tracking-widest mt-3">Scan at gate for boarding</p>
+                            <p className="font-mono text-xs font-black text-primary tracking-[0.3em] mt-1">{upcomingTrip.pnr}</p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="px-6 pb-6 space-y-3">
+                            <button
+                                onClick={handleSaveQR}
+                                className="w-full h-12 rounded-xl bg-navy-950 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-navy-800 transition-all shadow-lg shadow-navy-950/20"
+                            >
+                                <span className="material-symbols-outlined text-sm">download</span>
+                                Save to Phone
+                            </button>
+                            <button
+                                onClick={() => window.print()}
+                                className="w-full h-12 rounded-xl border-2 border-navy-200 text-navy-700 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-navy-50 transition-all"
+                            >
+                                <span className="material-symbols-outlined text-sm">print</span>
+                                Print Boarding Pass
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <style>{`
                 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
                 @keyframes modalSlideUp {

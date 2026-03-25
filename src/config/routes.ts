@@ -140,6 +140,9 @@ export const ROUTES = {
     CREW_MANAGEMENT: '/admin/crew',
     CREW_SCHEDULING: '/admin/crew/scheduling',
 
+    // Admin — Gate Operations
+    BOARDING_SCANNER: '/admin/boarding-scanner',
+
     // Admin — IROP & Revenue
     MASS_REBOOKING: '/admin/mass-rebooking',
     OVERBOOKING: '/admin/overbooking',

@@ -107,6 +107,7 @@ const navGroups = [
         items: [
             { label: 'Crew Management', path: ROUTES.CREW_MANAGEMENT, icon: 'group' },
             { label: 'Crew Scheduling', path: ROUTES.CREW_SCHEDULING, icon: 'calendar_month' },
+            { label: 'Boarding Scanner', path: ROUTES.BOARDING_SCANNER, icon: 'qr_code_scanner' },
         ],
     },
 ];

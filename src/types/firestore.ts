@@ -445,6 +445,7 @@ export interface CheckinDoc {
     seatNumber: string;
     boardingGroup: string;
     boardingPassUrl: string | null;
+    bcbpData: string | null;
     checkedInAt: Timestamp;
 }
 

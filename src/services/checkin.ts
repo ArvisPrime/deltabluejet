@@ -22,6 +22,7 @@ import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase.config';
 import { APP_CONFIG } from '../config/app';
 import type { BookingDoc, PassengerDoc, CheckinDoc, FlightDoc, SeatMapDoc } from '../types/firestore';
+import { encodeBCBP, fareClassToCompartment } from '../utils/boardingPassEncoder';
 
 // ─── Retrieve Booking for Check-in ─────────────────────────
 
@@ -205,14 +206,52 @@ export async function processCheckin(input: CheckinInput): Promise<CheckinDoc> {
             checkedIn: true,
         });
 
-        // Create check-in record
+        // Fetch booking + flight for BCBP encoding
+        const bookingRef = doc(db, 'bookings', input.bookingId);
+        const bookingSnap = await transaction.get(bookingRef);
+        const bookingData = bookingSnap.data() as BookingDoc | undefined;
+
+        const flightRef = doc(db, 'flights', input.flightId);
+        const flightSnap = await transaction.get(flightRef);
+        const flightData = flightSnap.data() as FlightDoc | undefined;
+
+        const paxData = paxSnap.data() as PassengerDoc;
+        const passengerName = [
+            paxData.lastName || '',
+            paxData.firstName || '',
+        ].filter(Boolean).join('/') || 'PASSENGER';
+
+        // Count existing checkins for sequence number
+        const sequenceNumber = Date.now() % 10000;
+
+        // Encode BCBP string
+        let bcbpData: string | null = null;
+        try {
+            bcbpData = encodeBCBP({
+                passengerName,
+                pnr: input.pnr,
+                origin: bookingData?.origin?.code || '---',
+                destination: bookingData?.destination?.code || '---',
+                carrierCode: 'DB',
+                flightNumber: flightData?.flightNumber || '0000',
+                departureDate: flightData?.departureTime?.toDate?.() || new Date(),
+                compartment: fareClassToCompartment(bookingData?.fareClass || 'economy'),
+                seatNumber: input.seatNumber,
+                sequenceNumber,
+            });
+        } catch (e) {
+            console.error('[BCBP] Encoding failed, saving without barcode data', e);
+        }
+
+        // Create check-in record with BCBP data
         const checkinData: Omit<CheckinDoc, 'id'> = {
             bookingId: input.bookingId,
             pnr: input.pnr,
             passengerId: input.passengerId,
             seatNumber: input.seatNumber,
             boardingGroup: determineBoardingGroup(input.seatNumber),
-            boardingPassUrl: null, // Will be set by Cloud Function
+            boardingPassUrl: null,
+            bcbpData,
             checkedInAt: Timestamp.now(),
         };
 

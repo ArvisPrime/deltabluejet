@@ -158,6 +158,7 @@ const AncillaryAdmin = lazyRetry(() => import('../features/dashboard/AncillaryAd
 const BaggageAdmin = lazyRetry(() => import('../features/dashboard/BaggageAdmin'));
 const CrewManagement = lazyRetry(() => import('../features/operations/CrewManagement'));
 const CrewScheduling = lazyRetry(() => import('../features/operations/CrewScheduling'));
+const BoardingScanner = lazyRetry(() => import('../features/operations/BoardingScanner'));
 
 // --- Phase 3D: IROP & Revenue ---
 const MassRebooking = lazyRetry(() => import('../features/operations/MassRebooking'));
@@ -385,6 +386,7 @@ export const router = createBrowserRouter([
             { path: ROUTES.BAGGAGE_ADMIN, element: withSuspense(BaggageAdmin) },
             { path: ROUTES.CREW_MANAGEMENT, element: withSuspense(CrewManagement) },
             { path: ROUTES.CREW_SCHEDULING, element: withSuspense(CrewScheduling) },
+            { path: ROUTES.BOARDING_SCANNER, element: withSuspense(BoardingScanner) },
 
             // --- IROP & Revenue ---
             { path: ROUTES.MASS_REBOOKING, element: withSuspense(MassRebooking) },
