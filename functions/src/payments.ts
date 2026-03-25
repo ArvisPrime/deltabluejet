@@ -209,3 +209,68 @@ export const sendBookingConfirmation = onCall(async (request) => {
 
     return { success: true };
 });
+
+/**
+ * Confirm payment and update booking status (server-side only).
+ * Generates e-ticket number server-side and marks booking as confirmed.
+ */
+export const confirmPaymentSecure = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Must be logged in.');
+    }
+
+    const uid = request.auth.uid;
+    const { bookingId, paymentIntentId } = request.data as {
+        bookingId: string; paymentIntentId?: string;
+    };
+
+    if (!bookingId) {
+        throw new HttpsError('invalid-argument', 'Missing bookingId.');
+    }
+
+    const bookingRef = db.doc(`bookings/${bookingId}`);
+    const bookingDoc = await bookingRef.get();
+    if (!bookingDoc.exists) {
+        throw new HttpsError('not-found', 'Booking not found.');
+    }
+
+    const booking = bookingDoc.data()!;
+    if (booking.userId !== uid) {
+        throw new HttpsError('permission-denied', 'This booking does not belong to you.');
+    }
+
+    if (booking.status !== 'pending') {
+        throw new HttpsError('failed-precondition', `Booking is already ${booking.status}.`);
+    }
+
+    // Generate e-ticket number server-side
+    const crypto = require('crypto');
+    const now = new Date();
+    const datePart = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, '0'),
+        String(now.getDate()).padStart(2, '0'),
+    ].join('');
+    const randomPart = crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
+    const eTicketNumber = `DBJ-${datePart}-${randomPart}`;
+
+    await bookingRef.update({
+        status: 'confirmed',
+        eTicketNumber,
+        paymentIntentId: paymentIntentId || booking.paymentIntentId || null,
+        updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+        action: 'PAYMENT_CONFIRMED',
+        entityType: 'booking',
+        entityId: bookingId,
+        userId: uid,
+        userEmail: request.auth.token.email || '',
+        details: { eTicketNumber, paymentIntentId },
+        timestamp: FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, eTicketNumber };
+});

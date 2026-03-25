@@ -9,15 +9,14 @@ import {
     doc,
     getDoc,
     setDoc,
-    updateDoc,
-    addDoc,
     getDocs,
     query,
     where,
     orderBy,
     Timestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase.config';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../config/firebase.config';
 import type { LoyaltyDoc, LoyaltyTier, PointsHistoryEntry } from '../types/firestore';
 
 // ─── Constants ─────────────────────────────────────────────
@@ -109,32 +108,23 @@ export function getAwardMilesCost(origin: string, destination: string, fareClass
     return AWARD_PRICING[cat][fareClass.toLowerCase()] || AWARD_PRICING[cat].economy;
 }
 
+// ─── Cloud Function callables ─────────────────────────────
+
+const redeemPointsSecureFn = httpsCallable<
+    { rewardId: string; rewardName: string; pointsCost: number },
+    { success: boolean; message: string }
+>(functions, 'redeemPointsSecure');
+
+const createAwardBookingSecureFn = httpsCallable<
+    { origin: string; destination: string; fareClass: string },
+    { success: boolean; message: string; milesDeducted: number }
+>(functions, 'createAwardBookingSecure');
+
 export async function createAwardBooking(
     uid: string, origin: string, destination: string, fareClass: string,
 ): Promise<{ success: boolean; message: string; milesDeducted: number }> {
-    const cost = getAwardMilesCost(origin, destination, fareClass);
-    const loyalty = await getLoyaltyStatus(uid);
-
-    if (loyalty.totalPoints < cost) {
-        return { success: false, message: `Need ${cost} miles, you have ${loyalty.totalPoints}`, milesDeducted: 0 };
-    }
-
-    const entry: PointsHistoryEntry = {
-        date: Timestamp.now(),
-        amount: cost,
-        type: 'redeem' as any,
-        bookingRef: `AWARD-${Date.now()}`,
-        description: `Award booking: ${origin}→${destination} ${fareClass}`,
-    };
-
-    const ref = doc(loyaltyRef, uid);
-    await updateDoc(ref, {
-        totalPoints: loyalty.totalPoints - cost,
-        pointsHistory: [...loyalty.pointsHistory, entry],
-        updatedAt: Timestamp.now(),
-    });
-
-    return { success: true, message: `Booked! ${cost} miles deducted.`, milesDeducted: cost };
+    const result = await createAwardBookingSecureFn({ origin, destination, fareClass });
+    return result.data;
 }
 
 // ─── Miles + Cash Split ───────────────────────────────────
@@ -222,8 +212,9 @@ export async function getLoyaltyStatus(uid: string): Promise<LoyaltyDoc> {
 }
 
 /**
- * Award points on booking confirmation.
- * $1 spent = 1 point × class multiplier.
+ * Award points — now handled by server-side trigger (onBookingConfirmedLoyalty).
+ * This function is kept for API compatibility but is a no-op on the client.
+ * Points are automatically awarded when booking status changes to 'confirmed'.
  */
 export async function awardPoints(
     uid: string,
@@ -232,42 +223,13 @@ export async function awardPoints(
     bookingRef: string,
     description?: string,
 ): Promise<LoyaltyDoc> {
-    const loyalty = await getLoyaltyStatus(uid);
-    const multiplier = CLASS_MULTIPLIERS[fareClass.toLowerCase()] || 1;
-    const points = Math.round(amountSpent * multiplier);
-
-    const entry: PointsHistoryEntry = {
-        date: Timestamp.now(),
-        amount: points,
-        type: 'earn',
-        bookingRef,
-        description: description || `Earned ${points} pts on ${fareClass} booking`,
-    };
-
-    const newTotal = loyalty.totalPoints + points;
-    const newLifetime = loyalty.lifetimePoints + points;
-    const newTier = calculateTier(newLifetime);
-
-    const ref = doc(loyaltyRef, uid);
-    await updateDoc(ref, {
-        totalPoints: newTotal,
-        lifetimePoints: newLifetime,
-        tier: newTier,
-        pointsHistory: [...loyalty.pointsHistory, entry],
-        updatedAt: Timestamp.now(),
-    });
-
-    return {
-        ...loyalty,
-        totalPoints: newTotal,
-        lifetimePoints: newLifetime,
-        tier: newTier,
-        pointsHistory: [...loyalty.pointsHistory, entry],
-    };
+    // No-op: points are awarded server-side via Firestore trigger
+    return getLoyaltyStatus(uid);
 }
 
 /**
- * Deduct points on refund/cancellation.
+ * Deduct points — now handled by server-side trigger (onBookingRefundedLoyalty).
+ * This function is kept for API compatibility but is a no-op on the client.
  */
 export async function deductPoints(
     uid: string,
@@ -275,32 +237,13 @@ export async function deductPoints(
     bookingRef: string,
     description?: string,
 ): Promise<LoyaltyDoc> {
-    const loyalty = await getLoyaltyStatus(uid);
-    const pointsToDeduct = Math.min(amount, loyalty.totalPoints); // Don't go negative
-
-    const entry: PointsHistoryEntry = {
-        date: Timestamp.now(),
-        amount: pointsToDeduct,
-        type: 'deduct',
-        bookingRef,
-        description: description || `Deducted ${pointsToDeduct} pts (refund)`,
-    };
-
-    const newTotal = loyalty.totalPoints - pointsToDeduct;
-
-    const ref = doc(loyaltyRef, uid);
-    await updateDoc(ref, {
-        totalPoints: newTotal,
-        pointsHistory: [...loyalty.pointsHistory, entry],
-        updatedAt: Timestamp.now(),
-    });
-
-    return {
-        ...loyalty,
-        totalPoints: newTotal,
-        pointsHistory: [...loyalty.pointsHistory, entry],
-    };
+    // No-op: points are deducted server-side via Firestore trigger
+    return getLoyaltyStatus(uid);
 }
+
+/**
+ * Deduct points is kept but is a no-op — see above.
+ */
 
 /**
  * Get points history sorted by date (newest first).
@@ -346,44 +289,19 @@ export async function getRewardsCatalog(): Promise<LoyaltyReward[]> {
 /**
  * Redeem points for a reward.
  */
+/**
+ * Redeem points for a reward — now via Cloud Function.
+ */
 export async function redeemPoints(
     uid: string,
     reward: LoyaltyReward,
 ): Promise<{ success: boolean; message: string }> {
-    const loyalty = await getLoyaltyStatus(uid);
-
-    if (loyalty.totalPoints < reward.pointsCost) {
-        return { success: false, message: `Not enough points. You need ${reward.pointsCost - loyalty.totalPoints} more.` };
-    }
-
-    // Deduct points
-    const entry: PointsHistoryEntry = {
-        date: Timestamp.now(),
-        amount: reward.pointsCost,
-        type: 'redeem' as any,
-        bookingRef: `REDEEM-${Date.now()}`,
-        description: `Redeemed ${reward.pointsCost} pts for ${reward.name}`,
-    };
-
-    const newTotal = loyalty.totalPoints - reward.pointsCost;
-    const ref = doc(loyaltyRef, uid);
-    await updateDoc(ref, {
-        totalPoints: newTotal,
-        pointsHistory: [...loyalty.pointsHistory, entry],
-        updatedAt: Timestamp.now(),
-    });
-
-    // Create redemption record
-    await addDoc(collection(db, 'loyalty_redemptions'), {
-        uid,
+    const result = await redeemPointsSecureFn({
         rewardId: reward.id,
         rewardName: reward.name,
-        pointsSpent: reward.pointsCost,
-        status: 'completed',
-        redeemedAt: Timestamp.now(),
+        pointsCost: reward.pointsCost,
     });
-
-    return { success: true, message: `Successfully redeemed ${reward.name}!` };
+    return result.data;
 }
 
 /**

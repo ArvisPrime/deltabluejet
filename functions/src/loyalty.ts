@@ -7,6 +7,8 @@
  */
 
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { enforceRateLimit, RATE_LIMITS } from './rateLimit';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
 
@@ -217,3 +219,156 @@ export const onBookingRefundedLoyalty = onDocumentUpdated(
         console.log(`↩️ Deducted ${pointsAwarded} pts from user ${userId} (booking ${event.params.bookingId} refunded)`);
     }
 );
+
+// ─── Callable: Redeem Points for a Reward ─────────────────
+
+const ROUTE_DISTANCES: Record<string, number> = {
+    'BJL-DSS': 180, 'DSS-BJL': 180,
+    'BJL-LHR': 3100, 'LHR-BJL': 3100,
+    'BJL-JFK': 4800, 'JFK-BJL': 4800,
+    'BJL-DXB': 5800, 'DXB-BJL': 5800,
+    'BJL-ACC': 1100, 'ACC-BJL': 1100,
+    'LHR-JFK': 3450, 'JFK-LHR': 3450,
+    'LHR-DXB': 3400, 'DXB-LHR': 3400,
+    'DSS-LHR': 2900, 'LHR-DSS': 2900,
+    'DSS-ACC': 1200, 'ACC-DSS': 1200,
+};
+
+const AWARD_PRICING: Record<string, Record<string, number>> = {
+    short: { economy: 8_000, business: 16_000, first: 30_000 },
+    medium: { economy: 15_000, business: 30_000, first: 55_000 },
+    long: { economy: 25_000, business: 50_000, first: 90_000 },
+};
+
+export const redeemPointsSecure = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Must be logged in.');
+    }
+
+    const uid = request.auth.uid;
+    await enforceRateLimit(uid, 'redeemPoints', { maxRequests: 10, windowMs: 60 * 60 * 1000 });
+
+    const { rewardId, rewardName, pointsCost } = request.data as {
+        rewardId: string; rewardName: string; pointsCost: number;
+    };
+
+    if (!rewardId || !pointsCost || pointsCost <= 0) {
+        throw new HttpsError('invalid-argument', 'Invalid reward data.');
+    }
+
+    // Validate reward exists and matches cost
+    const rewardDoc = await db.doc(`loyalty_rewards/${rewardId}`).get();
+    if (!rewardDoc.exists) {
+        throw new HttpsError('not-found', 'Reward not found.');
+    }
+    const rewardData = rewardDoc.data()!;
+    if (!rewardData.available) {
+        throw new HttpsError('failed-precondition', 'This reward is no longer available.');
+    }
+    if (rewardData.pointsCost !== pointsCost) {
+        throw new HttpsError('invalid-argument', 'Points cost does not match.');
+    }
+
+    // Check balance
+    const loyaltyRef = db.doc(`loyalty/${uid}`);
+    const loyaltyDoc = await loyaltyRef.get();
+    if (!loyaltyDoc.exists) {
+        throw new HttpsError('failed-precondition', 'No loyalty account found.');
+    }
+
+    const loyaltyData = loyaltyDoc.data()!;
+    const currentPoints = loyaltyData.currentPoints || loyaltyData.totalPoints || 0;
+
+    if (currentPoints < pointsCost) {
+        throw new HttpsError('failed-precondition',
+            `Not enough points. You need ${pointsCost - currentPoints} more.`);
+    }
+
+    // Atomic: deduct points + create redemption
+    const batch = db.batch();
+
+    batch.update(loyaltyRef, {
+        currentPoints: FieldValue.increment(-pointsCost),
+        updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    const redemptionRef = db.collection('loyalty_redemptions').doc();
+    batch.set(redemptionRef, {
+        userId: uid,
+        rewardId,
+        rewardName: rewardName || rewardData.name,
+        pointsSpent: pointsCost,
+        status: 'completed',
+        redeemedAt: FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+
+    // Points history
+    await db.collection(`loyalty/${uid}/points_history`).add({
+        type: 'redeem',
+        points: -pointsCost,
+        reason: `Redeemed: ${rewardName || rewardData.name}`,
+        balanceAfter: currentPoints - pointsCost,
+        createdAt: FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, message: `Successfully redeemed ${rewardName || rewardData.name}!` };
+});
+
+// ─── Callable: Award Booking (Miles-for-Flights) ──────────
+
+export const createAwardBookingSecure = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Must be logged in.');
+    }
+
+    const uid = request.auth.uid;
+    await enforceRateLimit(uid, 'awardBooking', { maxRequests: 10, windowMs: 60 * 60 * 1000 });
+
+    const { origin, destination, fareClass } = request.data as {
+        origin: string; destination: string; fareClass: string;
+    };
+
+    if (!origin || !destination || !fareClass) {
+        throw new HttpsError('invalid-argument', 'Missing origin, destination, or fareClass.');
+    }
+
+    // Calculate cost server-side
+    const key = `${origin}-${destination}`;
+    const dist = ROUTE_DISTANCES[key] || 3000;
+    const cat = dist <= 1500 ? 'short' : dist <= 4000 ? 'medium' : 'long';
+    const cost = AWARD_PRICING[cat][fareClass.toLowerCase()] || AWARD_PRICING[cat].economy;
+
+    // Check balance
+    const loyaltyRef = db.doc(`loyalty/${uid}`);
+    const loyaltyDoc = await loyaltyRef.get();
+    if (!loyaltyDoc.exists) {
+        throw new HttpsError('failed-precondition', 'No loyalty account found.');
+    }
+
+    const data = loyaltyDoc.data()!;
+    const currentPoints = data.currentPoints || data.totalPoints || 0;
+
+    if (currentPoints < cost) {
+        throw new HttpsError('failed-precondition',
+            `Need ${cost} miles, you have ${currentPoints}.`);
+    }
+
+    // Deduct miles
+    await loyaltyRef.update({
+        currentPoints: FieldValue.increment(-cost),
+        updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    // History
+    await db.collection(`loyalty/${uid}/points_history`).add({
+        type: 'redeem',
+        points: -cost,
+        reason: `Award booking: ${origin}→${destination} ${fareClass}`,
+        balanceAfter: currentPoints - cost,
+        createdAt: FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, message: `Booked! ${cost} miles deducted.`, milesDeducted: cost };
+});

@@ -24,23 +24,12 @@ type UserRole = AuthUser['role'];
 
 /**
  * Map a Firebase User to our AuthUser shape.
- * Reads role from custom claims (set by Cloud Function) with fallback to 'customer'.
+ * Reads role exclusively from custom claims (set by Cloud Function).
+ * No Firestore fallback — custom claims are the single source of truth.
  */
 async function mapFirebaseUser(user: User): Promise<AuthUser> {
     const tokenResult = await user.getIdTokenResult();
-    let role = tokenResult.claims.role as UserRole | undefined;
-
-    // Fallback: read role from Firestore user document when custom claims aren't set
-    if (!role) {
-        try {
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
-            if (userDoc.exists()) {
-                role = userDoc.data().role as UserRole;
-            }
-        } catch {
-            // Firestore read may fail if rules are strict; use default
-        }
-    }
+    const role = tokenResult.claims.role as UserRole | undefined;
 
     return {
         uid: user.uid,

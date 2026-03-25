@@ -1,14 +1,13 @@
 /**
- * Booking Service — end-to-end booking flow with Firestore.
+ * Booking Service — end-to-end booking flow.
  *
- * Handles: create booking, modify, cancel, retrieve by PNR,
- * seat assignment, and payment intent creation.
+ * Booking creation and cancellation are now handled by Cloud Functions
+ * for server-side validation of pricing and seat availability.
  */
 
 import {
     collection,
     doc,
-    addDoc,
     getDoc,
     getDocs,
     updateDoc,
@@ -26,19 +25,9 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase.config';
-import type { BookingDoc, PassengerDoc, FlightDoc } from '../types/firestore';
+import type { BookingDoc, PassengerDoc } from '../types/firestore';
 import type { PassengerInfo } from '../stores/bookingStore';
-import { awardPoints, deductPoints } from './loyaltyService';
-
-// ─── PNR Generation ────────────────────────────────────────
-
-const PNR_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-export function generatePNR(): string {
-    return Array.from({ length: 6 }, () =>
-        PNR_CHARS[Math.floor(Math.random() * PNR_CHARS.length)],
-    ).join('');
-}
+import { awardPoints } from './loyaltyService';
 
 // ─── Create Booking ────────────────────────────────────────
 
@@ -59,70 +48,64 @@ export interface CreateBookingInput {
     selectedSeats: Record<string, string>;
 }
 
+// Cloud Function callables for secure booking operations
+const createBookingSecureFn = httpsCallable<
+    {
+        flightId: string;
+        fareClass: string;
+        passengers: Array<{
+            title?: string;
+            firstName: string;
+            lastName: string;
+            gender?: string;
+            dateOfBirth: string;
+            nationality: string;
+            documentType?: string;
+            documentNumber: string;
+            passportExpiry?: string | null;
+            issuingCountry?: string | null;
+        }>;
+        contactEmail: string;
+        contactPhone: string;
+        selectedSeats: Record<string, string>;
+    },
+    { bookingId: string; pnr: string; totalAmount: number; currency: string }
+>(functions, 'createBookingSecure');
+
+const cancelBookingSecureFn = httpsCallable<
+    { bookingId: string },
+    { success: boolean }
+>(functions, 'cancelBookingSecure');
+
 export async function createBooking(input: CreateBookingInput): Promise<{
     bookingId: string;
     pnr: string;
 }> {
-    const pnr = generatePNR();
-    const batch = writeBatch(db);
-
-    // 1. Create the booking document
-    const bookingRef = doc(collection(db, 'bookings'));
-    const bookingData: Omit<BookingDoc, 'id'> = {
-        pnr,
-        userId: input.userId,
+    // Delegate to Cloud Function for server-side validation
+    const result = await createBookingSecureFn({
         flightId: input.flightId,
-        flightNumber: input.flightNumber,
-        status: 'pending',
-        origin: input.origin,
-        destination: input.destination,
-        departureTime: input.departureTime,
-        arrivalTime: input.arrivalTime,
         fareClass: input.fareClass,
-        totalAmount: input.totalAmount,
-        currency: input.currency,
-        passengerCount: input.passengers.length,
-        contactEmail: input.contactEmail,
-        contactPhone: input.contactPhone,
-        paymentIntentId: null,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-    };
-    batch.set(bookingRef, bookingData);
-
-    // 2. Create passenger sub-documents
-    for (let i = 0; i < input.passengers.length; i++) {
-        const pax = input.passengers[i];
-        const paxRef = doc(collection(db, 'bookings', bookingRef.id, 'passengers'));
-        const paxData: Omit<PassengerDoc, 'id'> = {
-            title: pax.title || undefined,
+        passengers: input.passengers.map(pax => ({
+            title: pax.title,
             firstName: pax.firstName,
             lastName: pax.lastName,
-            gender: pax.gender || undefined,
+            gender: pax.gender,
             dateOfBirth: pax.dateOfBirth,
             nationality: pax.nationality,
-            documentType: (pax.documentType as 'passport' | 'national_id') || 'passport',
+            documentType: pax.documentType,
             documentNumber: pax.documentNumber,
             passportExpiry: pax.passportExpiry || null,
             issuingCountry: pax.issuingCountry || null,
-            seatNumber: input.selectedSeats[`pax-${i}`] || null,
-            boardingPassUrl: null,
-            checkedIn: false,
-            specialRequests: [],
-        };
-        batch.set(paxRef, paxData);
-    }
+        })),
+        contactEmail: input.contactEmail,
+        contactPhone: input.contactPhone,
+        selectedSeats: input.selectedSeats,
+    });
 
-    // 3. Update seat counts on the flight
-    const seatUpdates: Record<string, any> = {};
-    seatUpdates[`seatsTaken.${input.fareClass}`] = increment(input.passengers.length);
-    seatUpdates[`seatsAvailable.${input.fareClass}`] = increment(-input.passengers.length);
-    seatUpdates['updatedAt'] = serverTimestamp();
-    batch.update(doc(db, 'flights', input.flightId), seatUpdates);
-
-    await batch.commit();
-
-    return { bookingId: bookingRef.id, pnr };
+    return {
+        bookingId: result.data.bookingId,
+        pnr: result.data.pnr,
+    };
 }
 
 // ─── Confirm Booking (after payment) ──────────────────────
@@ -161,41 +144,8 @@ export async function confirmBooking(
 // ─── Cancel Booking ────────────────────────────────────────
 
 export async function cancelBooking(bookingId: string): Promise<void> {
-    const bookingSnap = await getDoc(doc(db, 'bookings', bookingId));
-    if (!bookingSnap.exists()) throw new Error('Booking not found');
-
-    const booking = bookingSnap.data() as BookingDoc;
-
-    const batch = writeBatch(db);
-
-    // Cancel the booking
-    batch.update(doc(db, 'bookings', bookingId), {
-        status: 'cancelled',
-        updatedAt: serverTimestamp(),
-    });
-
-    // Release the seats back to the flight
-    const seatUpdates: Record<string, any> = {};
-    seatUpdates[`seatsTaken.${booking.fareClass}`] = increment(-booking.passengerCount);
-    seatUpdates[`seatsAvailable.${booking.fareClass}`] = increment(booking.passengerCount);
-    seatUpdates['updatedAt'] = serverTimestamp();
-    batch.update(doc(db, 'flights', booking.flightId), seatUpdates);
-
-    await batch.commit();
-
-    // Deduct loyalty points on cancellation
-    if (booking.userId && booking.totalAmount) {
-        try {
-            await deductPoints(
-                booking.userId,
-                booking.totalAmount,
-                booking.pnr || bookingId,
-                `Cancellation of booking ${booking.pnr || bookingId}`,
-            );
-        } catch (err) {
-            console.error('Failed to deduct loyalty points:', err);
-        }
-    }
+    // Delegate to Cloud Function for server-side validation
+    await cancelBookingSecureFn({ bookingId });
 }
 
 // ─── Modify Booking ────────────────────────────────────────

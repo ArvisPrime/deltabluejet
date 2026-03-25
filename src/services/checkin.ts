@@ -10,19 +10,15 @@ import {
     doc,
     getDoc,
     getDocs,
-    updateDoc,
     query,
     where,
     limit,
-    runTransaction,
-    serverTimestamp,
     Timestamp,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase.config';
 import { APP_CONFIG } from '../config/app';
 import type { BookingDoc, PassengerDoc, CheckinDoc, FlightDoc, SeatMapDoc } from '../types/firestore';
-import { encodeBCBP, fareClassToCompartment } from '../utils/boardingPassEncoder';
 
 // ─── Retrieve Booking for Check-in ─────────────────────────
 
@@ -166,134 +162,50 @@ export interface CheckinInput {
     flightId: string;
 }
 
+// ─── Cloud Function callables ─────────────────────────────
+
+const processCheckinSecureFn = httpsCallable<
+    { bookingId: string; passengerId: string; seatNumber: string; pnr: string; flightId: string },
+    { checkinId: string; seatNumber: string; boardingGroup: string; bcbpData: string | null }
+>(functions, 'processCheckinSecure');
+
 /**
- * Process check-in for a passenger with seat conflict prevention.
- * Uses a Firestore transaction to ensure the seat is not double-booked.
+ * Process check-in for a passenger (now via Cloud Function).
+ * Server validates eligibility, prevents seat conflicts, generates BCBP data.
  */
 export async function processCheckin(input: CheckinInput): Promise<CheckinDoc> {
-    const checkinId = `ci-${Date.now()}-${input.passengerId}`;
-
-    const result = await runTransaction(db, async (transaction) => {
-        // Verify the seat is not already taken
-        const paxRef = doc(db, 'bookings', input.bookingId, 'passengers', input.passengerId);
-        const paxSnap = await transaction.get(paxRef);
-        if (!paxSnap.exists()) throw new Error('Passenger not found');
-
-        // Check all other passengers on this flight for seat conflicts
-        const bookingsSnap = await getDocs(
-            query(
-                collection(db, 'bookings'),
-                where('flightId', '==', input.flightId),
-                where('status', 'in', ['confirmed', 'checked_in']),
-            ),
-        );
-
-        for (const bDoc of bookingsSnap.docs) {
-            const innerPaxSnap = await getDocs(collection(db, 'bookings', bDoc.id, 'passengers'));
-            for (const pDoc of innerPaxSnap.docs) {
-                // Skip the current passenger
-                if (bDoc.id === input.bookingId && pDoc.id === input.passengerId) continue;
-                const existingPax = pDoc.data() as PassengerDoc;
-                if (existingPax.seatNumber === input.seatNumber) {
-                    throw new Error(`Seat ${input.seatNumber} is already taken. Please choose another seat.`);
-                }
-            }
-        }
-
-        // Assign the seat and mark as checked in
-        transaction.update(paxRef, {
-            seatNumber: input.seatNumber,
-            checkedIn: true,
-        });
-
-        // Fetch booking + flight for BCBP encoding
-        const bookingRef = doc(db, 'bookings', input.bookingId);
-        const bookingSnap = await transaction.get(bookingRef);
-        const bookingData = bookingSnap.data() as BookingDoc | undefined;
-
-        const flightRef = doc(db, 'flights', input.flightId);
-        const flightSnap = await transaction.get(flightRef);
-        const flightData = flightSnap.data() as FlightDoc | undefined;
-
-        const paxData = paxSnap.data() as PassengerDoc;
-        const passengerName = [
-            paxData.lastName || '',
-            paxData.firstName || '',
-        ].filter(Boolean).join('/') || 'PASSENGER';
-
-        // Count existing checkins for sequence number
-        const sequenceNumber = Date.now() % 10000;
-
-        // Encode BCBP string
-        let bcbpData: string | null = null;
-        try {
-            bcbpData = encodeBCBP({
-                passengerName,
-                pnr: input.pnr,
-                origin: bookingData?.origin?.code || '---',
-                destination: bookingData?.destination?.code || '---',
-                carrierCode: 'DB',
-                flightNumber: flightData?.flightNumber || '0000',
-                departureDate: flightData?.departureTime?.toDate?.() || new Date(),
-                compartment: fareClassToCompartment(bookingData?.fareClass || 'economy'),
-                seatNumber: input.seatNumber,
-                sequenceNumber,
-            });
-        } catch (e) {
-            console.error('[BCBP] Encoding failed, saving without barcode data', e);
-        }
-
-        // Create check-in record with BCBP data
-        const checkinData: Omit<CheckinDoc, 'id'> = {
-            bookingId: input.bookingId,
-            pnr: input.pnr,
-            passengerId: input.passengerId,
-            seatNumber: input.seatNumber,
-            boardingGroup: determineBoardingGroup(input.seatNumber),
-            boardingPassUrl: null,
-            bcbpData,
-            checkedInAt: Timestamp.now(),
-        };
-
-        const checkinRef = doc(db, 'checkins', checkinId);
-        transaction.set(checkinRef, checkinData);
-
-        return { id: checkinId, ...checkinData } as CheckinDoc;
+    const result = await processCheckinSecureFn({
+        bookingId: input.bookingId,
+        passengerId: input.passengerId,
+        seatNumber: input.seatNumber,
+        pnr: input.pnr,
+        flightId: input.flightId,
     });
 
-    return result;
+    // Map CF response to CheckinDoc shape for compatibility
+    return {
+        id: result.data.checkinId,
+        bookingId: input.bookingId,
+        pnr: input.pnr,
+        passengerId: input.passengerId,
+        seatNumber: result.data.seatNumber,
+        boardingGroup: result.data.boardingGroup,
+        boardingPassUrl: null,
+        bcbpData: result.data.bcbpData,
+        checkedInAt: Timestamp.now(),
+    } as CheckinDoc;
 }
 
 /**
- * Determine boarding group based on seat row.
+ * Complete booking check-in — now handled automatically server-side.
+ * Kept for API compatibility but is a no-op.
  */
-function determineBoardingGroup(seatNumber: string): string {
-    const row = parseInt(seatNumber.replace(/[A-Z]/g, ''), 10);
-    if (row <= 3) return 'First Class';
-    if (row <= 7) return 'Business Priority';
-    if (row <= 15) return 'Group A';
-    if (row <= 25) return 'Group B';
-    return 'Group C';
+export async function completeBookingCheckin(_bookingId: string): Promise<void> {
+    // No-op: the processCheckinSecure CF auto-updates booking status
+    // when all passengers are checked in.
 }
 
-// ─── Complete Booking Check-in ─────────────────────────────
-
-/**
- * Mark entire booking as checked_in after all passengers are processed.
- */
-export async function completeBookingCheckin(bookingId: string): Promise<void> {
-    const paxSnap = await getDocs(collection(db, 'bookings', bookingId, 'passengers'));
-    const allCheckedIn = paxSnap.docs.every((d) => (d.data() as PassengerDoc).checkedIn);
-
-    if (allCheckedIn) {
-        await updateDoc(doc(db, 'bookings', bookingId), {
-            status: 'checked_in',
-            updatedAt: serverTimestamp(),
-        });
-    }
-}
-
-// ─── Boarding Pass Cloud Function ──────────────────────────
+// ─── Boarding Pass Cloud Function ──────────────────────
 
 export const generateBoardingPass = httpsCallable<
     { checkinId: string; bookingId: string; passengerId: string },

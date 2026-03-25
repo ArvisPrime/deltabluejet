@@ -106,4 +106,6 @@ export const RATE_LIMITS = {
     FLIGHT_OPS: { maxRequests: 30, windowMs: 60 * 60 * 1000 },
     /** Schedule publishing: 5 per hour per user */
     SCHEDULE_PUBLISH: { maxRequests: 5, windowMs: 60 * 60 * 1000 },
+    /** Booking creation: 20 per hour per user */
+    BOOKING_CREATE: { maxRequests: 20, windowMs: 60 * 60 * 1000 },
 } as const;

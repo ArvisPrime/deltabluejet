@@ -19,7 +19,6 @@ import {
     getUserBookings,
     createPaymentIntent,
     sendBookingConfirmation,
-    generatePNR,
     type CreateBookingInput,
     type ModifyBookingInput,
 } from '../services/booking';

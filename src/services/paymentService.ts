@@ -147,43 +147,27 @@ export async function processPayment(_paymentId: string): Promise<{ success: boo
     return { success: true, eTicketNumber };
 }
 
+// ─── Cloud Function callable for secure payment confirmation ──
+
+const confirmPaymentSecureFn = httpsCallable<
+    { bookingId: string; paymentIntentId?: string },
+    { success: boolean; eTicketNumber: string }
+>(functions, 'confirmPaymentSecure');
+
 /**
- * Confirm payment and update booking status.
+ * Confirm payment and update booking status (via Cloud Function).
+ * E-ticket number is generated server-side.
  */
 export async function confirmPaymentAndBooking(
     paymentId: string,
     bookingId: string,
-    eTicketNumber: string,
-    userId: string,
+    _eTicketNumber: string,
+    _userId: string,
 ): Promise<void> {
-    // Update booking to confirmed
-    await updateDoc(doc(db, 'bookings', bookingId), {
-        status: 'confirmed',
-        eTicketNumber,
-        updatedAt: serverTimestamp(),
-    });
-
-    // Audit log
-    await logAuditEntry({
-        action: 'payment_confirmed',
-        targetCollection: 'payments',
-        targetId: paymentId,
-        performedBy: userId,
-        details: { bookingId, eTicketNumber },
-    });
-
-    // Fire notification (async, non-blocking)
-    onBookingConfirmed({
+    await confirmPaymentSecureFn({
         bookingId,
-        pnr: bookingId, // TODO: pass real PNR from booking
-        passengerName: 'Passenger',
-        passengerEmail: '',
-        flightNumber: '',
-        route: '',
-        departureDate: '',
-        eTicketNumber,
-        amountPaid: '',
-    }).catch((err) => console.error('[Payment] Notification dispatch failed:', err));
+        paymentIntentId: paymentId,
+    });
 }
 
 /**
