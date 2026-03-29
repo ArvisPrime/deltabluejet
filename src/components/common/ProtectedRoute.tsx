@@ -44,9 +44,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
         }
     }
 
-    // YubiKey enforcement: admin users with a registered key must verify before accessing admin routes
-    if (user?.requiresYubikeyVerification && location.pathname !== ROUTES.YUBIKEY_VERIFY) {
-        return <Navigate to={ROUTES.YUBIKEY_VERIFY} replace />;
+    // MFA enforcement: admin users with pending MFA must verify before accessing admin routes
+    // NOTE: YubiKey enforcement is currently disabled
+    const mfaExemptPaths = [ROUTES.TOTP_VERIFY];
+    const isOnMfaPage = mfaExemptPaths.includes(location.pathname as any);
+
+    if (user?.requiresMfaVerification && !isOnMfaPage) {
+        const pending = user.pendingMfaMethods || [];
+        if (pending.includes('totp')) {
+            return <Navigate to={ROUTES.TOTP_VERIFY} replace />;
+        }
+        // YubiKey redirect disabled
     }
 
     return <>{children}</>;

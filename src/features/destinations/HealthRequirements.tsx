@@ -1,116 +1,31 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router';
 import { ROUTES } from '../../config/routes';
-
-// ─── Health Requirements Data ──────────────────────────────
-
-interface HealthRequirement {
-    destination: string;
-    country: string;
-    region: string;
-    vaccinations: { name: string; required: boolean; notes: string }[];
-    covidPolicy: string;
-    malariaRisk: boolean;
-    malariaInfo: string;
-    travelAdvisory: 'none' | 'caution' | 'restricted';
-    additionalNotes: string;
-}
-
-const HEALTH_DATA: HealthRequirement[] = [
-    {
-        destination: 'BJL', country: 'The Gambia', region: 'West Africa',
-        vaccinations: [
-            { name: 'Yellow Fever', required: true, notes: 'Required for all travellers over 9 months of age' },
-            { name: 'COVID-19', required: false, notes: 'Recommended — no longer mandatory' },
-            { name: 'Hepatitis A', required: false, notes: 'Recommended for all travellers' },
-            { name: 'Typhoid', required: false, notes: 'Recommended for most travellers' },
-        ],
-        covidPolicy: 'No COVID-19 restrictions currently in place. Proof of vaccination recommended but not required.',
-        malariaRisk: true,
-        malariaInfo: 'High risk throughout the year. Antimalarial prophylaxis strongly recommended.',
-        travelAdvisory: 'none',
-        additionalNotes: 'Yellow Fever vaccination certificate is checked on arrival.',
-    },
-    {
-        destination: 'DSS', country: 'Senegal', region: 'West Africa',
-        vaccinations: [
-            { name: 'Yellow Fever', required: true, notes: 'Required if arriving from an endemic area' },
-            { name: 'COVID-19', required: false, notes: 'No longer required' },
-            { name: 'Meningococcal', required: false, notes: 'Recommended during dry season (Dec-Jun)' },
-        ],
-        covidPolicy: 'No COVID-19 entry restrictions. Health declaration form may be required.',
-        malariaRisk: true,
-        malariaInfo: 'Risk present year-round, higher during rainy season (Jul-Oct).',
-        travelAdvisory: 'none',
-        additionalNotes: '',
-    },
-    {
-        destination: 'LHR', country: 'United Kingdom', region: 'Europe',
-        vaccinations: [
-            { name: 'COVID-19', required: false, notes: 'No vaccination requirements' },
-            { name: 'Routine Vaccines', required: false, notes: 'Ensure standard vaccinations are up to date' },
-        ],
-        covidPolicy: 'No COVID-19 restrictions. No testing or quarantine requirements.',
-        malariaRisk: false,
-        malariaInfo: '',
-        travelAdvisory: 'none',
-        additionalNotes: 'Visa may be required depending on nationality. Check UK visa requirements.',
-    },
-    {
-        destination: 'JFK', country: 'United States', region: 'North America',
-        vaccinations: [
-            { name: 'COVID-19', required: false, notes: 'No vaccination requirement for air travel' },
-            { name: 'Routine Vaccines', required: false, notes: 'Ensure MMR, Tdap, and influenza vaccinations are current' },
-        ],
-        covidPolicy: 'No COVID-19 restrictions for inbound travellers.',
-        malariaRisk: false,
-        malariaInfo: '',
-        travelAdvisory: 'none',
-        additionalNotes: 'ESTA or visa required. Customs declaration form completed on arrival.',
-    },
-    {
-        destination: 'DXB', country: 'United Arab Emirates', region: 'Middle East',
-        vaccinations: [
-            { name: 'Yellow Fever', required: true, notes: 'Required if arriving from an endemic country' },
-            { name: 'COVID-19', required: false, notes: 'No longer mandatory' },
-            { name: 'Polio', required: false, notes: 'May be required from specific countries' },
-        ],
-        covidPolicy: 'No COVID-19 restrictions. PCR testing centres available at airports.',
-        malariaRisk: false,
-        malariaInfo: '',
-        travelAdvisory: 'none',
-        additionalNotes: 'Visa on arrival for many nationalities. Check UAE ICP for eligibility.',
-    },
-    {
-        destination: 'ACC', country: 'Ghana', region: 'West Africa',
-        vaccinations: [
-            { name: 'Yellow Fever', required: true, notes: 'Required for all travellers' },
-            { name: 'COVID-19', required: false, notes: 'Recommended but not mandatory' },
-            { name: 'Hepatitis B', required: false, notes: 'Recommended for extended stays' },
-        ],
-        covidPolicy: 'No COVID-19 restrictions currently in effect.',
-        malariaRisk: true,
-        malariaInfo: 'High risk throughout the country year-round. Prophylaxis essential.',
-        travelAdvisory: 'none',
-        additionalNotes: 'Visa required for most nationalities. Apply online via Ghana E-Visa portal.',
-    },
-];
-
-// ─── Component ─────────────────────────────────────────────
+import { subscribeToHealthReqs, type HealthRequirement } from '../../services/healthService';
 
 const HealthRequirements: React.FC = () => {
+    const [data, setData] = useState<HealthRequirement[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDest, setSelectedDest] = useState<HealthRequirement | null>(null);
 
+    useEffect(() => {
+        const unsub = subscribeToHealthReqs(reqs => {
+            setData(reqs.filter(r => r.active));
+            setLoading(false);
+        });
+        return unsub;
+    }, []);
+
     const filtered = useMemo(() => {
-        if (!searchQuery) return HEALTH_DATA;
+        if (!searchQuery) return data;
         const q = searchQuery.toLowerCase();
-        return HEALTH_DATA.filter(h =>
+        return data.filter(h =>
             h.destination.toLowerCase().includes(q) ||
             h.country.toLowerCase().includes(q) ||
             h.region.toLowerCase().includes(q)
         );
-    }, [searchQuery]);
+    }, [data, searchQuery]);
 
     const advisoryColor = (a: string) => {
         if (a === 'restricted') return 'text-red-600 bg-red-50';
@@ -128,7 +43,7 @@ const HealthRequirements: React.FC = () => {
                     <span className="text-primary" aria-current="page">Health Requirements</span>
                 </nav>
                 <div className="space-y-1">
-                    <h1 className="text-3xl font-black text-navy-950 tracking-tighter uppercase">Health & Vaccination</h1>
+                    <h1 className="text-3xl font-black text-navy-950 tracking-tighter uppercase">Health &amp; Vaccination</h1>
                     <p className="text-navy-400 font-bold text-[10px] uppercase tracking-widest">
                         Check health and vaccination requirements by destination
                     </p>
@@ -144,13 +59,16 @@ const HealthRequirements: React.FC = () => {
                     aria-label="Search destinations" />
             </div>
 
-            {/* Detail View */}
-            {selectedDest ? (
+            {loading ? (
+                <div className="flex flex-col items-center py-16">
+                    <div className="mb-4 size-10 animate-spin rounded-full border-[3px] border-primary/20 border-t-primary" />
+                    <p className="text-xs font-bold text-navy-400">Loading health data...</p>
+                </div>
+            ) : selectedDest ? (
                 <div className="space-y-6 max-w-2xl">
                     <button onClick={() => setSelectedDest(null)} className="flex items-center gap-1 text-xs font-black text-primary hover:underline">
                         <span className="material-symbols-outlined text-sm">arrow_back</span> Back to all destinations
                     </button>
-
                     <div className="bg-white rounded-2xl border border-navy-100 p-6">
                         <div className="flex justify-between items-start mb-4">
                             <div>
@@ -161,8 +79,6 @@ const HealthRequirements: React.FC = () => {
                                 {selectedDest.travelAdvisory === 'none' ? 'No Advisories' : selectedDest.travelAdvisory}
                             </span>
                         </div>
-
-                        {/* Vaccinations */}
                         <div className="mb-6">
                             <h3 className="text-xs font-black text-navy-900 uppercase tracking-widest mb-3">Vaccinations</h3>
                             <div className="space-y-2">
@@ -184,14 +100,10 @@ const HealthRequirements: React.FC = () => {
                                 ))}
                             </div>
                         </div>
-
-                        {/* COVID Policy */}
                         <div className="mb-6">
                             <h3 className="text-xs font-black text-navy-900 uppercase tracking-widest mb-2">COVID-19 Policy</h3>
                             <p className="text-sm text-navy-600 p-3 bg-navy-50/30 rounded-xl">{selectedDest.covidPolicy}</p>
                         </div>
-
-                        {/* Malaria */}
                         {selectedDest.malariaRisk && (
                             <div className="mb-6">
                                 <h3 className="text-xs font-black text-navy-900 uppercase tracking-widest mb-2">Malaria Risk</h3>
@@ -201,7 +113,6 @@ const HealthRequirements: React.FC = () => {
                                 </div>
                             </div>
                         )}
-
                         {selectedDest.additionalNotes && (
                             <div>
                                 <h3 className="text-xs font-black text-navy-900 uppercase tracking-widest mb-2">Additional Notes</h3>
@@ -211,7 +122,6 @@ const HealthRequirements: React.FC = () => {
                     </div>
                 </div>
             ) : (
-                /* Destination Grid */
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 max-w-4xl">
                     {filtered.length === 0 ? (
                         <div className="col-span-full text-center py-16">
@@ -220,7 +130,7 @@ const HealthRequirements: React.FC = () => {
                         </div>
                     ) : (
                         filtered.map(dest => (
-                            <button key={dest.destination} onClick={() => setSelectedDest(dest)}
+                            <button key={dest.id} onClick={() => setSelectedDest(dest)}
                                 className="text-left bg-white rounded-2xl border border-navy-100 p-5 hover:shadow-lg hover:border-navy-200 transition-all">
                                 <div className="flex justify-between items-start mb-3">
                                     <div>

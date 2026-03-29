@@ -132,6 +132,10 @@ const MenuManagement = lazyRetry(() => import('../features/cms/MenuManagement'))
 const FaviconSEOAuditLog = lazyRetry(() => import('../features/cms/FaviconSEOAuditLog'));
 const AboutValuesManagement = lazyRetry(() => import('../features/cms/AboutValuesManagement'));
 const DestinationsCMS = lazyRetry(() => import('../features/cms/DestinationsCMS'));
+const FAQCMS = lazyRetry(() => import('../features/cms/FAQCMS'));
+const CareersCMS = lazyRetry(() => import('../features/cms/CareersCMS'));
+const HealthCMS = lazyRetry(() => import('../features/cms/HealthCMS'));
+const LegalCMS = lazyRetry(() => import('../features/cms/LegalCMS'));
 
 // --- Security ---
 const SessionMonitor = lazyRetry(() => import('../features/security/SessionMonitor'));
@@ -141,6 +145,7 @@ const SSOSettings = lazyRetry(() => import('../features/security/SSOSettings'));
 const PasswordPolicy = lazyRetry(() => import('../features/security/PasswordPolicy'));
 const SecurityKeySetup = lazyRetry(() => import('../features/security/SecurityKeySetup'));
 const YubiKeyVerify = lazyRetry(() => import('../features/security/YubiKeyVerify'));
+const TOTPVerify = lazyRetry(() => import('../features/security/TOTPVerify'));
 
 // --- Communications ---
 const EmailTemplatesCMS = lazyRetry(() => import('../features/communications/EmailTemplatesCMS'));
@@ -361,6 +366,10 @@ export const router = createBrowserRouter([
             { path: ROUTES.FAVICON_SEO, element: withSuspense(FaviconSEOAuditLog) },
             { path: ROUTES.ABOUT_VALUES_CMS, element: withSuspense(AboutValuesManagement) },
             { path: ROUTES.DESTINATIONS_CMS, element: withSuspense(DestinationsCMS) },
+            { path: ROUTES.FAQ_CMS, element: withSuspense(FAQCMS) },
+            { path: ROUTES.CAREERS_CMS, element: withSuspense(CareersCMS) },
+            { path: ROUTES.HEALTH_CMS, element: withSuspense(HealthCMS) },
+            { path: ROUTES.LEGAL_CMS, element: withSuspense(LegalCMS) },
 
             // --- Security ---
             { path: ROUTES.SESSION_MONITOR, element: withSuspense(SessionMonitor) },
@@ -412,6 +421,14 @@ export const router = createBrowserRouter([
         element: (
             <ProtectedRoute allowedRoles={['super_admin', 'ops_manager', 'cs_agent']}>
                 {withSuspense(YubiKeyVerify)}
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: ROUTES.TOTP_VERIFY,
+        element: (
+            <ProtectedRoute allowedRoles={['super_admin', 'ops_manager', 'cs_agent']}>
+                {withSuspense(TOTPVerify)}
             </ProtectedRoute>
         ),
     },

@@ -1,26 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BRAND } from '../../config/brand';
-
-/* ── Job listing data ──────────────────────────────────────── */
-interface JobListing {
-    id: string;
-    title: string;
-    department: string;
-    location: string;
-    type: string;
-    icon: string;
-}
-
-const JOB_LISTINGS: JobListing[] = [
-    { id: '1', title: 'First Officer (Boeing 737)', department: 'Flight Operations', location: 'Banjul, The Gambia', type: 'Full-time', icon: 'flight' },
-    { id: '2', title: 'Cabin Crew Member', department: 'In-Flight Services', location: 'Banjul, The Gambia', type: 'Full-time', icon: 'airline_seat_recline_extra' },
-    { id: '3', title: 'Aircraft Maintenance Engineer', department: 'Engineering', location: 'Banjul, The Gambia', type: 'Full-time', icon: 'build' },
-    { id: '4', title: 'Ground Operations Agent', department: 'Airport Services', location: 'Lagos, Nigeria', type: 'Full-time', icon: 'luggage' },
-    { id: '5', title: 'Revenue Management Analyst', department: 'Commercial', location: 'Banjul, The Gambia', type: 'Full-time', icon: 'analytics' },
-    { id: '6', title: 'Customer Service Representative', department: 'Customer Experience', location: 'Remote / Banjul', type: 'Full-time', icon: 'support_agent' },
-    { id: '7', title: 'Software Engineer — Aviation Systems', department: 'Technology', location: 'Remote', type: 'Full-time', icon: 'code' },
-    { id: '8', title: 'Safety & Compliance Officer', department: 'Safety', location: 'Banjul, The Gambia', type: 'Full-time', icon: 'verified_user' },
-];
+import { subscribeToJobs, type JobListing } from '../../services/careerService';
 
 const BENEFITS = [
     { icon: 'flight', title: 'Free & Discounted Travel', desc: 'Enjoy complimentary flights and heavily discounted travel for you and your family across all our routes.' },
@@ -38,13 +18,21 @@ const VALUES = [
     { icon: 'eco', text: 'Sustainability — We are committed to reducing our environmental footprint.' },
 ];
 
-/**
- * Careers — Public page for job opportunities at Deltablue Jet Air.
- */
 const Careers: React.FC = () => {
+    const [jobs, setJobs] = useState<JobListing[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const unsub = subscribeToJobs(data => {
+            setJobs(data.filter(j => j.active));
+            setLoading(false);
+        });
+        return unsub;
+    }, []);
+
     return (
         <div className="font-display bg-white">
-            {/* ── Hero Section ─────────────────────────────────────── */}
+            {/* ── Hero Section */}
             <section className="relative overflow-hidden bg-navy-950 text-white py-32 px-6">
                 <div className="absolute inset-0 opacity-10">
                     <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full bg-primary blur-[120px]" />
@@ -61,17 +49,14 @@ const Careers: React.FC = () => {
                     <p className="text-xl text-white/60 max-w-2xl mx-auto font-medium leading-relaxed">
                         Help us connect West Africa to the world. We're building the future of aviation — and we need talented people like you.
                     </p>
-                    <a
-                        href="#openings"
-                        className="inline-flex items-center gap-3 px-10 py-5 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all"
-                    >
+                    <a href="#openings" className="inline-flex items-center gap-3 px-10 py-5 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
                         <span className="material-symbols-outlined">search</span>
                         View Open Positions
                     </a>
                 </div>
             </section>
 
-            {/* ── Why Join Us ──────────────────────────────────────── */}
+            {/* ── Why Join Us */}
             <section className="py-28 px-6 bg-navy-50/30">
                 <div className="max-w-6xl mx-auto space-y-16">
                     <div className="text-center space-y-4">
@@ -95,7 +80,7 @@ const Careers: React.FC = () => {
                 </div>
             </section>
 
-            {/* ── Our Values ───────────────────────────────────────── */}
+            {/* ── Our Values */}
             <section className="py-24 px-6">
                 <div className="max-w-6xl mx-auto space-y-12">
                     <div className="text-center space-y-4">
@@ -115,50 +100,59 @@ const Careers: React.FC = () => {
                 </div>
             </section>
 
-            {/* ── Open Positions ───────────────────────────────────── */}
+            {/* ── Open Positions */}
             <section id="openings" className="py-28 px-6 bg-navy-950 text-white">
                 <div className="max-w-6xl mx-auto space-y-16">
                     <div className="text-center space-y-4">
                         <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em]">Open Positions</span>
                         <h2 className="text-4xl font-black uppercase tracking-tighter">Find Your Role</h2>
                         <p className="text-white/50 max-w-xl mx-auto font-medium">
-                            We're hiring across flight operations, engineering, customer service, and technology. Explore the roles below.
+                            We're hiring across flight operations, engineering, customer service, and technology.
                         </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {JOB_LISTINGS.map((job) => (
-                            <div key={job.id} className="bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-8 space-y-4 group hover:bg-white/10 hover:border-primary/30 transition-all duration-300 cursor-pointer">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-start gap-4">
-                                        <div className="size-12 rounded-2xl bg-primary/20 flex items-center justify-center shrink-0">
-                                            <span className="material-symbols-outlined text-primary text-xl">{job.icon}</span>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <h3 className="text-lg font-black uppercase tracking-tight group-hover:text-primary transition-colors">{job.title}</h3>
-                                            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">{job.department}</p>
+                    {loading ? (
+                        <div className="flex flex-col items-center py-16">
+                            <div className="mb-4 size-10 animate-spin rounded-full border-[3px] border-primary/20 border-t-primary" />
+                            <p className="text-xs font-bold text-white/40">Loading positions...</p>
+                        </div>
+                    ) : jobs.length === 0 ? (
+                        <p className="text-center text-white/40 py-16 text-sm">No open positions at the moment. Check back soon!</p>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {jobs.map(job => (
+                                <div key={job.id} className="bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-8 space-y-4 group hover:bg-white/10 hover:border-primary/30 transition-all duration-300 cursor-pointer">
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex items-start gap-4">
+                                            <div className="size-12 rounded-2xl bg-primary/20 flex items-center justify-center shrink-0">
+                                                <span className="material-symbols-outlined text-primary text-xl">{job.icon}</span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <h3 className="text-lg font-black uppercase tracking-tight group-hover:text-primary transition-colors">{job.title}</h3>
+                                                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">{job.department}</p>
+                                            </div>
                                         </div>
                                     </div>
+                                    <div className="flex items-center gap-4 pt-2">
+                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/50">
+                                            <span className="material-symbols-outlined text-xs">location_on</span>
+                                            {job.location}
+                                        </span>
+                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/50">
+                                            <span className="material-symbols-outlined text-xs">schedule</span>
+                                            {job.type}
+                                        </span>
+                                    </div>
+                                    <button className="w-full mt-3 py-3 bg-primary/10 border border-primary/20 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all">
+                                        View Details &amp; Apply
+                                    </button>
                                 </div>
-                                <div className="flex items-center gap-4 pt-2">
-                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/50">
-                                        <span className="material-symbols-outlined text-xs">location_on</span>
-                                        {job.location}
-                                    </span>
-                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white/50">
-                                        <span className="material-symbols-outlined text-xs">schedule</span>
-                                        {job.type}
-                                    </span>
-                                </div>
-                                <button className="w-full mt-3 py-3 bg-primary/10 border border-primary/20 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all">
-                                    View Details & Apply
-                                </button>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </section>
 
-            {/* ── Application Process ──────────────────────────────── */}
+            {/* ── Application Process */}
             <section className="py-28 px-6">
                 <div className="max-w-4xl mx-auto space-y-16">
                     <div className="text-center space-y-4">
@@ -189,29 +183,19 @@ const Careers: React.FC = () => {
                 </div>
             </section>
 
-            {/* ── CTA Section ──────────────────────────────────────── */}
+            {/* ── CTA Section */}
             <section className="py-24 px-6 bg-primary/5">
                 <div className="max-w-4xl mx-auto text-center space-y-8">
-                    <h2 className="text-4xl font-black text-navy-950 uppercase tracking-tighter">
-                        Ready to Take Off?
-                    </h2>
+                    <h2 className="text-4xl font-black text-navy-950 uppercase tracking-tighter">Ready to Take Off?</h2>
                     <p className="text-navy-500 max-w-xl mx-auto font-medium leading-relaxed">
                         Don't see a role that fits? Send us your CV and we'll keep you in mind for future opportunities.
                     </p>
                     <div className="flex flex-wrap items-center justify-center gap-4">
-                        <a
-                            href={`mailto:careers@${BRAND.domain}`}
-                            className="inline-flex items-center gap-3 px-10 py-5 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all"
-                        >
-                            <span className="material-symbols-outlined">email</span>
-                            Send Your CV
+                        <a href={`mailto:careers@${BRAND.domain}`} className="inline-flex items-center gap-3 px-10 py-5 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-2xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
+                            <span className="material-symbols-outlined">email</span>Send Your CV
                         </a>
-                        <a
-                            href="#openings"
-                            className="inline-flex items-center gap-3 px-10 py-5 bg-white border-2 border-navy-100 text-navy-700 rounded-2xl font-black uppercase tracking-widest text-sm hover:border-primary hover:text-primary transition-all"
-                        >
-                            <span className="material-symbols-outlined">search</span>
-                            Browse Openings
+                        <a href="#openings" className="inline-flex items-center gap-3 px-10 py-5 bg-white border-2 border-navy-100 text-navy-700 rounded-2xl font-black uppercase tracking-widest text-sm hover:border-primary hover:text-primary transition-all">
+                            <span className="material-symbols-outlined">search</span>Browse Openings
                         </a>
                     </div>
                 </div>

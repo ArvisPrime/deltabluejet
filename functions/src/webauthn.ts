@@ -565,3 +565,56 @@ export const getSecurityKeyStatus = onCall(async (request) => {
         credentialCount: credsSnap.size,
     };
 });
+
+/**
+ * resetYubikeyRegistration — Clear all YubiKey claims and credentials for the caller.
+ * This allows a user to start fresh after losing their key or when the old key
+ * doesn't match the registered one.
+ *
+ * Only callable by admin users. Removes:
+ *   - yubikey_registered, yubikey_verified, yubikey_required claims
+ *   - All webauthn_credentials documents for the user
+ */
+export const resetYubikeyRegistration = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Authentication required.');
+    }
+
+    const uid = request.auth.uid;
+    const callerClaims = (await adminAuth.getUser(uid)).customClaims || {};
+
+    // Only admin roles can reset
+    if (!ADMIN_ROLES.includes(callerClaims.role)) {
+        throw new HttpsError('permission-denied', 'Only admin users can reset security key registration.');
+    }
+
+    // Clear YubiKey-related claims
+    const updatedClaims = { ...callerClaims };
+    delete updatedClaims.yubikey_registered;
+    delete updatedClaims.yubikey_verified;
+    delete updatedClaims.yubikey_required;
+    await adminAuth.setCustomUserClaims(uid, updatedClaims);
+
+    // Delete all WebAuthn credentials for this user
+    const credsSnap = await db
+        .collection('webauthn_credentials')
+        .where('userId', '==', uid)
+        .get();
+
+    const batch = db.batch();
+    credsSnap.docs.forEach((doc) => batch.delete(doc.ref));
+
+    // Also delete any user-scoped credential subcollection
+    const userCredsSnap = await db
+        .collection(`users/${uid}/webauthn_credentials`)
+        .listDocuments();
+    userCredsSnap.forEach((docRef) => batch.delete(docRef));
+
+    await batch.commit();
+
+    return {
+        success: true,
+        message: 'YubiKey registration cleared. You can now re-register your security key.',
+        clearedCredentials: credsSnap.size,
+    };
+});

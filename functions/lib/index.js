@@ -6,7 +6,8 @@
  * Firebase reads this file to discover deployable functions.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.redeemVoucherSecure = exports.createVoucherSecure = exports.forecastRevenueSecure = exports.calculateDynamicPriceSecure = exports.processCheckinSecure = exports.getSecurityKeyStatus = exports.assignSecurityKeyRequirement = exports.clearYubikeyVerified = exports.webauthnRemoveKey = exports.webauthnListKeys = exports.webauthnVerifyAuthentication = exports.webauthnGenerateAuthentication = exports.webauthnVerifyRegistration = exports.webauthnGenerateRegistration = exports.createAwardBookingSecure = exports.redeemPointsSecure = exports.onBookingRefundedLoyalty = exports.onBookingConfirmedLoyalty = exports.onUserCreatedLoyalty = exports.withdrawFlight = exports.publishSchedule = exports.aggregateDailySales = exports.geminiAssistant = exports.cancelBookingSecure = exports.createBookingSecure = exports.generateBoardingPass = exports.onCheckinReminder = exports.onFlightDelayed = exports.onBookingConfirmed = exports.sendNotificationSms = exports.sendNotificationEmail = exports.reconcilePayments = exports.handleFlutterwaveWebhook = exports.createFlutterwavePayment = exports.handleStripeWebhook = exports.confirmPaymentSecure = exports.sendBookingConfirmation = exports.processRefund = exports.createPaymentIntent = exports.getDashboardStats = exports.swapAircraft = exports.assignGate = exports.updateFlightStatus = exports.deleteUserAccount = exports.disableUserAccount = exports.createUserAccount = exports.onUserCreated = exports.setUserRole = void 0;
+exports.totpGenerateSecret = exports.redeemVoucherSecure = exports.createVoucherSecure = exports.forecastRevenueSecure = exports.calculateDynamicPriceSecure = exports.processCheckinSecure = exports.resetYubikeyRegistration = exports.getSecurityKeyStatus = exports.assignSecurityKeyRequirement = exports.clearYubikeyVerified = exports.webauthnRemoveKey = exports.webauthnListKeys = exports.webauthnVerifyAuthentication = exports.webauthnGenerateAuthentication = exports.webauthnVerifyRegistration = exports.webauthnGenerateRegistration = exports.createAwardBookingSecure = exports.redeemPointsSecure = exports.onBookingRefundedLoyalty = exports.onBookingConfirmedLoyalty = exports.onUserCreatedLoyalty = exports.withdrawFlight = exports.publishSchedule = exports.aggregateDailySales = exports.geminiAssistant = exports.cancelBookingSecure = exports.createBookingSecure = exports.generateBoardingPass = exports.onCheckinReminder = exports.onFlightDelayed = exports.onBookingConfirmed = exports.sendNotificationSms = exports.sendNotificationEmail = exports.reconcilePayments = exports.handleFlutterwaveWebhook = exports.createFlutterwavePayment = exports.handleStripeWebhook = exports.confirmPaymentSecure = exports.sendBookingConfirmation = exports.processRefund = exports.createPaymentIntent = exports.getDashboardStats = exports.swapAircraft = exports.assignGate = exports.updateFlightStatus = exports.deleteUserAccount = exports.disableUserAccount = exports.createUserAccount = exports.onUserCreated = exports.setUserRole = void 0;
+exports.clearTotpVerified = exports.totpGetStatus = exports.totpRemove = exports.totpVerifyCode = exports.totpVerifySetup = void 0;
 var users_1 = require("./users");
 Object.defineProperty(exports, "setUserRole", { enumerable: true, get: function () { return users_1.setUserRole; } });
 Object.defineProperty(exports, "onUserCreated", { enumerable: true, get: function () { return users_1.onUserCreated; } });
@@ -66,6 +67,7 @@ Object.defineProperty(exports, "webauthnRemoveKey", { enumerable: true, get: fun
 Object.defineProperty(exports, "clearYubikeyVerified", { enumerable: true, get: function () { return webauthn_1.clearYubikeyVerified; } });
 Object.defineProperty(exports, "assignSecurityKeyRequirement", { enumerable: true, get: function () { return webauthn_1.assignSecurityKeyRequirement; } });
 Object.defineProperty(exports, "getSecurityKeyStatus", { enumerable: true, get: function () { return webauthn_1.getSecurityKeyStatus; } });
+Object.defineProperty(exports, "resetYubikeyRegistration", { enumerable: true, get: function () { return webauthn_1.resetYubikeyRegistration; } });
 var checkin_1 = require("./checkin");
 Object.defineProperty(exports, "processCheckinSecure", { enumerable: true, get: function () { return checkin_1.processCheckinSecure; } });
 var pricing_1 = require("./pricing");
@@ -74,4 +76,11 @@ Object.defineProperty(exports, "forecastRevenueSecure", { enumerable: true, get:
 var vouchers_1 = require("./vouchers");
 Object.defineProperty(exports, "createVoucherSecure", { enumerable: true, get: function () { return vouchers_1.createVoucherSecure; } });
 Object.defineProperty(exports, "redeemVoucherSecure", { enumerable: true, get: function () { return vouchers_1.redeemVoucherSecure; } });
+var totp_1 = require("./totp");
+Object.defineProperty(exports, "totpGenerateSecret", { enumerable: true, get: function () { return totp_1.totpGenerateSecret; } });
+Object.defineProperty(exports, "totpVerifySetup", { enumerable: true, get: function () { return totp_1.totpVerifySetup; } });
+Object.defineProperty(exports, "totpVerifyCode", { enumerable: true, get: function () { return totp_1.totpVerifyCode; } });
+Object.defineProperty(exports, "totpRemove", { enumerable: true, get: function () { return totp_1.totpRemove; } });
+Object.defineProperty(exports, "totpGetStatus", { enumerable: true, get: function () { return totp_1.totpGetStatus; } });
+Object.defineProperty(exports, "clearTotpVerified", { enumerable: true, get: function () { return totp_1.clearTotpVerified; } });
 //# sourceMappingURL=index.js.map

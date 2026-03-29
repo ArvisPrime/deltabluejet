@@ -109,6 +109,10 @@ export const ROUTES = {
     FAVICON_SEO: '/admin/cms/seo',
     ABOUT_VALUES_CMS: '/admin/cms/about-values',
     DESTINATIONS_CMS: '/admin/cms/destinations',
+    FAQ_CMS: '/admin/cms/faqs',
+    CAREERS_CMS: '/admin/cms/careers',
+    HEALTH_CMS: '/admin/cms/health',
+    LEGAL_CMS: '/admin/cms/legal',
 
     // Admin — Security
     SESSION_MONITOR: '/admin/security/sessions',
@@ -118,6 +122,7 @@ export const ROUTES = {
     PASSWORD_POLICY: '/admin/security/password-policy',
     SECURITY_KEYS: '/admin/security/keys',
     YUBIKEY_VERIFY: '/admin/verify-key',
+    TOTP_VERIFY: '/admin/verify-totp',
 
     // Admin — Communications
     EMAIL_TEMPLATES: '/admin/comms/email',

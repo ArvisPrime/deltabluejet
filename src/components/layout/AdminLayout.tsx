@@ -59,6 +59,10 @@ const navGroups = [
             { label: 'SEO & Branding', path: ROUTES.FAVICON_SEO, icon: 'search' },
             { label: 'About Values', path: ROUTES.ABOUT_VALUES_CMS, icon: 'auto_awesome' },
             { label: 'Destinations', path: ROUTES.DESTINATIONS_CMS, icon: 'travel_explore' },
+            { label: 'FAQ Manager', path: ROUTES.FAQ_CMS, icon: 'quiz' },
+            { label: 'Careers', path: ROUTES.CAREERS_CMS, icon: 'work' },
+            { label: 'Health & Visa', path: ROUTES.HEALTH_CMS, icon: 'health_and_safety' },
+            { label: 'Legal Pages', path: ROUTES.LEGAL_CMS, icon: 'gavel' },
         ],
     },
     {

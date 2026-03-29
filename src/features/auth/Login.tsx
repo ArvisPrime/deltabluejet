@@ -25,10 +25,11 @@ const Login: React.FC = () => {
 
     try {
       const authUser = await login(email, password);
-      // If admin has a registered YubiKey, redirect to verification gate
-      if (authUser.requiresYubikeyVerification) {
-        navigate(ROUTES.YUBIKEY_VERIFY, { replace: true });
-        return;
+      // If admin has pending MFA verification, redirect to appropriate gate
+      if (authUser.requiresMfaVerification) {
+        const pending = authUser.pendingMfaMethods || [];
+        if (pending.includes('totp')) { navigate(ROUTES.TOTP_VERIFY, { replace: true }); return; }
+        // YubiKey redirect disabled
       }
       const target = intendedPath || (authUser.role === 'customer' ? ROUTES.MY_DASHBOARD : ROUTES.DASHBOARD);
       navigate(target, { replace: true });
@@ -51,10 +52,11 @@ const Login: React.FC = () => {
     setIsSubmitting(true);
     try {
       const authUser = await googleLogin();
-      // If admin has a registered YubiKey, redirect to verification gate
-      if (authUser.requiresYubikeyVerification) {
-        navigate(ROUTES.YUBIKEY_VERIFY, { replace: true });
-        return;
+      // If admin has pending MFA verification, redirect to appropriate gate
+      if (authUser.requiresMfaVerification) {
+        const pending = authUser.pendingMfaMethods || [];
+        if (pending.includes('totp')) { navigate(ROUTES.TOTP_VERIFY, { replace: true }); return; }
+        // YubiKey redirect disabled
       }
       const target = intendedPath || (authUser.role === 'customer' ? ROUTES.MY_DASHBOARD : ROUTES.DASHBOARD);
       navigate(target, { replace: true });

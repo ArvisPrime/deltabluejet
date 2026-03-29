@@ -246,13 +246,10 @@ export async function updateRoute(routeId: string, data: Partial<Omit<RouteDoc, 
 }
 
 /**
- * Soft-delete a route (set isActive to false).
+ * Permanently delete a route document.
  */
 export async function deleteRoute(routeId: string): Promise<void> {
-    await updateDoc(doc(db, 'routes', routeId), {
-        isActive: false,
-        updatedAt: serverTimestamp(),
-    });
+    await deleteDoc(doc(db, 'routes', routeId));
 }
 
 /**

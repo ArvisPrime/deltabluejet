@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { useToastStore } from '../../stores/toastStore';
@@ -7,13 +7,14 @@ import {
     getAwardMilesCost, createAwardBooking, getLoyaltyStatus,
     ROUTE_DISTANCES, AWARD_PRICING,
 } from '../../services/loyaltyService';
+import { getAirports } from '../../services/airportService';
 
-const AIRPORTS = ['BJL', 'DSS', 'LHR', 'JFK', 'DXB', 'ACC'];
 const FARE_CLASSES = ['economy', 'business', 'first'];
 
 const AwardBooking: React.FC = () => {
     const addToast = useToastStore(s => s.addToast);
     const user = useAuthStore(s => s.user);
+    const [airports, setAirports] = useState<string[]>([]);
     const [origin, setOrigin] = useState('');
     const [destination, setDestination] = useState('');
     const [fareClass, setFareClass] = useState('economy');
@@ -22,6 +23,11 @@ const AwardBooking: React.FC = () => {
     const [confirmed, setConfirmed] = useState(false);
     const [milesBalance, setMilesBalance] = useState(0);
     const [loadingBalance, setLoadingBalance] = useState(false);
+
+    // Fetch airports from Firestore (cached after first call)
+    useEffect(() => {
+        getAirports().then(list => setAirports(list.map(a => a.code))).catch(() => {});
+    }, []);
 
     const milesCost = useMemo(() => {
         if (!origin || !destination || origin === destination) return 0;
@@ -143,14 +149,14 @@ const AwardBooking: React.FC = () => {
                                 <label className={labelClass}>From</label>
                                 <select value={origin} onChange={e => setOrigin(e.target.value)} className={selectClass}>
                                     <option value="">Select</option>
-                                    {AIRPORTS.filter(a => a !== destination).map(a => <option key={a} value={a}>{a}</option>)}
+                                    {airports.filter(a => a !== destination).map(a => <option key={a} value={a}>{a}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label className={labelClass}>To</label>
                                 <select value={destination} onChange={e => setDestination(e.target.value)} className={selectClass}>
                                     <option value="">Select</option>
-                                    {AIRPORTS.filter(a => a !== origin).map(a => <option key={a} value={a}>{a}</option>)}
+                                    {airports.filter(a => a !== origin).map(a => <option key={a} value={a}>{a}</option>)}
                                 </select>
                             </div>
                         </div>

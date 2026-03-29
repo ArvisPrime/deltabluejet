@@ -1,13 +1,19 @@
 import { create } from 'zustand';
 
+export type MfaMethod = 'yubikey' | 'totp';
+
 export interface AuthUser {
     uid: string;
     email: string | null;
     displayName: string | null;
     photoURL: string | null;
     role: 'super_admin' | 'ops_manager' | 'crew_sched' | 'cs_agent' | 'customer';
-    /** True when admin has a registered key but hasn't verified this session */
+    /** @deprecated Use requiresMfaVerification + pendingMfaMethods instead */
     requiresYubikeyVerification?: boolean;
+    /** True when admin must complete MFA before accessing the dashboard */
+    requiresMfaVerification?: boolean;
+    /** Which MFA methods are pending verification this session */
+    pendingMfaMethods?: MfaMethod[];
 }
 
 interface AuthState {

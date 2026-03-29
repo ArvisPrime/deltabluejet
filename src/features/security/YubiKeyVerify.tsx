@@ -19,15 +19,56 @@ export default function YubiKeyVerify() {
     const [verifying, setVerifying] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [noKeysDetected, setNoKeysDetected] = useState(false);
+    const [resetting, setResetting] = useState(false);
 
     const handleBypass = useCallback(async () => {
         // Force token refresh and clear the verification flag
         await auth.currentUser?.getIdToken(true);
         const currentUser = useAuthStore.getState().user;
         if (currentUser) {
-            useAuthStore.getState().setUser({ ...currentUser, requiresYubikeyVerification: false });
+            useAuthStore.getState().setUser({
+                ...currentUser,
+                requiresYubikeyVerification: false,
+                requiresMfaVerification: false,
+                pendingMfaMethods: [],
+            });
         }
         navigate('/admin/security/keys', { replace: true });
+    }, [navigate]);
+
+    const handleResetKey = useCallback(async () => {
+        try {
+            setResetting(true);
+            setError(null);
+
+            // Call the Cloud Function to clear all YubiKey claims and credentials
+            const resetFn = httpsCallable(functions, 'resetYubikeyRegistration');
+            const result = await resetFn();
+            const data = result.data as any;
+
+            if (data.success) {
+                // Force token refresh to pick up the cleared claims
+                await auth.currentUser?.getIdToken(true);
+
+                // Clear the MFA gate state
+                const currentUser = useAuthStore.getState().user;
+                if (currentUser) {
+                    useAuthStore.getState().setUser({
+                        ...currentUser,
+                        requiresYubikeyVerification: false,
+                        requiresMfaVerification: false,
+                        pendingMfaMethods: (currentUser.pendingMfaMethods || []).filter(m => m !== 'yubikey'),
+                    });
+                }
+
+                // Redirect to MFA settings so they can re-register
+                navigate('/admin/security/keys', { replace: true });
+            }
+        } catch (err: any) {
+            setError(err?.message || 'Failed to reset security key. Please try again.');
+        } finally {
+            setResetting(false);
+        }
     }, [navigate]);
 
     const handleVerify = useCallback(async () => {
@@ -45,7 +86,12 @@ export default function YubiKeyVerify() {
                 await auth.currentUser?.getIdToken(true);
                 const currentUser = useAuthStore.getState().user;
                 if (currentUser) {
-                    useAuthStore.getState().setUser({ ...currentUser, requiresYubikeyVerification: false });
+                    useAuthStore.getState().setUser({
+                        ...currentUser,
+                        requiresYubikeyVerification: false,
+                        requiresMfaVerification: false,
+                        pendingMfaMethods: [],
+                    });
                 }
                 navigate('/admin', { replace: true });
                 return;
@@ -65,7 +111,12 @@ export default function YubiKeyVerify() {
                 // Clear the verification flag in the store so ProtectedRoute permits access
                 const currentUser = useAuthStore.getState().user;
                 if (currentUser) {
-                    useAuthStore.getState().setUser({ ...currentUser, requiresYubikeyVerification: false });
+                    useAuthStore.getState().setUser({
+                        ...currentUser,
+                        requiresYubikeyVerification: false,
+                        requiresMfaVerification: false,
+                        pendingMfaMethods: (currentUser.pendingMfaMethods || []).filter(m => m !== 'yubikey'),
+                    });
                 }
                 navigate('/admin', { replace: true });
             }
@@ -147,6 +198,25 @@ export default function YubiKeyVerify() {
                         )}
                     </button>
 
+                    {/* Lost/Changed Key — Reset */}
+                    <button
+                        onClick={handleResetKey}
+                        disabled={resetting}
+                        className="w-full mt-3 py-2.5 px-6 bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white rounded-xl text-sm transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {resetting ? (
+                            <>
+                                <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                                Resetting...
+                            </>
+                        ) : (
+                            <>
+                                <span className="material-symbols-outlined text-sm">restart_alt</span>
+                                Lost or changed your key? Reset registration
+                            </>
+                        )}
+                    </button>
+
                     {/* Help Text */}
                     <div className="mt-6 text-white/40 text-xs space-y-1">
                         <p>Insert your YubiKey into a USB port, then click Verify above.</p>
@@ -172,3 +242,4 @@ export default function YubiKeyVerify() {
         </div>
     );
 }
+

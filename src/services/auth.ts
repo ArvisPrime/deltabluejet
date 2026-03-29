@@ -12,7 +12,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase.config';
-import { useAuthStore, type AuthUser } from '../stores/authStore';
+import { useAuthStore, type AuthUser, type MfaMethod } from '../stores/authStore';
 
 // ─── Provider Singletons ──────────────────────────────────
 const googleProvider = new GoogleAuthProvider();
@@ -41,6 +41,77 @@ async function mapFirebaseUser(user: User): Promise<AuthUser> {
     };
 }
 
+/**
+ * Check which MFA methods the user has enrolled but not yet verified this session.
+ * Sets flags on the AuthUser object for the MFA verification gate.
+ */
+async function checkMfaRequirements(firebaseUser: User, authUser: AuthUser): Promise<void> {
+    console.log('[MFA] checkMfaRequirements called for role:', authUser.role);
+    if (!ADMIN_ROLES.includes(authUser.role)) {
+        console.log('[MFA] Not an admin role, skipping MFA check');
+        return;
+    }
+
+    // Force refresh to get the latest custom claims from the server
+    const tokenResult = await firebaseUser.getIdTokenResult(true);
+    const claims = tokenResult.claims;
+    console.log('[MFA] Custom Claims:', JSON.stringify({
+        role: claims.role,
+        yubikey_registered: claims.yubikey_registered,
+        yubikey_verified: claims.yubikey_verified,
+        totp_registered: claims.totp_registered,
+        totp_verified: claims.totp_verified,
+    }));
+
+    const pending: MfaMethod[] = [];
+
+    // ── YubiKey disabled ─────────────────────────────────────
+    // To re-enable, uncomment the block below.
+    // if (claims.yubikey_registered) {
+    //     pending.push('yubikey');
+    //     authUser.requiresYubikeyVerification = true;
+    //     console.log('[MFA] YubiKey is registered — verification required');
+    //     if (claims.yubikey_verified) {
+    //         console.log('[MFA] Clearing stale YubiKey verified claim');
+    //         try {
+    //             const { httpsCallable } = await import('firebase/functions');
+    //             const { functions } = await import('../config/firebase.config');
+    //             await httpsCallable(functions, 'clearYubikeyVerified')();
+    //         } catch (err) {
+    //             console.warn('[MFA] Failed to clear stale YubiKey claim:', err);
+    //         }
+    //     }
+    // }
+    console.log('[MFA] YubiKey enforcement is DISABLED');
+
+    // If TOTP is registered, ALWAYS require verification for this session.
+    if (claims.totp_registered) {
+        pending.push('totp');
+        console.log('[MFA] TOTP is registered — verification required');
+
+        if (claims.totp_verified) {
+            console.log('[MFA] Clearing stale TOTP verified claim');
+            try {
+                const { httpsCallable } = await import('firebase/functions');
+                const { functions } = await import('../config/firebase.config');
+                await httpsCallable(functions, 'clearTotpVerified')();
+            } catch (err) {
+                console.warn('[MFA] Failed to clear stale TOTP claim:', err);
+            }
+        }
+    }
+
+    if (pending.length > 0) {
+        authUser.requiresMfaVerification = true;
+        authUser.pendingMfaMethods = pending;
+        console.log('[MFA] Pending methods:', pending);
+        // Force token refresh to pick up cleared claims
+        await firebaseUser.getIdToken(true);
+    } else {
+        console.log('[MFA] No MFA methods registered — no verification needed');
+    }
+}
+
 // ─── Auth Service ─────────────────────────────────────────
 
 /**
@@ -50,13 +121,8 @@ export async function loginWithEmail(email: string, password: string): Promise<A
     const { user } = await signInWithEmailAndPassword(auth, email, password);
     const authUser = await mapFirebaseUser(user);
 
-    // Check if admin has a registered security key that needs verification
-    if (ADMIN_ROLES.includes(authUser.role)) {
-        const tokenResult = await user.getIdTokenResult();
-        if (tokenResult.claims.yubikey_registered && !tokenResult.claims.yubikey_verified) {
-            authUser.requiresYubikeyVerification = true;
-        }
-    }
+    // Check MFA requirements for admin users
+    await checkMfaRequirements(user, authUser);
 
     // Update last login in Firestore
     await setDoc(doc(db, 'users', user.uid), {
@@ -125,13 +191,8 @@ export async function loginWithGoogle(): Promise<AuthUser> {
 
     const authUser = await mapFirebaseUser(user);
 
-    // Check if admin has a registered security key that needs verification
-    if (ADMIN_ROLES.includes(authUser.role)) {
-        const tokenResult = await user.getIdTokenResult();
-        if (tokenResult.claims.yubikey_registered && !tokenResult.claims.yubikey_verified) {
-            authUser.requiresYubikeyVerification = true;
-        }
-    }
+    // Check MFA requirements for admin users
+    await checkMfaRequirements(user, authUser);
 
     // Session tracking — create active session document
     await createSessionDoc(user.uid, authUser.displayName || user.email || '', authUser.role);
@@ -162,14 +223,18 @@ export async function logout(): Promise<void> {
     const user = auth.currentUser;
 
     if (user) {
-        // Clear YubiKey verified status so next login requires re-verification
+        // Clear MFA verified statuses so next login requires re-verification
         try {
             const { httpsCallable } = await import('firebase/functions');
             const { functions } = await import('../config/firebase.config');
-            const clearVerified = httpsCallable(functions, 'clearYubikeyVerified');
-            await clearVerified();
+            // YubiKey disabled — skip clearing yubikey verified claim
+            // const clearVerified = httpsCallable(functions, 'clearYubikeyVerified');
+            // await clearVerified();
+            // Also clear TOTP verified status
+            const clearTotp = httpsCallable(functions, 'clearTotpVerified');
+            await clearTotp().catch(() => {}); // Ignore if not enrolled
         } catch (err) {
-            console.warn('[Auth] Failed to clear YubiKey verified status:', err);
+            console.warn('[Auth] Failed to clear MFA verified status:', err);
         }
 
         // Clean up session document before signing out
@@ -281,13 +346,8 @@ export function onAuthChange(callback?: (user: AuthUser | null) => void): () => 
         if (firebaseUser) {
             const authUser = await mapFirebaseUser(firebaseUser);
 
-            // Check YubiKey claims on session resume (e.g. page refresh)
-            if (ADMIN_ROLES.includes(authUser.role)) {
-                const tokenResult = await firebaseUser.getIdTokenResult();
-                if (tokenResult.claims.yubikey_registered && !tokenResult.claims.yubikey_verified) {
-                    authUser.requiresYubikeyVerification = true;
-                }
-            }
+            // Check MFA requirements on session resume (e.g. page refresh)
+            await checkMfaRequirements(firebaseUser, authUser);
 
             useAuthStore.getState().setUser(authUser);
             // Start idle timer for admin/staff users only
