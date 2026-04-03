@@ -10,6 +10,7 @@
  */
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 import { enforceRateLimit, RATE_LIMITS } from './rateLimit';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
@@ -18,12 +19,12 @@ if (!getApps().length) initializeApp();
 const db = getFirestore();
 
 // ─── Flutterwave Initialization ─────────────────────────────
-// Set via:  firebase functions:secrets:set FLUTTERWAVE_SECRET_KEY
-//           firebase functions:secrets:set FLUTTERWAVE_PUBLIC_KEY
+// Stored via:  firebase functions:secrets:set FLUTTERWAVE_SECRET_KEY
+//              firebase functions:secrets:set FLUTTERWAVE_PUBLIC_KEY
 
-const FLW_SECRET_KEY = process.env.FLUTTERWAVE_SECRET_KEY || '';
-const FLW_PUBLIC_KEY = process.env.FLUTTERWAVE_PUBLIC_KEY || '';
-const IS_FLW_LIVE = !!FLW_SECRET_KEY;
+const flwSecretKey = defineSecret('FLUTTERWAVE_SECRET_KEY');
+const flwPublicKey = defineSecret('FLUTTERWAVE_PUBLIC_KEY');
+const flwEncryptionKey = defineSecret('FLUTTERWAVE_ENCRYPTION_KEY');
 
 // Base URL for the Flutterwave v3 REST API
 const FLW_API_BASE = 'https://api.flutterwave.com/v3';
@@ -35,7 +36,7 @@ async function flwPost<T = any>(path: string, body: Record<string, any>): Promis
     const res = await fetch(`${FLW_API_BASE}${path}`, {
         method: 'POST',
         headers: {
-            'Authorization': `Bearer ${FLW_SECRET_KEY}`,
+            'Authorization': `Bearer ${flwSecretKey.value()}`,
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
@@ -51,7 +52,7 @@ async function flwPost<T = any>(path: string, body: Record<string, any>): Promis
 export async function flwGet<T = any>(path: string): Promise<T> {
     const res = await fetch(`${FLW_API_BASE}${path}`, {
         method: 'GET',
-        headers: { 'Authorization': `Bearer ${FLW_SECRET_KEY}` },
+        headers: { 'Authorization': `Bearer ${flwSecretKey.value()}` },
     });
     if (!res.ok) {
         const text = await res.text();
@@ -80,7 +81,10 @@ interface CreateFLWPaymentData {
  * Returns a payment link that the frontend redirects the customer to.
  * Uses real Flutterwave when configured, otherwise falls back to mock.
  */
-export const createFlutterwavePayment = onCall(async (request) => {
+export const createFlutterwavePayment = onCall(
+    { secrets: [flwSecretKey, flwPublicKey, flwEncryptionKey] },
+    async (request) => {
+    const IS_FLW_LIVE = !!flwSecretKey.value();
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Must be logged in to make a payment.');
     }

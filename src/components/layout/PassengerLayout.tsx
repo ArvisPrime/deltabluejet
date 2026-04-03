@@ -116,7 +116,7 @@ const PassengerLayout: React.FC = () => {
 
                                 {/* Dropdown */}
                                 {notifOpen && (
-                                    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-navy-100 shadow-2xl shadow-navy-950/10 z-50 overflow-hidden" style={{ animation: 'modalSlideUp 0.2s ease-out' }}>
+                                    <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-navy-100 shadow-2xl shadow-navy-950/10 z-50 overflow-hidden" style={{ animation: 'modalSlideUp 0.2s ease-out' }}>
                                         <div className="px-4 py-3 border-b border-navy-50 flex items-center justify-between">
                                             <p className="text-[10px] font-black text-navy-700 uppercase tracking-widest">Notifications</p>
                                             {unreadCount > 0 && (

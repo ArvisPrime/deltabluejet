@@ -6,10 +6,23 @@
  */
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 import { enforceRateLimit, RATE_LIMITS } from './rateLimit';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import Stripe from 'stripe';
+
+/* ── Secrets ───────────────────────────────────────────────── */
+const SENDGRID_API_KEY = defineSecret('SENDGRID_API_KEY');
+
+/* ── Template Rendering Helper ─────────────────────────────── */
+function renderTemplate(text: string, variables: Record<string, string>): string {
+    let rendered = text;
+    for (const [key, value] of Object.entries(variables)) {
+        rendered = rendered.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+    }
+    return rendered;
+}
 
 if (!getApps().length) initializeApp();
 const db = getFirestore();
@@ -177,10 +190,12 @@ export const processRefund = onCall(async (request) => {
 });
 
 /**
- * Send a booking confirmation email.
- * TODO (Phase 2): Integrate with SendGrid for real email delivery.
+ * Send a booking confirmation email via SendGrid.
+ * Uses the SENDGRID_API_KEY secret; falls back to console.log mock if absent.
  */
-export const sendBookingConfirmation = onCall(async (request) => {
+export const sendBookingConfirmation = onCall(
+    { secrets: [SENDGRID_API_KEY] },
+    async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'Must be logged in.');
     }
@@ -194,8 +209,76 @@ export const sendBookingConfirmation = onCall(async (request) => {
 
     const booking = bookingDoc.data()!;
 
-    // TODO (Phase 2): Replace with SendGrid integration
-    console.log(`📧 Booking confirmation email sent to ${email} for PNR ${booking.pnr}`);
+    // Try to find a live "Booking Confirmation" email template
+    const templatesSnap = await db.collection('email_templates')
+        .where('name', '==', 'Booking Confirmation')
+        .where('status', '==', 'live')
+        .limit(1)
+        .get();
+
+    let subject = `Booking Confirmed — ${booking.pnr || 'DeltaBlue Jet Air'}`;
+    let htmlBody = `<p>Dear Passenger,</p><p>Your booking <strong>${booking.pnr}</strong> for flight <strong>${booking.flightNumber || 'N/A'}</strong> has been confirmed.</p><p>Thank you for choosing DeltaBlue Jet Air.</p>`;
+
+    if (!templatesSnap.empty) {
+        const template = templatesSnap.docs[0].data();
+        const variables: Record<string, string> = {
+            passengerName: email,
+            pnr: (booking.pnr as string) || 'N/A',
+            flightNumber: (booking.flightNumber as string) || 'N/A',
+            origin: booking.origin?.city || booking.origin?.code || '',
+            destination: booking.destination?.city || booking.destination?.code || '',
+            departureDate: booking.departureTime?.toDate?.()
+                ? booking.departureTime.toDate().toISOString().split('T')[0]
+                : 'TBD',
+            totalAmount: `${booking.currency || 'USD'} ${booking.totalAmount || 0}`,
+        };
+        subject = renderTemplate((template.subject as string) || subject, variables);
+        htmlBody = renderTemplate((template.htmlBody as string) || htmlBody, variables);
+    }
+
+    // Send via SendGrid or mock fallback
+    const apiKey = SENDGRID_API_KEY.value();
+    let provider = 'mock';
+    let success = true;
+    let errorMessage: string | null = null;
+
+    if (apiKey) {
+        try {
+            const sgMail = await import('@sendgrid/mail');
+            sgMail.default.setApiKey(apiKey);
+            await sgMail.default.send({
+                to: email,
+                from: 'noreply@deltabluejetair.com',
+                subject,
+                html: htmlBody,
+            });
+            provider = 'sendgrid';
+            console.log(`📧 [SendGrid] Booking confirmation sent to ${email} for PNR ${booking.pnr}`);
+        } catch (err: any) {
+            provider = 'sendgrid';
+            success = false;
+            errorMessage = err.message;
+            console.error(`❌ [SendGrid] Failed to send confirmation to ${email}:`, err.message);
+        }
+    } else {
+        console.log(`📧 [Mock] Booking confirmation email to ${email} for PNR ${booking.pnr}`);
+    }
+
+    // Log to notification_logs
+    await db.collection('notification_logs').add({
+        channel: 'email',
+        templateId: templatesSnap.empty ? null : templatesSnap.docs[0].id,
+        templateName: 'Booking Confirmation',
+        recipientEmail: email,
+        recipientPhone: null,
+        bookingRef: booking.pnr || bookingId,
+        subject,
+        status: success ? 'sent' : 'failed',
+        provider,
+        errorMessage,
+        sentBy: request.auth.token.email || 'system',
+        sentAt: FieldValue.serverTimestamp(),
+    });
 
     await db.collection('audit_logs').add({
         action: 'CONFIRMATION_EMAIL_SENT',
@@ -203,11 +286,11 @@ export const sendBookingConfirmation = onCall(async (request) => {
         entityId: bookingId,
         userId: request.auth.uid,
         userEmail: request.auth.token.email || '',
-        details: { recipientEmail: email, pnr: booking.pnr },
+        details: { recipientEmail: email, pnr: booking.pnr, provider, success },
         timestamp: FieldValue.serverTimestamp(),
     });
 
-    return { success: true };
+    return { success };
 });
 
 /**

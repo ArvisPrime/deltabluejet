@@ -5,16 +5,60 @@
  * Uses Stripe for real payment intent creation and refund processing.
  * Falls back to mock mode if STRIPE_SECRET_KEY is not configured.
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.confirmPaymentSecure = exports.sendBookingConfirmation = exports.processRefund = exports.createPaymentIntent = void 0;
 const https_1 = require("firebase-functions/v2/https");
+const params_1 = require("firebase-functions/params");
 const rateLimit_1 = require("./rateLimit");
 const firestore_1 = require("firebase-admin/firestore");
 const app_1 = require("firebase-admin/app");
 const stripe_1 = __importDefault(require("stripe"));
+/* ── Secrets ───────────────────────────────────────────────── */
+const SENDGRID_API_KEY = (0, params_1.defineSecret)('SENDGRID_API_KEY');
+/* ── Template Rendering Helper ─────────────────────────────── */
+function renderTemplate(text, variables) {
+    let rendered = text;
+    for (const [key, value] of Object.entries(variables)) {
+        rendered = rendered.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+    }
+    return rendered;
+}
 if (!(0, app_1.getApps)().length)
     (0, app_1.initializeApp)();
 const db = (0, firestore_1.getFirestore)();
@@ -157,10 +201,10 @@ exports.processRefund = (0, https_1.onCall)(async (request) => {
     return { refundId, status: 'succeeded' };
 });
 /**
- * Send a booking confirmation email.
- * TODO (Phase 2): Integrate with SendGrid for real email delivery.
+ * Send a booking confirmation email via SendGrid.
+ * Uses the SENDGRID_API_KEY secret; falls back to console.log mock if absent.
  */
-exports.sendBookingConfirmation = (0, https_1.onCall)(async (request) => {
+exports.sendBookingConfirmation = (0, https_1.onCall)({ secrets: [SENDGRID_API_KEY] }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'Must be logged in.');
     }
@@ -170,18 +214,83 @@ exports.sendBookingConfirmation = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('not-found', 'Booking not found.');
     }
     const booking = bookingDoc.data();
-    // TODO (Phase 2): Replace with SendGrid integration
-    console.log(`📧 Booking confirmation email sent to ${email} for PNR ${booking.pnr}`);
+    // Try to find a live "Booking Confirmation" email template
+    const templatesSnap = await db.collection('email_templates')
+        .where('name', '==', 'Booking Confirmation')
+        .where('status', '==', 'live')
+        .limit(1)
+        .get();
+    let subject = `Booking Confirmed — ${booking.pnr || 'DeltaBlue Jet Air'}`;
+    let htmlBody = `<p>Dear Passenger,</p><p>Your booking <strong>${booking.pnr}</strong> for flight <strong>${booking.flightNumber || 'N/A'}</strong> has been confirmed.</p><p>Thank you for choosing DeltaBlue Jet Air.</p>`;
+    if (!templatesSnap.empty) {
+        const template = templatesSnap.docs[0].data();
+        const variables = {
+            passengerName: email,
+            pnr: booking.pnr || 'N/A',
+            flightNumber: booking.flightNumber || 'N/A',
+            origin: booking.origin?.city || booking.origin?.code || '',
+            destination: booking.destination?.city || booking.destination?.code || '',
+            departureDate: booking.departureTime?.toDate?.()
+                ? booking.departureTime.toDate().toISOString().split('T')[0]
+                : 'TBD',
+            totalAmount: `${booking.currency || 'USD'} ${booking.totalAmount || 0}`,
+        };
+        subject = renderTemplate(template.subject || subject, variables);
+        htmlBody = renderTemplate(template.htmlBody || htmlBody, variables);
+    }
+    // Send via SendGrid or mock fallback
+    const apiKey = SENDGRID_API_KEY.value();
+    let provider = 'mock';
+    let success = true;
+    let errorMessage = null;
+    if (apiKey) {
+        try {
+            const sgMail = await Promise.resolve().then(() => __importStar(require('@sendgrid/mail')));
+            sgMail.default.setApiKey(apiKey);
+            await sgMail.default.send({
+                to: email,
+                from: 'noreply@deltabluejetair.com',
+                subject,
+                html: htmlBody,
+            });
+            provider = 'sendgrid';
+            console.log(`📧 [SendGrid] Booking confirmation sent to ${email} for PNR ${booking.pnr}`);
+        }
+        catch (err) {
+            provider = 'sendgrid';
+            success = false;
+            errorMessage = err.message;
+            console.error(`❌ [SendGrid] Failed to send confirmation to ${email}:`, err.message);
+        }
+    }
+    else {
+        console.log(`📧 [Mock] Booking confirmation email to ${email} for PNR ${booking.pnr}`);
+    }
+    // Log to notification_logs
+    await db.collection('notification_logs').add({
+        channel: 'email',
+        templateId: templatesSnap.empty ? null : templatesSnap.docs[0].id,
+        templateName: 'Booking Confirmation',
+        recipientEmail: email,
+        recipientPhone: null,
+        bookingRef: booking.pnr || bookingId,
+        subject,
+        status: success ? 'sent' : 'failed',
+        provider,
+        errorMessage,
+        sentBy: request.auth.token.email || 'system',
+        sentAt: firestore_1.FieldValue.serverTimestamp(),
+    });
     await db.collection('audit_logs').add({
         action: 'CONFIRMATION_EMAIL_SENT',
         entityType: 'booking',
         entityId: bookingId,
         userId: request.auth.uid,
         userEmail: request.auth.token.email || '',
-        details: { recipientEmail: email, pnr: booking.pnr },
+        details: { recipientEmail: email, pnr: booking.pnr, provider, success },
         timestamp: firestore_1.FieldValue.serverTimestamp(),
     });
-    return { success: true };
+    return { success };
 });
 /**
  * Confirm payment and update booking status (server-side only).

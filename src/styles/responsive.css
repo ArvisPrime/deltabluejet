@@ -1,0 +1,250 @@
+/*
+ * Responsive Overrides — Deltablue Jet Air
+ *
+ * Fixes admin (backend) pages for mobile & tablet viewports.
+ * Applied globally so all admin pages benefit without per-file edits.
+ *
+ * Breakpoints:
+ *   ≤ 640px  — Mobile phones
+ *   ≤ 768px  — Small tablets / landscape phones
+ *   ≤ 1024px — Tablets
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE  (≤ 640px)
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+
+  /* ── Page-level headings ────────────────────────────────── */
+  h1 {
+    font-size: 1.5rem !important;
+    line-height: 1.2 !important;
+  }
+
+  h2 {
+    font-size: 1.25rem !important;
+    line-height: 1.3 !important;
+  }
+
+  h3 {
+    font-size: 1rem !important;
+  }
+
+  /* ── Hero sub-headings (italic descriptions under titles) ─ */
+  h1 + p,
+  .space-y-4 > p[class*="italic"] {
+    font-size: 0.8rem !important;
+  }
+
+  /* ── Notification dropdowns — constrain to viewport ────── */
+  .absolute[class*="w-80"],
+  .absolute[class*="w-[320px]"] {
+    width: calc(100vw - 2rem) !important;
+    max-width: 320px !important;
+    right: -1rem !important;
+  }
+
+  /* ── Oversized rounded corners on cards ─────────────────── */
+  [class*="rounded-[3"],
+  [class*="rounded-[4"] {
+    border-radius: 1rem !important;
+  }
+
+  /* ── Sticky action bar (save/discard) ───────────────────── */
+  .sticky[class*="bottom-"] > div {
+    flex-wrap: wrap;
+    gap: 0.75rem !important;
+    padding: 0.75rem 1rem !important;
+    border-radius: 1rem !important;
+  }
+
+  .sticky[class*="bottom-"] > div > div {
+    border-right: none !important;
+    padding-right: 0 !important;
+  }
+
+  .sticky[class*="bottom-"] {
+    bottom: 0.5rem !important;
+    padding-top: 0.5rem !important;
+  }
+
+  /* ── Tabs — prevent overflow, enable scroll ─────────────── */
+  .flex[class*="border-b"][class*="px-10"] {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .flex[class*="border-b"][class*="px-10"]::-webkit-scrollbar {
+    display: none;
+  }
+
+  .flex[class*="border-b"][class*="px-10"] > button {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── Sidebar "aside" in grid — full width on mobile ─────── */
+  aside[class*="col-span-3"],
+  aside[class*="col-span-4"] {
+    min-height: auto !important;
+  }
+
+  /* ── Large internal padding on cards / sections ─────────── */
+  [class*="p-10"],
+  [class*="p-12"] {
+    padding: 1rem !important;
+  }
+
+  [class*="px-10"],
+  [class*="px-12"] {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  /* ── Large gap containers ───────────────────────────────── */
+  [class*="gap-10"],
+  [class*="gap-12"] {
+    gap: 1.25rem !important;
+  }
+
+  /* ── Buttons with excessive padding ─────────────────────── */
+  button[class*="px-8"],
+  a[class*="px-8"] {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  button[class*="px-12"],
+  a[class*="px-12"] {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+  }
+
+  button[class*="py-4"],
+  a[class*="py-4"] {
+    padding-top: 0.625rem !important;
+    padding-bottom: 0.625rem !important;
+  }
+
+  /* ── Side-by-side button groups — stack on mobile ────────── */
+  .flex[class*="gap-4"] > button[class*="px-8"] + button[class*="px-8"],
+  .flex[class*="gap-4"] > button[class*="px-12"] {
+    flex: 1;
+  }
+
+  /* ── Content max-width containers — add mobile padding ──── */
+  [class*="max-w-[1600px]"],
+  [class*="max-w-[1400px]"],
+  [class*="max-w-[1200px]"] {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  /* ── Modal responsiveness ───────────────────────────────── */
+  [class*="rounded-[2.5rem]"][class*="max-w-lg"],
+  [class*="rounded-[2.5rem]"][class*="max-w-sm"] {
+    border-radius: 1.25rem !important;
+  }
+
+  /* ── Header action buttons — wrap on mobile ──────────────── */
+  header .flex[class*="gap-4"] {
+    flex-wrap: wrap;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   TABLET  (≤ 768px)
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* ── Page headings scale ────────────────────────────────── */
+  h1 {
+    font-size: 1.75rem !important;
+  }
+
+  /* ── Oversized border-radius at tablet ──────────────────── */
+  [class*="rounded-[3.5rem]"],
+  [class*="rounded-[4rem]"] {
+    border-radius: 1.5rem !important;
+  }
+
+  [class*="rounded-[3rem]"] {
+    border-radius: 1.25rem !important;
+  }
+
+  /* ── Grid layouts that should stack ─────────────────────── */
+  .grid[class*="grid-cols-12"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .grid[class*="grid-cols-12"] > [class*="col-span-3"],
+  .grid[class*="grid-cols-12"] > [class*="col-span-4"],
+  .grid[class*="grid-cols-12"] > [class*="col-span-8"],
+  .grid[class*="grid-cols-12"] > [class*="col-span-9"] {
+    grid-column: 1 / -1 !important;
+  }
+
+  /* ── Medium internal padding ────────────────────────────── */
+  [class*="p-10"],
+  [class*="p-12"] {
+    padding: 1.25rem !important;
+  }
+
+  /* ── Scale down gap ─────────────────────────────────────── */
+  [class*="space-y-12"] {
+    --spacing-y: 1.5rem;
+  }
+
+  [class*="space-y-12"] > * + * {
+    margin-top: 1.5rem !important;
+  }
+
+  /* ── Breadcrumb text spacing ────────────────────────────── */
+  nav[class*="tracking-[0.4em]"] {
+    letter-spacing: 0.15em !important;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   SMALL DESKTOP / LARGE TABLET  (≤ 1024px)
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+
+  /* ── Sidebar minimum height — let it shrink ─────────────── */
+  aside[class*="min-h-[600px]"] {
+    min-height: auto !important;
+  }
+
+  /* ── Notification dropdown overflow prevention ──────────── */
+  .absolute[class*="w-80"] {
+    max-width: min(320px, calc(100vw - 2rem)) !important;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PRINT STYLES — hide non-essential admin chrome
+   ═══════════════════════════════════════════════════════════ */
+
+@media print {
+  aside,
+  header,
+  .sticky {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Outlet, Link, useLocation } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
@@ -7,6 +7,9 @@ import { useAuthStore } from '../../stores/authStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useCmsHeaderStore } from '../../stores/cmsHeaderStore';
 import { getDashboardAccess, type DashboardAccessConfig } from '../../services/dashboardAccessService';
+import { subscribeToNotificationLogs } from '../../services/notifications';
+import type { NotificationLogDoc } from '../../types/firestore';
+import { useNotificationSound } from '../../hooks/useNotificationSound';
 
 const navGroups = [
     {
@@ -139,10 +142,95 @@ const AdminLayout: React.FC = () => {
     const { logoUrl, brandName } = useCmsHeaderStore();
     const [showNotifications, setShowNotifications] = useState(false);
     const [accessConfig, setAccessConfig] = useState<DashboardAccessConfig | null>(null);
+    const [liveNotifications, setLiveNotifications] = useState<NotificationLogDoc[]>([]);
+    const [readIds, setReadIds] = useState<Set<string>>(new Set());
+    const prevCountRef = useRef(0);
+    const { playSound } = useNotificationSound();
+    const initialLoadRef = useRef(true);
 
     /* ── Load dashboard access config ────────────────────────── */
     useEffect(() => {
         getDashboardAccess().then(setAccessConfig).catch(() => setAccessConfig(null));
+    }, []);
+
+    /* ── Subscribe to live notification logs ─────────────────── */
+    useEffect(() => {
+        const unsub = subscribeToNotificationLogs(
+            (logs) => {
+                setLiveNotifications(logs);
+
+                // Play sound for new critical/warning notifications
+                if (initialLoadRef.current) {
+                    // Skip sound on initial load
+                    initialLoadRef.current = false;
+                    prevCountRef.current = logs.length;
+                    return;
+                }
+
+                if (logs.length > prevCountRef.current) {
+                    // New notification(s) arrived
+                    const newest = logs[0]; // sorted desc by sentAt
+                    const name = (newest?.templateName || '').toLowerCase();
+
+                    if (name.includes('delay') || name.includes('disrupt') || name.includes('cancel') || newest?.status === 'failed') {
+                        playSound('critical');
+                    } else if (name.includes('warning') || name.includes('gate') || name.includes('alert')) {
+                        playSound('warning');
+                    } else {
+                        playSound('info');
+                    }
+                }
+                prevCountRef.current = logs.length;
+            },
+            { maxResults: 20 },
+        );
+        return unsub;
+    }, [playSound]);
+
+    /* ── Computed notification helpers ───────────────────────── */
+    const unreadCount = liveNotifications.filter(n => !readIds.has(n.id)).length;
+
+    const markAllRead = useCallback(() => {
+        setReadIds(new Set(liveNotifications.map(n => n.id)));
+        setShowNotifications(false);
+        addToast('All notifications marked as read', 'success');
+    }, [liveNotifications, addToast]);
+
+    const formatTimeAgo = useCallback((sentAt: any) => {
+        if (!sentAt?.toDate) return '';
+        const diff = Date.now() - sentAt.toDate().getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'Just now';
+        if (mins < 60) return `${mins}m ago`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs}h ago`;
+        return `${Math.floor(hrs / 24)}d ago`;
+    }, []);
+
+    const getNotificationType = useCallback((n: NotificationLogDoc): 'warning' | 'info' | 'success' | 'error' => {
+        if (n.status === 'failed') return 'error';
+        const name = (n.templateName || '').toLowerCase();
+        if (name.includes('delay') || name.includes('disrupt') || name.includes('cancel')) return 'warning';
+        if (name.includes('confirm') || name.includes('success')) return 'success';
+        return 'info';
+    }, []);
+
+    const getNotificationIcon = useCallback((type: string) => {
+        switch (type) {
+            case 'warning': return 'warning';
+            case 'error': return 'error';
+            case 'success': return 'check_circle';
+            default: return 'info';
+        }
+    }, []);
+
+    const getIconColor = useCallback((type: string) => {
+        switch (type) {
+            case 'warning': return 'text-amber-500';
+            case 'error': return 'text-red-500';
+            case 'success': return 'text-emerald-500';
+            default: return 'text-blue-500';
+        }
     }, []);
 
     /* ── Filter navGroups based on role ──────────────────────── */
@@ -162,12 +250,6 @@ const AdminLayout: React.FC = () => {
             }))
             .filter(group => group.items.length > 0);
     }, [accessConfig, user]);
-
-    const mockNotifications = [
-        { id: 1, title: 'Gate B7 conflict detected', time: '2 min ago', type: 'warning' as const },
-        { id: 2, title: 'Flight DB-204 delay updated', time: '15 min ago', type: 'info' as const },
-        { id: 3, title: 'New crew roster published', time: '1 hr ago', type: 'success' as const },
-    ];
 
     const sidebarWidth = sidebarCollapsed ? 'w-20' : 'w-[264px]';
 
@@ -289,20 +371,67 @@ const AdminLayout: React.FC = () => {
                         <div className="relative">
                             <button className="text-navy-400 hover:text-navy-800 relative" onClick={() => setShowNotifications((p) => !p)}>
                                 <span className="material-symbols-outlined">notifications</span>
-                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[8px] font-bold text-white flex items-center justify-center">{mockNotifications.length}</span>
+                                {unreadCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 bg-red-500 rounded-full text-[8px] font-bold text-white flex items-center justify-center animate-pulse">
+                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                    </span>
+                                )}
                             </button>
                             {showNotifications && (
-                                <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-2xl border border-navy-100 overflow-hidden z-50">
+                                <div className="absolute right-0 top-12 w-96 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-navy-100 overflow-hidden z-50">
                                     <div className="px-5 py-4 border-b border-navy-100 flex items-center justify-between">
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-navy-800">Notifications</h3>
-                                        <button onClick={() => { setShowNotifications(false); addToast('All notifications marked as read', 'success'); }} className="text-[10px] font-bold text-primary hover:underline">Mark all read</button>
+                                        <h3 className="text-xs font-black uppercase tracking-widest text-navy-800">
+                                            Notifications
+                                            {unreadCount > 0 && <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full text-[9px]">{unreadCount} new</span>}
+                                        </h3>
+                                        <button onClick={markAllRead} className="text-[10px] font-bold text-primary hover:underline">Mark all read</button>
                                     </div>
-                                    {mockNotifications.map((n) => (
-                                        <div key={n.id} className="px-5 py-3 border-b border-navy-50 hover:bg-navy-50/50 transition-colors cursor-pointer" onClick={() => { addToast(n.title, n.type); setShowNotifications(false); }}>
-                                            <p className="text-xs font-bold text-navy-800">{n.title}</p>
-                                            <p className="text-[10px] text-navy-400 mt-0.5">{n.time}</p>
+                                    <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                                        {liveNotifications.length === 0 ? (
+                                            <div className="px-5 py-8 text-center">
+                                                <span className="material-symbols-outlined text-3xl text-navy-200">notifications_off</span>
+                                                <p className="text-xs text-navy-400 mt-2">No notifications yet</p>
+                                            </div>
+                                        ) : liveNotifications.map((n) => {
+                                            const type = getNotificationType(n);
+                                            const isUnread = !readIds.has(n.id);
+                                            return (
+                                                <div
+                                                    key={n.id}
+                                                    className={`px-5 py-3 border-b border-navy-50 hover:bg-navy-50/50 transition-colors cursor-pointer flex items-start gap-3 ${
+                                                        isUnread ? 'bg-blue-50/40' : ''
+                                                    }`}
+                                                    onClick={() => {
+                                                        setReadIds(prev => new Set([...prev, n.id]));
+                                                        addToast(`${n.templateName}: ${n.recipientEmail || n.recipientPhone || ''}`, type);
+                                                        setShowNotifications(false);
+                                                    }}
+                                                >
+                                                    <span className={`material-symbols-outlined text-base mt-0.5 ${getIconColor(type)}`}>
+                                                        {getNotificationIcon(type)}
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-xs font-bold text-navy-800 truncate">{n.templateName}</p>
+                                                            {isUnread && <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />}
+                                                        </div>
+                                                        <p className="text-[10px] text-navy-500 truncate">
+                                                            {n.channel === 'email' ? '📧' : '📱'} {n.recipientEmail || n.recipientPhone || 'System'}
+                                                            {n.status === 'failed' && <span className="ml-1 text-red-500 font-bold">FAILED</span>}
+                                                        </p>
+                                                        <p className="text-[9px] text-navy-400 mt-0.5">{formatTimeAgo(n.sentAt)}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    {liveNotifications.length > 0 && (
+                                        <div className="px-5 py-3 border-t border-navy-100 text-center">
+                                            <Link to={ROUTES.EMAIL_AUDIT_LOG} className="text-[10px] font-bold text-primary hover:underline" onClick={() => setShowNotifications(false)}>
+                                                View all notifications →
+                                            </Link>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             )}
                         </div>
