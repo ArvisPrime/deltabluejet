@@ -444,6 +444,22 @@ export async function getAuditLogs(maxResults = 100): Promise<AuditLogDoc[]> {
 }
 
 /**
+ * Subscribe to real-time audit log updates.
+ */
+export function subscribeToAuditLogs(
+    callback: (logs: AuditLogDoc[]) => void,
+    maxResults = 20,
+): () => void {
+    return onSnapshot(
+        query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'), limit(maxResults)),
+        (snap) => {
+            const logs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as AuditLogDoc);
+            callback(logs);
+        },
+    );
+}
+
+/**
  * Write an audit log entry for any mutation.
  */
 export async function logAuditEntry(entry: {

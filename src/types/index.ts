@@ -98,7 +98,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'Super Admin' | 'Manager' | 'Customer' | 'Ops Manager' | 'System Admin' | 'Crew Sched.';
+  role: string;
   status: 'Active' | 'Pending' | 'Inactive' | 'Suspended';
   lastLogin: string;
   avatar: string;

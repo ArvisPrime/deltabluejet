@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getDashboardAccess,
   saveDashboardAccess,
@@ -6,29 +6,48 @@ import {
   ALL_MODULE_IDS,
   type DashboardAccessConfig,
 } from '../../services/dashboardAccessService';
+import { getRoles, type RoleDoc } from '../../services/rolesPolicyService';
 import { useToastStore } from '../../stores/toastStore';
 
-/* ── Configurable roles (super_admin always has full access) ── */
-const CONFIGURABLE_ROLES = [
-  { id: 'ops_manager', label: 'Ops Manager', icon: 'engineering', color: 'indigo' },
-  { id: 'crew_sched', label: 'Crew Scheduler', icon: 'calendar_month', color: 'blue' },
-  { id: 'cs_agent', label: 'CS Agent', icon: 'support_agent', color: 'sky' },
-] as const;
+/* Icon lookup — built-in roles get specific icons; custom roles get a fallback */
+const ROLE_ICON: Record<string, string> = {
+  ops_manager: 'engineering',
+  crew_sched: 'calendar_month',
+  cs_agent: 'support_agent',
+};
+const getRoleIcon = (roleId: string) => ROLE_ICON[roleId] || 'badge';
 
 const DashboardAccessControl: React.FC = () => {
   const addToast = useToastStore(s => s.addToast);
   const [config, setConfig] = useState<DashboardAccessConfig>({});
-  const [activeRole, setActiveRole] = useState<string>(CONFIGURABLE_ROLES[0].id);
+  const [allRoles, setAllRoles] = useState<RoleDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  /* ── Load config from Firestore ────────────────────────────── */
+  /* Derive configurable roles (exclude super_admin + customer) */
+  const configurableRoles = useMemo(() => {
+    return allRoles
+      .filter(r => r.id !== 'super_admin' && r.id !== 'customer')
+      .map(r => ({
+        id: r.id,
+        label: r.label,
+        icon: ROLE_ICON[r.id] || 'badge',
+        color: r.color,
+      }));
+  }, [allRoles]);
+
+  const [activeRole, setActiveRole] = useState<string>('');
+
+  /* ── Load config + roles from Firestore ──────────────────── */
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const data = await getDashboardAccess();
+      const [data, roles] = await Promise.all([getDashboardAccess(), getRoles()]);
       setConfig(data);
+      setAllRoles(roles);
+      const first = roles.find(r => r.id !== 'super_admin' && r.id !== 'customer');
+      if (first) setActiveRole(first.id);
       setLoading(false);
     })();
   }, []);
@@ -133,7 +152,7 @@ const DashboardAccessControl: React.FC = () => {
       {/* Role Selector Tabs */}
       <div className="bg-white rounded-2xl border border-navy-100 shadow-sm overflow-hidden">
         <div className="flex border-b border-navy-100">
-          {CONFIGURABLE_ROLES.map(role => (
+          {configurableRoles.map(role => (
             <button
               key={role.id}
               onClick={() => setActiveRole(role.id)}
@@ -153,7 +172,7 @@ const DashboardAccessControl: React.FC = () => {
         <div className="px-6 py-4 bg-navy-50/30 border-b border-navy-100 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">
-              {CONFIGURABLE_ROLES.find(r => r.id === activeRole)?.label}
+              {configurableRoles.find(r => r.id === activeRole)?.label}
             </span>
             <span className="text-[10px] font-black text-navy-300 uppercase tracking-widest">
               {enabledCount} / {totalModules} Modules Enabled

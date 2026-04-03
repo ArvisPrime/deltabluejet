@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import {
    getOrCreateCustomer,
@@ -6,20 +6,21 @@ import {
 } from '../../services/customerService';
 import type { CustomerDoc, DocumentType } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
-
-const ROLE_LABELS: Record<string, string> = {
-   super_admin: 'Super Admin',
-   ops_manager: 'Operations Manager',
-   crew_sched: 'Crew Scheduler',
-   cs_agent: 'Customer Service Agent',
-   customer: 'Customer',
-};
+import { getRoles, type RoleDoc } from '../../services/rolesPolicyService';
 
 const AccountSettings: React.FC = () => {
    const authUser = useAuthStore((s) => s.user);
    const [loading, setLoading] = useState(true);
    const [saving, setSaving] = useState(false);
    const [successMsg, setSuccessMsg] = useState('');
+   const [allRoles, setAllRoles] = useState<RoleDoc[]>([]);
+
+   // Dynamic role labels derived from Firestore
+   const ROLE_LABELS = useMemo(() => {
+      const map: Record<string, string> = {};
+      allRoles.forEach(r => { map[r.id] = r.label; });
+      return map;
+   }, [allRoles]);
 
    // Profile state
    const [customer, setCustomer] = useState<CustomerDoc | null>(null);
@@ -38,11 +39,15 @@ const AccountSettings: React.FC = () => {
       if (!authUser) return;
       setLoading(true);
       try {
-         const c = await getOrCreateCustomer(
-            authUser.uid,
-            authUser.email || '',
-            authUser.displayName || 'Admin User',
-         );
+         const [c, roles] = await Promise.all([
+            getOrCreateCustomer(
+               authUser.uid,
+               authUser.email || '',
+               authUser.displayName || 'Admin User',
+            ),
+            getRoles(),
+         ]);
+         setAllRoles(roles);
          setCustomer(c);
          setPhone(c.phone || '');
          setNationality(c.nationality || '');

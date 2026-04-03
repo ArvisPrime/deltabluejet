@@ -6,8 +6,8 @@ import { ROUTES } from '../../config/routes';
 interface ProtectedRouteProps {
     /** The component to render if authorized */
     children: React.ReactNode;
-    /** Roles that are allowed. If empty/undefined, any authenticated user is allowed. */
-    allowedRoles?: AuthUser['role'][];
+    /** Roles that are allowed. Can be an array of role strings, or a check function. If empty/undefined, any authenticated user is allowed. */
+    allowedRoles?: string[] | ((role: string) => boolean);
 }
 
 /**
@@ -36,8 +36,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
     }
 
     // Check role-based access
-    if (allowedRoles && allowedRoles.length > 0 && user) {
-        if (!allowedRoles.includes(user.role)) {
+    if (allowedRoles && user) {
+        const isAllowed = typeof allowedRoles === 'function'
+            ? allowedRoles(user.role)
+            : allowedRoles.length === 0 || allowedRoles.includes(user.role);
+        if (!isAllowed) {
             // Redirect based on role: customers → passenger portal, staff → admin
             const fallback = user.role === 'customer' ? ROUTES.MY_DASHBOARD : ROUTES.DASHBOARD;
             return <Navigate to={fallback} replace />;

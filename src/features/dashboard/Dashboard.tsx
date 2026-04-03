@@ -1,20 +1,25 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { collection, query, where, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
+import { db } from '../../config/firebase.config';
 import { ROUTES } from '../../config/routes';
 import { useAdminAction } from '../../hooks/useAdminAction';
-import { getFlights, getAuditLogs } from '../../services/firestore';
+import { subscribeToAuditLogs } from '../../services/firestore';
 import type { FlightDoc, AuditLogDoc } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
+import { getDashboardAccess, type DashboardAccessConfig } from '../../services/dashboardAccessService';
+import FlightTrackingCard from '../../components/scheduling/FlightTrackingCard';
+import BoardingProgressCard from '../../components/scheduling/BoardingProgressCard';
+import DelayWarningCard from '../../components/scheduling/DelayWarningCard';
 
 // ─── Helper to build 24-hour OTP chart from live flight data ─────────
 function buildPerformanceData(flights: FlightDoc[]) {
   const now = new Date();
   const buckets: Record<string, { total: number; onTime: number }> = {};
 
-  // Create time buckets for the last 24 hours (every 4h)
   const labels = ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', 'Now'];
   labels.forEach(l => { buckets[l] = { total: 0, onTime: 0 }; });
 
@@ -30,7 +35,6 @@ function buildPerformanceData(flights: FlightDoc[]) {
     else if (hour < 20) label = '16:00';
     else label = '20:00';
 
-    // If the flight is from today, map to its bucket
     const isToday = d.toDateString() === now.toDateString();
     if (!isToday) continue;
 
@@ -44,7 +48,7 @@ function buildPerformanceData(flights: FlightDoc[]) {
     name,
     current: buckets[name].total > 0
       ? Math.round((buckets[name].onTime / buckets[name].total) * 100)
-      : 80, // default target when no flights in that bucket
+      : null, // null = no flights in this bucket → Recharts will show a gap
     target: 80,
   }));
 }
@@ -53,12 +57,67 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const action = useAdminAction();
   const user = useAuthStore(s => s.user);
-  const userRole = user?.role || 'ops_manager';
+  const userRole = user?.role || 'customer';
+
+  // ─── Access-based quick actions (from Firestore) ────────
+  const [accessConfig, setAccessConfig] = useState<DashboardAccessConfig | null>(null);
+  useEffect(() => {
+    getDashboardAccess().then(setAccessConfig).catch(() => null);
+  }, []);
+  const hasModule = (mod: string) => {
+    if (!accessConfig || userRole === 'super_admin') return true;
+    return (accessConfig[userRole] || []).includes(mod);
+  };
 
   // ─── State ───────────────────────────────
   const [flights, setFlights] = useState<FlightDoc[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(Date.now());
+
+  // ─── Real-time flight subscription ────────────────────
+  useEffect(() => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfTomorrow = new Date(startOfDay.getTime() + 2 * 24 * 60 * 60 * 1000);
+
+    const q = query(
+      collection(db, 'flights'),
+      where('departureTime', '>=', Timestamp.fromDate(startOfDay)),
+      where('departureTime', '<=', Timestamp.fromDate(endOfTomorrow)),
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as FlightDoc);
+        data.sort((a, b) => a.departureTime.toMillis() - b.departureTime.toMillis());
+        setFlights(data);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('[Dashboard] Flight snapshot error:', err);
+        useToastStore.getState().addToast('Failed to load live flight data', 'error');
+        setLoading(false);
+      },
+    );
+
+    return unsub;
+  }, []);
+
+  // ─── Real-time audit log subscription ─────────────────
+  useEffect(() => {
+    const unsub = subscribeToAuditLogs((logs) => {
+      setAuditLogs(logs);
+    }, 10);
+    return unsub;
+  }, []);
+
+  // ─── 60-second ticker for live progress recalculation ──
+  useEffect(() => {
+    const interval = setInterval(() => setTick(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ─── Computed metrics ────────────────────
   const activeFlights = flights.filter(f =>
@@ -81,26 +140,40 @@ const Dashboard: React.FC = () => {
 
   const performanceData = buildPerformanceData(flights);
 
-  // ─── Fetch data ──────────────────────────
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const [flightData, logData] = await Promise.all([
-          getFlights({ maxResults: 200 }),
-          getAuditLogs(10),
-        ]);
-        setFlights(flightData);
-        setAuditLogs(logData);
-      } catch (err) {
-        console.error('Dashboard load error:', err);
-        useToastStore.getState().addToast("Dashboard load error", "error");
-      } finally {
-        setLoading(false);
+  // ─── Live flight derivations (mirrors useActiveFlight) ──
+  const boardingFlights = useMemo(() =>
+    flights.filter(f => f.status === 'boarding'), [flights]);
+
+  const airborneFlights = useMemo(() =>
+    flights.filter(f => f.status === 'departed' || f.status === 'in_air'), [flights]);
+
+  const delayedFlights = useMemo(() =>
+    flights.filter(f => {
+      if (f.status === 'delayed') return true;
+      if (f.status === 'scheduled' || f.status === 'boarding') {
+        const depMs = f.departureTime?.toMillis?.() || 0;
+        return depMs > 0 && tick > depMs;
       }
-    };
-    load();
-  }, []);
+      return false;
+    }), [flights, tick]);
+
+  const todayFlights = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    return flights.filter(f => {
+      const depMs = f.departureTime?.toMillis?.() || 0;
+      return depMs >= todayStart.getTime() && depMs < todayEnd.getTime();
+    });
+  }, [flights]);
+
+  // ─── Per-card progress bar widths ────────
+  const progressWidths = {
+    activeFlights: flights.length > 0 ? Math.round((activeFlights / flights.length) * 100) : 0,
+    totalDelays: flights.length > 0 ? Math.round((totalDelays / flights.length) * 100) : 0,
+    openConflicts: flights.length > 0 ? Math.max(5, 100 - Math.round((openConflicts / flights.length) * 100)) : 100,
+    gateEfficiency: gateEfficiency,
+  };
 
   // ─── Helpers ─────────────────────────────
   const formatTimeAgo = (ts: any) => {
@@ -129,6 +202,13 @@ const Dashboard: React.FC = () => {
     return '0';
   };
 
+  const metricCards = [
+    { label: 'Active Flights', val: loading ? '...' : activeFlights.toLocaleString(), trend: trendChar(activeFlights), icon: 'flight', color: 'text-primary', bg: 'bg-primary/5', barWidth: progressWidths.activeFlights },
+    { label: 'Total Delays', val: loading ? '...' : String(totalDelays), trend: trendChar(totalDelays), icon: 'schedule', color: 'text-orange-500', bg: 'bg-orange-50', barWidth: progressWidths.totalDelays },
+    { label: 'Open Conflicts', val: loading ? '...' : String(openConflicts), trend: trendChar(-openConflicts), icon: 'warning', color: 'text-red-500', bg: 'bg-red-50', barWidth: progressWidths.openConflicts },
+    { label: 'Gate Efficiency', val: loading ? '...' : `${gateEfficiency}%`, trend: `${gateEfficiency > 80 ? '+' : ''}${gateEfficiency - 80}%`, icon: 'door_front', color: 'text-emerald-500', bg: 'bg-emerald-50', barWidth: progressWidths.gateEfficiency },
+  ];
+
   return (
     <div className="p-4 md:p-8 space-y-6 md:space-y-10 animate-in fade-in duration-700 max-w-[1600px] mx-auto">
       {/* Page Header */}
@@ -152,12 +232,7 @@ const Dashboard: React.FC = () => {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {[
-          { label: 'Active Flights', val: loading ? '...' : activeFlights.toLocaleString(), trend: trendChar(activeFlights), icon: 'flight', color: 'text-primary', bg: 'bg-primary/5' },
-          { label: 'Total Delays', val: loading ? '...' : String(totalDelays), trend: trendChar(totalDelays), icon: 'schedule', color: 'text-orange-500', bg: 'bg-orange-50' },
-          { label: 'Open Conflicts', val: loading ? '...' : String(openConflicts), trend: trendChar(-openConflicts), icon: 'warning', color: 'text-red-500', bg: 'bg-red-50' },
-          { label: 'Gate Efficiency', val: loading ? '...' : `${gateEfficiency}%`, trend: `${gateEfficiency > 80 ? '+' : ''}${gateEfficiency - 80}%`, icon: 'door_front', color: 'text-emerald-500', bg: 'bg-emerald-50' },
-        ].map((stat, i) => (
+        {metricCards.map((stat, i) => (
           <div key={i} className="bg-white border border-navy-100 rounded-2xl md:rounded-[2.5rem] p-6 md:p-8 shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
             <div className="flex justify-between items-start mb-6">
               <div className={`p-3 md:p-4 rounded-xl md:rounded-2xl ${stat.bg} ${stat.color} shadow-inner group-hover:scale-110 transition-transform`}>
@@ -171,10 +246,105 @@ const Dashboard: React.FC = () => {
             <p className="text-[10px] font-black text-navy-400 uppercase tracking-[0.2em] mb-1">{stat.label}</p>
             <h3 className="text-2xl md:text-3xl font-black text-navy-950 tracking-tighter">{stat.val}</h3>
             <div className="mt-6 md:mt-8 w-full h-1 bg-navy-50 rounded-full overflow-hidden shadow-inner">
-              <div className={`h-full rounded-full transition-all duration-1000 ${stat.color.replace('text-', 'bg-')}`} style={{ width: `${Math.min(100, Math.max(5, gateEfficiency))}%` }}></div>
+              <div className={`h-full rounded-full transition-all duration-1000 ${stat.color.replace('text-', 'bg-')}`} style={{ width: `${Math.min(100, Math.max(5, stat.barWidth))}%` }}></div>
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ─── Live Flight Updates ─── */}
+      <div className="bg-white rounded-2xl md:rounded-[3rem] border border-navy-100 p-6 md:p-10 shadow-sm relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 md:mb-8 gap-4">
+          <div className="space-y-1">
+            <h3 className="text-xl md:text-2xl font-black text-navy-950 uppercase tracking-tighter flex items-center gap-3">
+              <span className="material-symbols-outlined text-primary text-2xl">flight</span>
+              Live Flight Updates
+            </h3>
+            <p className="text-[10px] text-navy-400 font-bold uppercase tracking-widest opacity-60">
+              Real-time status • {todayFlights.length} flights today • {boardingFlights.length} boarding • {airborneFlights.length} airborne
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+            <span className="text-[9px] font-black uppercase tracking-widest text-navy-400">Live Sync</span>
+            <button
+              onClick={() => navigate(ROUTES.FLIGHT_SCHEDULING)}
+              className="px-4 py-2 bg-primary/5 text-primary text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-primary/10 transition-all border border-primary/10"
+            >
+              Full Schedule →
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-4">
+            <div className="w-10 h-10 rounded-full border-[3px] border-navy-100 border-t-primary animate-spin" />
+            <p className="text-sm font-bold text-navy-400">Loading flight operations…</p>
+          </div>
+        ) : todayFlights.length === 0 ? (
+          <div className="text-center py-16">
+            <span className="material-symbols-outlined text-5xl text-navy-200 block mb-3">event_busy</span>
+            <p className="font-bold text-navy-400">No flights scheduled today</p>
+            <p className="text-xs text-navy-300 mt-1">Check back later or view the full schedule.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Status pills */}
+            <div className="flex flex-wrap gap-2">
+              {boardingFlights.length > 0 && (
+                <span className="px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-[9px] font-black uppercase tracking-widest border border-amber-100 animate-pulse">
+                  {boardingFlights.length} Boarding
+                </span>
+              )}
+              {airborneFlights.length > 0 && (
+                <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-widest border border-emerald-100">
+                  {airborneFlights.length} Airborne
+                </span>
+              )}
+              {delayedFlights.length > 0 && (
+                <span className="px-3 py-1.5 rounded-full bg-red-50 text-red-700 text-[9px] font-black uppercase tracking-widest border border-red-100 animate-pulse">
+                  {delayedFlights.length} Delayed
+                </span>
+              )}
+            </div>
+
+            {/* Boarding progress cards */}
+            {boardingFlights.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {boardingFlights.map(f => (
+                  <BoardingProgressCard key={f.id} flight={f} tick={tick} />
+                ))}
+              </div>
+            )}
+
+            {/* Delay warnings */}
+            {delayedFlights.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {delayedFlights.map(f => (
+                  <DelayWarningCard key={f.id} flight={f} tick={tick} />
+                ))}
+              </div>
+            )}
+
+            {/* Flight cards grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {todayFlights.slice(0, 8).map(f => (
+                <FlightTrackingCard key={f.id} flight={f} tick={tick} />
+              ))}
+            </div>
+
+            {todayFlights.length > 8 && (
+              <div className="text-center pt-2">
+                <button
+                  onClick={() => navigate(ROUTES.FLIGHT_SCHEDULING)}
+                  className="text-[10px] font-black text-primary uppercase tracking-widest underline decoration-2 underline-offset-4 hover:text-primary-700 transition-colors"
+                >
+                  View all {todayFlights.length} flights →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Analysis Section */}
@@ -206,8 +376,9 @@ const Dashboard: React.FC = () => {
                 <Tooltip
                   contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 30px -10px rgb(0 0 0 / 0.1)', padding: '20px' }}
                   itemStyle={{ fontWeight: 900, fontSize: '13px', textTransform: 'uppercase' }}
+                  formatter={(value: any) => value === null ? 'No data' : `${value}%`}
                 />
-                <Area type="monotone" dataKey="current" stroke="#137fec" strokeWidth={5} fillOpacity={1} fill="url(#colorCurrent)" />
+                <Area type="monotone" dataKey="current" stroke="#137fec" strokeWidth={5} fillOpacity={1} fill="url(#colorCurrent)" connectNulls={false} />
                 <Area type="monotone" dataKey="target" stroke="#e2e8f0" strokeWidth={2} fill="transparent" strokeDasharray="6 6" />
               </AreaChart>
             </ResponsiveContainer>
@@ -231,7 +402,7 @@ const Dashboard: React.FC = () => {
               <h3 className="text-lg font-bold">Quick Actions</h3>
               <p className="text-blue-100 text-sm mt-1 mb-6 uppercase tracking-widest font-black text-[10px]">Manage your station efficiently.</p>
               <div className="flex flex-col gap-3">
-                {(userRole === 'cs_agent') ? (
+                {hasModule('BOOKINGS') ? (
                   <button onClick={() => navigate(ROUTES.BOOKINGS)} className="bg-white text-primary w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2 shadow-sm">
                     <span className="material-symbols-outlined text-[18px]">confirmation_number</span>
                     View Bookings
@@ -242,19 +413,19 @@ const Dashboard: React.FC = () => {
                     Create Booking
                   </button>
                 )}
-                {userRole === 'super_admin' && (
+                {hasModule('USER_MANAGEMENT') && (
                   <button onClick={() => navigate(ROUTES.USER_MANAGEMENT)} className="bg-blue-600 text-white w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 border border-blue-500 shadow-sm">
                     <span className="material-symbols-outlined text-[18px]">person_add</span>
                     Manage Users
                   </button>
                 )}
-                {userRole === 'crew_sched' && (
+                {hasModule('CREW_SCHEDULING') && (
                   <button onClick={() => navigate(ROUTES.CREW_SCHEDULING)} className="bg-blue-600 text-white w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 border border-blue-500 shadow-sm">
                     <span className="material-symbols-outlined text-[18px]">calendar_month</span>
                     Crew Schedule
                   </button>
                 )}
-                {userRole === 'ops_manager' && (
+                {hasModule('FLIGHT_SCHEDULING') && (
                   <button onClick={() => navigate(ROUTES.FLIGHT_SCHEDULING)} className="bg-blue-600 text-white w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 border border-blue-500 shadow-sm">
                     <span className="material-symbols-outlined text-[18px]">schedule</span>
                     Flight Schedule

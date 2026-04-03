@@ -5,7 +5,7 @@
  * Firebase reads this file to discover deployable functions.
  */
 
-export { setUserRole, onUserCreated, createUserAccount, disableUserAccount, deleteUserAccount } from './users';
+export { setUserRole, onUserCreated, createUserAccount, disableUserAccount, deleteUserAccount, syncAllClaims } from './users';
 export { updateFlightStatus, assignGate, swapAircraft } from './flights';
 export { getDashboardStats } from './dashboard';
 export { createPaymentIntent, processRefund, sendBookingConfirmation, confirmPaymentSecure } from './payments';
@@ -25,3 +25,4 @@ export { processCheckinSecure } from './checkin';
 export { calculateDynamicPriceSecure, forecastRevenueSecure } from './pricing';
 export { createVoucherSecure, redeemVoucherSecure } from './vouchers';
 export { totpGenerateSecret, totpVerifySetup, totpVerifyCode, totpRemove, totpGetStatus, clearTotpVerified } from './totp';
+export { checkFlightStatus } from './flightStatus';

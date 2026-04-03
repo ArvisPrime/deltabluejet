@@ -4,6 +4,7 @@ import { collection, getDocs, query, orderBy, limit, startAfter, type DocumentSn
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../../config/firebase.config';
 import type { UserDoc } from '../../types/firestore';
+import { getRoles, type RoleDoc } from '../../services/rolesPolicyService';
 
 const DashboardAccessControl = lazy(() => import('./DashboardAccessControl'));
 const RolesAndPolicies = lazy(() => import('./RolesAndPolicies'));
@@ -11,20 +12,16 @@ const RolesAndPolicies = lazy(() => import('./RolesAndPolicies'));
 /* ── Constants ──────────────────────────────────────────────── */
 const PAGE_SIZE = 20;
 
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: 'Super Admin',
-  ops_manager: 'Ops Manager',
-  crew_sched: 'Crew Scheduler',
-  cs_agent: 'CS Agent',
-  customer: 'Customer',
-};
-
-const ROLE_COLORS: Record<string, string> = {
-  super_admin: 'bg-purple-50 text-purple-700 border-purple-100',
-  ops_manager: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-  crew_sched: 'bg-blue-50 text-blue-700 border-blue-100',
-  cs_agent: 'bg-sky-50 text-sky-700 border-sky-100',
-  customer: 'bg-navy-50 text-navy-700 border-navy-100',
+/* Fallback badge styles keyed by hex color */
+const hexToBadge = (hex: string): string => {
+  const map: Record<string, string> = {
+    '#dc2626': 'bg-red-50 text-red-700 border-red-100',
+    '#7c3aed': 'bg-purple-50 text-purple-700 border-purple-100',
+    '#2563eb': 'bg-blue-50 text-blue-700 border-blue-100',
+    '#0891b2': 'bg-sky-50 text-sky-700 border-sky-100',
+    '#059669': 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  };
+  return map[hex] || 'bg-navy-50 text-navy-600 border-navy-100';
 };
 
 const STATUS_STYLES: Record<string, { badge: string; icon: string; label: string }> = {
@@ -91,6 +88,7 @@ const UserManagement: React.FC = () => {
   /* ── Data state ────────────────────────────────────────────── */
   const [users, setUsers] = useState<UserDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [allRoles, setAllRoles] = useState<RoleDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   /* ── UI state ──────────────────────────────────────────────── */
@@ -165,6 +163,30 @@ const UserManagement: React.FC = () => {
   }, [lastDocs]);
 
   useEffect(() => { fetchUsers(1); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Load roles from Firestore ──────────────────────────────── */
+  const loadRoles = useCallback(async () => {
+    try {
+      const r = await getRoles();
+      setAllRoles(r);
+    } catch (err) {
+      console.error('[UserManagement] Failed to load roles:', err);
+    }
+  }, []);
+  useEffect(() => { loadRoles(); }, [loadRoles]);
+
+  /* ── Dynamic role lookup maps built from Firestore data ─────── */
+  const ROLE_LABELS = useMemo(() => {
+    const map: Record<string, string> = {};
+    allRoles.forEach(r => { map[r.id] = r.label; });
+    return map;
+  }, [allRoles]);
+
+  const ROLE_COLORS = useMemo(() => {
+    const map: Record<string, string> = {};
+    allRoles.forEach(r => { map[r.id] = hexToBadge(r.color); });
+    return map;
+  }, [allRoles]);
 
   /* ── Computed: filtered users ───────────────────────────────── */
   const filteredUsers = useMemo(() => {
@@ -484,11 +506,9 @@ const UserManagement: React.FC = () => {
               className="flex-1 sm:flex-none h-12 md:h-14 px-4 md:px-6 bg-white border-2 border-navy-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-navy-900 appearance-none cursor-pointer"
             >
               <option value="all">All Roles</option>
-              <option value="super_admin">Super Admin</option>
-              <option value="ops_manager">Ops Manager</option>
-              <option value="crew_sched">Crew Scheduler</option>
-              <option value="cs_agent">CS Agent</option>
-              <option value="customer">Customer</option>
+              {allRoles.map(r => (
+                <option key={r.id} value={r.id}>{r.label}</option>
+              ))}
             </select>
             <select
               value={statusFilter}
@@ -644,11 +664,9 @@ const UserManagement: React.FC = () => {
                                     onChange={(e) => setNewRole(e.target.value)}
                                     className="h-8 px-2 bg-white border border-navy-100 rounded-lg text-xs font-bold"
                                   >
-                                    <option value="customer">Customer</option>
-                                    <option value="cs_agent">CS Agent</option>
-                                    <option value="crew_sched">Crew Scheduler</option>
-                                    <option value="ops_manager">Ops Manager</option>
-                                    <option value="super_admin">Super Admin</option>
+                                    {allRoles.map(r => (
+                                      <option key={r.id} value={r.id}>{r.label}</option>
+                                    ))}
                                   </select>
                                   <button onClick={() => handleUpdateRole(u.uid)} className="px-3 py-1 bg-primary text-white rounded-lg text-xs font-bold hover:bg-primary-600">Save</button>
                                   <button onClick={() => setEditingRoleUid(null)} className="px-3 py-1 bg-white border border-navy-100 rounded-lg text-xs font-bold text-navy-500 hover:bg-navy-50">Cancel</button>
@@ -875,11 +893,9 @@ const UserManagement: React.FC = () => {
                   onChange={(e) => setNewUserForm(f => ({ ...f, role: e.target.value }))}
                   className="w-full h-12 px-5 bg-navy-50 rounded-xl border-none font-bold text-navy-900 focus:ring-2 focus:ring-primary/20"
                 >
-                  <option value="customer">Customer</option>
-                  <option value="cs_agent">CS Agent</option>
-                  <option value="crew_sched">Crew Scheduler</option>
-                  <option value="ops_manager">Ops Manager</option>
-                  <option value="super_admin">Super Admin</option>
+                  {allRoles.map(r => (
+                    <option key={r.id} value={r.id}>{r.label}</option>
+                  ))}
                 </select>
               </div>
             </div>

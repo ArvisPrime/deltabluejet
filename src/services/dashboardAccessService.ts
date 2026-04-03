@@ -48,6 +48,10 @@ export const MODULE_GROUPS = [
       { id: 'FAVICON_SEO', label: 'SEO & Branding', icon: 'search' },
       { id: 'ABOUT_VALUES_CMS', label: 'About Values', icon: 'auto_awesome' },
       { id: 'DESTINATIONS_CMS', label: 'Destinations', icon: 'travel_explore' },
+      { id: 'FAQ_CMS', label: 'FAQ Manager', icon: 'quiz' },
+      { id: 'CAREERS_CMS', label: 'Careers', icon: 'work' },
+      { id: 'HEALTH_CMS', label: 'Health & Visa', icon: 'health_and_safety' },
+      { id: 'LEGAL_CMS', label: 'Legal Pages', icon: 'gavel' },
     ],
   },
   {

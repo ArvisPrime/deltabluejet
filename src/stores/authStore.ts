@@ -7,7 +7,7 @@ export interface AuthUser {
     email: string | null;
     displayName: string | null;
     photoURL: string | null;
-    role: 'super_admin' | 'ops_manager' | 'crew_sched' | 'cs_agent' | 'customer';
+    role: string;
     /** @deprecated Use requiresMfaVerification + pendingMfaMethods instead */
     requiresYubikeyVerification?: boolean;
     /** True when admin must complete MFA before accessing the dashboard */

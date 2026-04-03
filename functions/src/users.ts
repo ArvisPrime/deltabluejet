@@ -12,18 +12,45 @@ if (!getApps().length) initializeApp();
 const db = getFirestore();
 
 /**
- * Set a user's role via custom claims.
- * Only callable by super_admin.
+ * Helper: Check if caller is an admin.
+ * First checks custom claims, then falls back to Firestore user doc.
+ * This solves the chicken-and-egg problem where claims haven't been set yet.
  */
-export const setUserRole = onCall(async (request) => {
-    if (!request.auth || request.auth.token.role !== 'super_admin') {
-        throw new HttpsError('permission-denied', 'Only super admins can assign roles.');
+async function assertCallerIsAdmin(request: any): Promise<string> {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Authentication required.');
     }
 
+    // 1. Check custom claims first (fast path)
+    const claimRole = request.auth.token?.role;
+    if (claimRole && claimRole !== 'customer') {
+        return claimRole;
+    }
+
+    // 2. Fallback: check Firestore user document
+    const userDoc = await db.doc(`users/${request.auth.uid}`).get();
+    const firestoreRole = userDoc.data()?.role;
+
+    if (firestoreRole && firestoreRole !== 'customer') {
+        // Auto-fix: sync the custom claims to match Firestore
+        await getAuth().setCustomUserClaims(request.auth.uid, { role: firestoreRole });
+        console.log(`Auto-synced claims for ${request.auth.uid}: ${firestoreRole}`);
+        return firestoreRole;
+    }
+
+    throw new HttpsError('permission-denied', 'Only admin users can perform this action.');
+}
+
+/**
+ * Set a user's role via custom claims.
+ * Callable by any admin (non-customer) role.
+ */
+export const setUserRole = onCall(async (request) => {
+    await assertCallerIsAdmin(request);
+
     const { uid, role } = request.data;
-    const validRoles = ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent', 'customer'];
-    if (!validRoles.includes(role)) {
-        throw new HttpsError('invalid-argument', `Invalid role. Must be one of: ${validRoles.join(', ')}`);
+    if (!uid || !role || typeof role !== 'string' || role.trim() === '') {
+        throw new HttpsError('invalid-argument', 'uid and role are required.');
     }
 
     await getAuth().setCustomUserClaims(uid, { role });
@@ -34,8 +61,8 @@ export const setUserRole = onCall(async (request) => {
         action: 'SET_USER_ROLE',
         entityType: 'user',
         entityId: uid,
-        userId: request.auth.uid,
-        userEmail: request.auth.token.email || '',
+        userId: request.auth!.uid,
+        userEmail: request.auth!.token.email || '',
         details: { newRole: role },
         timestamp: FieldValue.serverTimestamp(),
     });
@@ -45,20 +72,18 @@ export const setUserRole = onCall(async (request) => {
 
 /**
  * Create a new user account (Auth + Firestore).
- * Only callable by super_admin.
+ * Callable by any admin role.
  */
 export const createUserAccount = onCall(async (request) => {
-    if (!request.auth || request.auth.token.role !== 'super_admin') {
-        throw new HttpsError('permission-denied', 'Only super admins can create users.');
-    }
+    await assertCallerIsAdmin(request);
 
     const { email, displayName, role, password } = request.data;
     if (!email || !displayName) {
         throw new HttpsError('invalid-argument', 'Email and display name are required.');
     }
 
-    const validRoles = ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent', 'customer'];
-    const assignRole = validRoles.includes(role) ? role : 'customer';
+    // Accept any role string; default to customer if not provided
+    const assignRole = (role && typeof role === 'string' && role.trim() !== '') ? role : 'customer';
 
     // Generate a temporary password if none provided
     const userPassword = password || `Temp${Math.random().toString(36).slice(2, 10)}!`;
@@ -86,7 +111,7 @@ export const createUserAccount = onCall(async (request) => {
             mfaEnabled: false,
             lastLoginAt: null,
             createdAt: FieldValue.serverTimestamp(),
-            createdBy: request.auth.uid,
+            createdBy: request.auth!.uid,
         });
 
         // 4. Audit log
@@ -94,8 +119,8 @@ export const createUserAccount = onCall(async (request) => {
             action: 'CREATE_USER',
             entityType: 'user',
             entityId: userRecord.uid,
-            userId: request.auth.uid,
-            userEmail: request.auth.token.email || '',
+            userId: request.auth!.uid,
+            userEmail: request.auth!.token.email || '',
             details: { email, displayName, role: assignRole },
             timestamp: FieldValue.serverTimestamp(),
         });
@@ -117,12 +142,10 @@ export const createUserAccount = onCall(async (request) => {
 
 /**
  * Disable or re-enable a user account.
- * Only callable by super_admin.
+ * Callable by any admin role.
  */
 export const disableUserAccount = onCall(async (request) => {
-    if (!request.auth || request.auth.token.role !== 'super_admin') {
-        throw new HttpsError('permission-denied', 'Only super admins can disable/enable users.');
-    }
+    await assertCallerIsAdmin(request);
 
     const { uid, disabled } = request.data;
     if (!uid || typeof disabled !== 'boolean') {
@@ -130,7 +153,7 @@ export const disableUserAccount = onCall(async (request) => {
     }
 
     // Prevent self-disable
-    if (uid === request.auth.uid) {
+    if (uid === request.auth!.uid) {
         throw new HttpsError('failed-precondition', 'You cannot disable your own account.');
     }
 
@@ -148,8 +171,8 @@ export const disableUserAccount = onCall(async (request) => {
             action: disabled ? 'SUSPEND_USER' : 'REACTIVATE_USER',
             entityType: 'user',
             entityId: uid,
-            userId: request.auth.uid,
-            userEmail: request.auth.token.email || '',
+            userId: request.auth!.uid,
+            userEmail: request.auth!.token.email || '',
             details: { newStatus },
             timestamp: FieldValue.serverTimestamp(),
         });
@@ -163,12 +186,10 @@ export const disableUserAccount = onCall(async (request) => {
 
 /**
  * Permanently delete a user account (Auth + Firestore).
- * Only callable by super_admin.
+ * Callable by any admin role.
  */
 export const deleteUserAccount = onCall(async (request) => {
-    if (!request.auth || request.auth.token.role !== 'super_admin') {
-        throw new HttpsError('permission-denied', 'Only super admins can delete users.');
-    }
+    await assertCallerIsAdmin(request);
 
     const { uid } = request.data;
     if (!uid) {
@@ -176,7 +197,7 @@ export const deleteUserAccount = onCall(async (request) => {
     }
 
     // Prevent self-delete
-    if (uid === request.auth.uid) {
+    if (uid === request.auth!.uid) {
         throw new HttpsError('failed-precondition', 'You cannot delete your own account.');
     }
 
@@ -208,8 +229,8 @@ export const deleteUserAccount = onCall(async (request) => {
             action: 'DELETE_USER',
             entityType: 'user',
             entityId: uid,
-            userId: request.auth.uid,
-            userEmail: request.auth.token.email || '',
+            userId: request.auth!.uid,
+            userEmail: request.auth!.token.email || '',
             details: { deletedUserEmail: userEmail },
             timestamp: FieldValue.serverTimestamp(),
         });
@@ -222,7 +243,45 @@ export const deleteUserAccount = onCall(async (request) => {
 });
 
 /**
- * Auto-assign 'customer' custom claim when a new user document is created.
+ * Sync all Firebase Auth custom claims from Firestore user documents.
+ * Callable by any admin. Use this if claims are out of sync.
+ */
+export const syncAllClaims = onCall(async (request) => {
+    await assertCallerIsAdmin(request);
+
+    const snap = await db.collection('users').get();
+    let synced = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const userDoc of snap.docs) {
+        const { role, email } = userDoc.data();
+        const uid = userDoc.id;
+        if (!role) { skipped++; continue; }
+
+        try {
+            const userRecord = await getAuth().getUser(uid);
+            if (userRecord.customClaims?.role !== role) {
+                await getAuth().setCustomUserClaims(uid, { role });
+                synced++;
+                console.log(`Synced ${email}: → ${role}`);
+            } else {
+                skipped++;
+            }
+        } catch (err: any) {
+            errors++;
+            console.error(`Failed to sync ${uid}: ${err.message}`);
+        }
+    }
+
+    return {
+        success: true,
+        message: `Claims sync complete: ${synced} updated, ${skipped} already correct, ${errors} errors.`,
+    };
+});
+
+/**
+ * Auto-assign custom claim when a new user document is created.
  */
 export const onUserCreated = onDocumentCreated('users/{userId}', async (event) => {
     const userId = event.params.userId;

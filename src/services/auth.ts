@@ -20,8 +20,11 @@ googleProvider.addScope('email');
 googleProvider.addScope('profile');
 
 // ─── Type Helpers ─────────────────────────────────────────
-type UserRole = AuthUser['role'];
-const ADMIN_ROLES: UserRole[] = ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent'];
+type UserRole = string;
+/** Any role that is not 'customer' is considered admin/staff */
+function isAdminRole(role: string): boolean {
+  return role !== 'customer';
+}
 
 /**
  * Map a Firebase User to our AuthUser shape.
@@ -47,7 +50,7 @@ async function mapFirebaseUser(user: User): Promise<AuthUser> {
  */
 async function checkMfaRequirements(firebaseUser: User, authUser: AuthUser): Promise<void> {
     console.log('[MFA] checkMfaRequirements called for role:', authUser.role);
-    if (!ADMIN_ROLES.includes(authUser.role)) {
+    if (!isAdminRole(authUser.role)) {
         console.log('[MFA] Not an admin role, skipping MFA check');
         return;
     }

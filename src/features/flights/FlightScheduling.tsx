@@ -8,6 +8,7 @@ import WizardStepper from '../../components/scheduling/WizardStepper';
 import FlightPreviewTable from '../../components/scheduling/FlightPreviewTable';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuth } from '../../hooks/useAuth';
+import LiveOpsView from './LiveOpsView';
 
 interface ScheduleDoc {
    id: string;
@@ -315,137 +316,8 @@ const FlightScheduling: React.FC = () => {
             )}
          </div>
 
-         {/* ═══ SCHEDULES LIST VIEW ═══ */}
-         {viewMode === 'list' && (
-            <div className="space-y-6">
-               {/* Status Tabs */}
-               <div className="flex gap-2 flex-wrap">
-                  {(['all', 'active', 'draft', 'cancelled'] as const).map((tab) => (
-                     <button
-                        key={tab}
-                        onClick={() => setStatusTab(tab)}
-                        className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
-                           statusTab === tab
-                              ? 'bg-primary text-white border-primary shadow-md'
-                              : 'bg-white text-navy-400 border-navy-100 hover:border-primary/30'
-                        }`}
-                     >
-                        {tab === 'all' ? `All (${schedules.length})` : `${tab} (${schedules.filter(s => tab === 'active' ? (s.status === 'active' || s.status === 'published') : s.status === tab).length})`}
-                     </button>
-                  ))}
-               </div>
-
-               {/* Schedule Table */}
-               <div className="bg-white rounded-3xl border border-navy-100 overflow-hidden">
-                  {schedulesLoading ? (
-                     <div className="p-16 flex flex-col items-center gap-4">
-                        <div className="w-8 h-8 rounded-full border-3 border-navy-100 border-t-primary animate-spin" />
-                        <p className="text-sm font-bold text-navy-400">Loading schedules…</p>
-                     </div>
-                  ) : filteredSchedules.length === 0 ? (
-                     <div className="p-16 text-center">
-                        <span className="material-symbols-outlined text-5xl text-navy-200 block mb-3">event_busy</span>
-                        <p className="font-bold text-navy-400">No schedules found</p>
-                        <p className="text-xs text-navy-300 mt-1">Create a new schedule to get started.</p>
-                     </div>
-                  ) : (
-                     <div className="overflow-x-auto">
-                        <table className="w-full text-left min-w-[800px]">
-                           <thead>
-                              <tr className="bg-navy-50/50 border-b border-navy-50 text-[10px] font-black text-navy-300 uppercase tracking-[0.25em]">
-                                 <th className="px-8 py-5">Route</th>
-                                 <th className="px-6 py-5">Aircraft</th>
-                                 <th className="px-6 py-5">Flight #</th>
-                                 <th className="px-6 py-5">Days</th>
-                                 <th className="px-6 py-5">Dates</th>
-                                 <th className="px-6 py-5">Status</th>
-                                 <th className="px-6 py-5">Flights</th>
-                                 <th className="px-8 py-5 text-right">Actions</th>
-                              </tr>
-                           </thead>
-                           <tbody className="divide-y divide-navy-50">
-                              {filteredSchedules.map((s) => (
-                                 <tr key={s.id} className="hover:bg-navy-50/50 transition-colors">
-                                    <td className="px-8 py-5 text-sm font-black text-navy-950">{getRouteName(s.routeId)}</td>
-                                    <td className="px-6 py-5 text-xs font-bold text-navy-700">{getAircraftName(s.aircraftId)}</td>
-                                    <td className="px-6 py-5 text-xs font-bold text-navy-700 font-mono">{s.flightNumberPrefix}</td>
-                                    <td className="px-6 py-5 text-[10px] font-bold text-navy-500">
-                                       {s.daysOfWeek?.map(d => DAY_NAMES[d]).join(', ')}
-                                    </td>
-                                    <td className="px-6 py-5 text-[10px] font-bold text-navy-500">
-                                       {formatScheduleDate(s.effectiveFrom)} — {formatScheduleDate(s.effectiveTo)}
-                                    </td>
-                                    <td className="px-6 py-5">
-                                       <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
-                                          s.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-100'
-                                          : (s.status === 'active' || s.status === 'published') ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                          : 'bg-amber-50 text-amber-700 border-amber-100'
-                                       }`}>
-                                          {s.status === 'published' ? 'Active' : s.status}
-                                       </span>
-                                    </td>
-                                    <td className="px-6 py-5 text-xs font-black text-navy-700">{s.publishedFlightCount || 0}</td>
-                                    <td className="px-8 py-5 text-right">
-                                       <div className="flex justify-end gap-1">
-                                          {s.status !== 'cancelled' && (
-                                             <button
-                                                onClick={() => handleCancelSchedule(s)}
-                                                disabled={scheduleActionLoading}
-                                                className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
-                                                title="Cancel Schedule"
-                                             >
-                                                <span className="material-symbols-outlined text-sm">cancel</span>
-                                             </button>
-                                          )}
-                                          <button
-                                             onClick={() => setConfirmDeleteSchedule(s)}
-                                             disabled={scheduleActionLoading}
-                                             className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                             title="Delete Schedule"
-                                          >
-                                             <span className="material-symbols-outlined text-sm">delete</span>
-                                          </button>
-                                       </div>
-                                    </td>
-                                 </tr>
-                              ))}
-                           </tbody>
-                        </table>
-                     </div>
-                  )}
-               </div>
-
-               {/* Delete Confirm Modal */}
-               {confirmDeleteSchedule && (
-                  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                     <div className="bg-white rounded-3xl border border-navy-100 shadow-2xl w-full max-w-md p-8 space-y-6 animate-in zoom-in-95 duration-300">
-                        <div className="flex flex-col items-center gap-4">
-                           <div className="size-16 rounded-full bg-red-50 flex items-center justify-center">
-                              <span className="material-symbols-outlined text-3xl text-red-500">delete_forever</span>
-                           </div>
-                           <div className="text-center space-y-2">
-                              <h3 className="text-xl font-black text-navy-950 tracking-tight">Delete Schedule</h3>
-                              <p className="text-sm text-navy-500">
-                                 Permanently delete schedule <strong>{confirmDeleteSchedule.flightNumberPrefix}</strong>
-                                 ({getRouteName(confirmDeleteSchedule.routeId)})? This cannot be undone.
-                              </p>
-                           </div>
-                        </div>
-                        <div className="flex gap-3">
-                           <button onClick={() => setConfirmDeleteSchedule(null)} className="flex-1 h-12 bg-white border border-navy-200 text-navy-700 font-black rounded-xl hover:bg-navy-50 transition-all">Cancel</button>
-                           <button
-                              onClick={() => handleDeleteSchedule(confirmDeleteSchedule)}
-                              disabled={scheduleActionLoading}
-                              className="flex-1 h-12 bg-red-500 text-white font-black rounded-xl hover:bg-red-600 transition-all shadow-lg shadow-red-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
-                           >
-                              {scheduleActionLoading ? (<><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Deleting…</>) : 'Delete'}
-                           </button>
-                        </div>
-                     </div>
-                  </div>
-               )}
-            </div>
-         )}
+          {/* ═══ LIVE OPS CONTROL CENTER ═══ */}
+          {viewMode === 'list' && <LiveOpsView />}
 
          {/* ═══ WIZARD VIEW ═══ */}
          {viewMode === 'wizard' && (

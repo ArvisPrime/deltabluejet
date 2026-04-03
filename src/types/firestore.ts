@@ -458,7 +458,7 @@ export interface UserDoc {
     email: string;
     displayName: string;
     photoURL: string | null;
-    role: 'super_admin' | 'ops_manager' | 'crew_sched' | 'cs_agent' | 'customer';
+    role: string;
     provider: 'email' | 'google';
     mfaEnabled: boolean;
     lastLoginAt: Timestamp;

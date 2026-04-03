@@ -213,7 +213,7 @@ const withSuspense = (Component: React.ComponentType<any>) => (
 );
 
 /** Wrap a component with ProtectedRoute + Suspense */
-const withAuth = (Component: React.ComponentType<any>, allowedRoles?: AuthRole[]) => (
+const withAuth = (Component: React.ComponentType<any>, allowedRoles?: string[] | ((role: string) => boolean)) => (
     <Suspense fallback={<PageLoader />}>
         <ProtectedRoute allowedRoles={allowedRoles}>
             <Component />
@@ -221,8 +221,8 @@ const withAuth = (Component: React.ComponentType<any>, allowedRoles?: AuthRole[]
     </Suspense>
 );
 
-type AuthRole = 'super_admin' | 'ops_manager' | 'crew_sched' | 'cs_agent' | 'customer';
-const OPS_ROLES: AuthRole[] = ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent'];
+/** Any role that is not 'customer' is considered ops/admin staff */
+const OPS_ROLES_CHECK = (role: string) => role !== 'customer';
 
 export const router = createBrowserRouter([
     // ═══ PUBLIC ROUTES (wrapped in PublicLayout) ═══════════════
@@ -325,7 +325,7 @@ export const router = createBrowserRouter([
 
     // ═══ PROTECTED ADMIN ROUTES (wrapped in AdminLayout) ══════
     {
-        element: withAuth(AdminLayout, OPS_ROLES),
+        element: withAuth(AdminLayout, OPS_ROLES_CHECK),
         errorElement: <RouteErrorPage />,
         children: [
             // --- Dashboard ---
@@ -419,7 +419,7 @@ export const router = createBrowserRouter([
     {
         path: ROUTES.YUBIKEY_VERIFY,
         element: (
-            <ProtectedRoute allowedRoles={['super_admin', 'ops_manager', 'cs_agent']}>
+            <ProtectedRoute allowedRoles={OPS_ROLES_CHECK}>
                 {withSuspense(YubiKeyVerify)}
             </ProtectedRoute>
         ),
@@ -427,7 +427,7 @@ export const router = createBrowserRouter([
     {
         path: ROUTES.TOTP_VERIFY,
         element: (
-            <ProtectedRoute allowedRoles={['super_admin', 'ops_manager', 'cs_agent']}>
+            <ProtectedRoute allowedRoles={OPS_ROLES_CHECK}>
                 {withSuspense(TOTPVerify)}
             </ProtectedRoute>
         ),

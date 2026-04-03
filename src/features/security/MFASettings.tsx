@@ -5,6 +5,7 @@ import { ROUTES } from '../../config/routes';
 import { useToastStore } from '../../stores/toastStore';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase.config';
+import { getRoles } from '../../services/rolesPolicyService';
 
 // ── Types ──────────────────────────────────────────────────
 interface MfaMethod {
@@ -34,7 +35,9 @@ const DEFAULT_METHODS: MfaMethod[] = [
    { id: 4, icon: 'security_key', label: 'Security Key', desc: 'Physical security keys or fingerprint / face login.', active: true },
 ];
 
-const AVAILABLE_ROLES = ['Super Admin', 'Ops Manager', 'Dispatcher', 'Captain', 'Ground Ops', 'Admin', 'Agent', 'Crew'];
+// MFA role lists are loaded dynamically from Firestore on mount
+// but kept as defaults for initial render before data arrives
+const FALLBACK_ROLES = ['Super Admin', 'Ops Manager', 'Dispatcher', 'Captain', 'Ground Ops', 'Admin', 'Agent', 'Crew'];
 
 const DEFAULT_MANDATORY_ROLES = ['Super Admin', 'Ops Manager', 'Dispatcher'];
 
@@ -63,6 +66,7 @@ const MFASettings: React.FC = () => {
    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
    const [statusFilter, setStatusFilter] = useState<string>('All');
    const [openMenuIdx, setOpenMenuIdx] = useState<number | null>(null);
+   const [availableRoles, setAvailableRoles] = useState<string[]>(FALLBACK_ROLES);
 
    const touch = () => { if (!dirty) setDirty(true); };
 
@@ -70,7 +74,14 @@ const MFASettings: React.FC = () => {
    useEffect(() => {
       const load = async () => {
          try {
-            const snap = await getDoc(doc(db, 'admin_config', 'mfa_settings'));
+            const [snap, rolesData] = await Promise.all([
+               getDoc(doc(db, 'admin_config', 'mfa_settings')),
+               getRoles(),
+            ]);
+            // Populate available roles from Firestore
+            if (rolesData.length > 0) {
+               setAvailableRoles(rolesData.map((r: { label: string }) => r.label));
+            }
             if (snap.exists()) {
                const d = snap.data();
                if (d.globalEnforce !== undefined) setGlobalEnforce(d.globalEnforce);
@@ -164,7 +175,7 @@ const MFASettings: React.FC = () => {
    }, [searchQuery, statusFilter]);
 
    // ── Available roles not yet mandatory ────────────────────
-   const availableRolesToAdd = AVAILABLE_ROLES.filter(r => !mandatoryRoles.includes(r));
+   const availableRolesToAdd = availableRoles.filter((r: string) => !mandatoryRoles.includes(r));
 
    // ── Render ───────────────────────────────────────────────
    return (
