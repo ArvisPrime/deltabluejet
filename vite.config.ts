@@ -13,6 +13,11 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  // Strip console.log and console.debug from production builds.
+  // console.warn and console.error are preserved intentionally.
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
   build: {
     rollupOptions: {
       input: path.resolve(__dirname, 'index.html'),

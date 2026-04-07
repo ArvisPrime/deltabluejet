@@ -474,6 +474,7 @@ export interface CustomerDoc {
     email: string;
     displayName: string;
     phone: string | null;
+    phoneVerified: boolean;
     nationality: string | null;
     documentType: DocumentType | null;
     documentNumber: string | null;

@@ -78,6 +78,10 @@ const PublicLayout: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-navy-50 font-display flex flex-col">
+            {/* Skip to Content — a11y for keyboard users */}
+            <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[200] focus:px-6 focus:py-3 focus:bg-primary focus:text-white focus:rounded-xl focus:font-black focus:text-sm focus:uppercase focus:tracking-widest focus:shadow-2xl">
+                Skip to main content
+            </a>
             {/* Mobile Menu Overlay */}
             {mobileMenuOpen && (
                 <div className="fixed inset-0 bg-black/50 z-[60] md:hidden" onClick={() => setMobileMenuOpen(false)} />
@@ -187,7 +191,7 @@ const PublicLayout: React.FC = () => {
             </header>
 
             {/* Page Content */}
-            <main className="flex-1">
+            <main id="main-content" className="flex-1">
                 <Outlet />
             </main>
 

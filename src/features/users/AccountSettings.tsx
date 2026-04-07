@@ -7,6 +7,7 @@ import {
 import type { CustomerDoc, DocumentType } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
 import { getRoles, type RoleDoc } from '../../services/rolesPolicyService';
+import PhoneVerification from '../../components/auth/PhoneVerification';
 
 const AccountSettings: React.FC = () => {
    const authUser = useAuthStore((s) => s.user);
@@ -25,6 +26,7 @@ const AccountSettings: React.FC = () => {
    // Profile state
    const [customer, setCustomer] = useState<CustomerDoc | null>(null);
    const [phone, setPhone] = useState('');
+   const [phoneVerified, setPhoneVerified] = useState(false);
    const [nationality, setNationality] = useState('');
    const [documentType, setDocumentType] = useState<DocumentType | ''>('');
    const [documentNumber, setDocumentNumber] = useState('');
@@ -50,6 +52,7 @@ const AccountSettings: React.FC = () => {
          setAllRoles(roles);
          setCustomer(c);
          setPhone(c.phone || '');
+         setPhoneVerified(c.phoneVerified ?? false);
          setNationality(c.nationality || '');
          setDocumentType(c.documentType || '');
          setDocumentNumber(c.documentNumber || '');
@@ -180,16 +183,22 @@ const AccountSettings: React.FC = () => {
          {/* Personal Info (editable) */}
          <div className="bg-white rounded-3xl border border-navy-100 p-8 shadow-sm space-y-6">
             <h3 className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Personal Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-navy-300 uppercase tracking-widest">Phone Number</label>
-                  <input
-                     className="w-full h-12 px-4 bg-navy-50 rounded-xl font-bold text-navy-900 outline-none focus:ring-2 focus:ring-primary/20"
-                     placeholder="+220 123 4567"
-                     value={phone}
-                     onChange={(e) => setPhone(e.target.value)}
-                  />
-               </div>
+            <div className="grid grid-cols-1 gap-6">
+               <PhoneVerification
+                  currentPhone={phone}
+                  isVerified={phoneVerified}
+                  onVerified={async (verifiedPhone) => {
+                     setPhone(verifiedPhone);
+                     setPhoneVerified(true);
+                     if (authUser) {
+                        await updateCustomer(authUser.uid, {
+                           phone: verifiedPhone,
+                           phoneVerified: true,
+                        } as any);
+                        useToastStore.getState().addToast('Phone number verified!', 'success');
+                     }
+                  }}
+               />
                <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-navy-300 uppercase tracking-widest">Nationality</label>
                   <input

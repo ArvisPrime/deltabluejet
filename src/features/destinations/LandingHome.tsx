@@ -356,9 +356,9 @@ const LandingHome: React.FC = () => {
 
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                   {/* Large Promo */}
-                  <div className="group relative h-[600px] rounded-[4rem] overflow-hidden shadow-2xl transition-all duration-700 cursor-pointer" onClick={onBookingStart}>
+                  <div role="button" tabIndex={0} aria-label={`Book now: ${promoData.featuredPromo.title}`} className="group relative h-[600px] rounded-[4rem] overflow-hidden shadow-2xl transition-all duration-700 cursor-pointer" onClick={onBookingStart} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onBookingStart(); } }}>
                      <div className="absolute inset-0 bg-navy-950/20 group-hover:bg-navy-950/10 transition-colors z-10" />
-                     <div className="w-full h-full bg-cover bg-center transition-transform duration-[10s] group-hover:scale-110" style={{ backgroundImage: `url('${promoData.featuredPromo.imageUrl}')` }} />
+                     <div role="img" aria-label={promoData.featuredPromo.title} className="w-full h-full bg-cover bg-center transition-transform duration-[10s] group-hover:scale-110" style={{ backgroundImage: `url('${promoData.featuredPromo.imageUrl}')` }} />
                      <div className="absolute bottom-0 left-0 w-full p-6 sm:p-10 md:p-12 z-20 text-white space-y-4 sm:space-y-6">
                         <span className="px-5 py-2 rounded-full bg-white/20 backdrop-blur-xl border border-white/20 text-[10px] font-black uppercase tracking-widest">{promoData.featuredPromo.tag}</span>
                         <div className="space-y-2">
@@ -372,9 +372,9 @@ const LandingHome: React.FC = () => {
                   {/* Grid of smaller promos */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                      {promoData.gridPromos.map((p, i) => (
-                        <div key={i} onClick={onBookingStart} className="group relative h-full min-h-[280px] rounded-[3rem] overflow-hidden shadow-xl hover:shadow-2xl transition-all cursor-pointer">
+                        <div key={i} role="button" tabIndex={0} aria-label={`Book flights to ${p.title}`} onClick={onBookingStart} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onBookingStart(); } }} className="group relative h-full min-h-[280px] rounded-[3rem] overflow-hidden shadow-xl hover:shadow-2xl transition-all cursor-pointer">
                            <div className="absolute inset-0 bg-navy-950/40 group-hover:bg-navy-950/20 transition-colors z-10" />
-                           <div className="w-full h-full bg-cover bg-center transition-transform duration-[6s] group-hover:scale-110" style={{ backgroundImage: `url('${p.imageUrl}')` }} />
+                           <div role="img" aria-label={p.title} className="w-full h-full bg-cover bg-center transition-transform duration-[6s] group-hover:scale-110" style={{ backgroundImage: `url('${p.imageUrl}')` }} />
                            <div className="absolute bottom-0 left-0 w-full p-8 z-20 text-white">
                               <p className="text-[8px] font-black text-primary uppercase tracking-[0.4em] mb-2">{p.tag}</p>
                               <h4 className="text-xl font-black uppercase tracking-tight mb-4">{p.title}</h4>
@@ -400,10 +400,10 @@ const LandingHome: React.FC = () => {
 
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
                   {destData.destinations.map((dest, i) => (
-                     <div key={i} onClick={onDestinationsStart} className="bg-white rounded-[4rem] border border-navy-100 shadow-sm overflow-hidden group hover:shadow-2xl hover:border-primary/40 transition-all duration-700 cursor-pointer flex flex-col">
+                     <div key={i} role="button" tabIndex={0} aria-label={`Explore ${dest.city}, ${dest.country}`} onClick={onDestinationsStart} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDestinationsStart(); } }} className="bg-white rounded-[4rem] border border-navy-100 shadow-sm overflow-hidden group hover:shadow-2xl hover:border-primary/40 transition-all duration-700 cursor-pointer flex flex-col">
                         <div className="aspect-[4/5] relative overflow-hidden">
                            <div className="absolute inset-0 bg-navy-950/10 group-hover:bg-transparent transition-colors z-10" />
-                           <div className="w-full h-full bg-cover bg-center transition-transform duration-[8s] group-hover:scale-110" style={{ backgroundImage: `url('${dest.imageUrl}')` }} />
+                           <div role="img" aria-label={`${dest.city} destination`} className="w-full h-full bg-cover bg-center transition-transform duration-[8s] group-hover:scale-110" style={{ backgroundImage: `url('${dest.imageUrl}')` }} />
                            <div className="absolute top-8 right-8 z-20">
                               <span className="px-4 py-1.5 rounded-xl bg-white/10 backdrop-blur-xl border border-white/20 text-white text-[9px] font-black uppercase tracking-widest shadow-2xl">
                                  {dest.airport}

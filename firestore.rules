@@ -10,17 +10,21 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated()
-             && request.auth.token.role != null
-             && request.auth.token.role != 'customer';
+             && request.auth.token.role in ['super_admin', 'ops_manager'];
     }
 
     function isOpsStaff() {
       return isAuthenticated()
-             && request.auth.token.role != null
-             && request.auth.token.role != 'customer';
+             && request.auth.token.role in ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent'];
     }
 
     function isAgent() {
+      return isAuthenticated()
+             && request.auth.token.role in ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent', 'finance'];
+    }
+
+    // Any non-customer staff member
+    function isStaff() {
       return isAuthenticated()
              && request.auth.token.role != null
              && request.auth.token.role != 'customer';

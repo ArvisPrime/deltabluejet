@@ -1,0 +1,12 @@
+# DeltaBlue Jet Air — robots.txt
+
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /staff-login
+Disallow: /yubikey-verify
+Disallow: /totp-verify
+Disallow: /account-settings
+Disallow: /notification-preferences
+
+Sitemap: https://deltablue-jet-air.web.app/sitemap.xml

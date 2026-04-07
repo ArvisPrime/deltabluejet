@@ -58,6 +58,7 @@ export async function getOrCreateCustomer(
         email,
         displayName,
         phone: null,
+        phoneVerified: false,
         nationality: null,
         documentType: null,
         documentNumber: null,
