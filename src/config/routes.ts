@@ -144,6 +144,12 @@ export const ROUTES = {
     // Admin — Crew
     CREW_MANAGEMENT: '/admin/crew',
     CREW_SCHEDULING: '/admin/crew/scheduling',
+    CREW_FTL: '/admin/crew/ftl',
+    CREW_QUALIFICATIONS: '/admin/crew/qualifications',
+    CREW_DISRUPTIONS: '/admin/crew/disruptions',
+    CREW_FATIGUE: '/admin/crew/fatigue',
+    CREW_SLEEP: '/admin/crew/sleep',
+    CREW_FRMS_REPORT: '/admin/crew/frms-report',
 
     // Admin — Gate Operations
     BOARDING_SCANNER: '/admin/boarding-scanner',

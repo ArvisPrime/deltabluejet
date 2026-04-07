@@ -16,6 +16,29 @@ export type CrewRole = 'captain' | 'first_officer' | 'purser' | 'cabin_crew' | '
 export type CrewStatus = 'active' | 'on_leave' | 'training' | 'inactive';
 export type AssignmentType = 'flight' | 'standby_office' | 'standby_home';
 
+/** Structured type rating with expiry */
+export interface TypeRating {
+    aircraftType: string;     // e.g. 'B737', 'A320'
+    issueDate: string;        // YYYY-MM-DD
+    expiryDate: string;       // YYYY-MM-DD
+    status: 'valid' | 'expiring' | 'expired';
+}
+
+/** Medical certificate */
+export interface MedicalCertificate {
+    class: string;            // 'Class 1', 'Class 2'
+    issueDate: string;
+    expiryDate: string;
+    status: 'valid' | 'expiring' | 'expired';
+}
+
+/** Landing recency (90-day rule) */
+export interface LandingRecency {
+    lastLandingDate: string;  // YYYY-MM-DD
+    landingsLast90Days: number;
+    current: boolean;
+}
+
 export interface CrewMember {
     id: string;
     employeeId: string;
@@ -29,6 +52,11 @@ export interface CrewMember {
     hireDate: Timestamp;
     totalFlightHours: number;
     lastFlightDate?: Timestamp;
+    // ── Phase 2: Structured Qualifications ──
+    typeRatings?: TypeRating[];
+    medicalCertificate?: MedicalCertificate;
+    recency?: LandingRecency;
+    passportExpiry?: string;  // YYYY-MM-DD
 }
 
 export interface CrewAssignment {
@@ -207,3 +235,205 @@ export const ROLE_META: Record<CrewRole, { label: string; icon: string; color: s
     cabin_crew: { label: 'Cabin Crew', icon: 'person', color: 'text-emerald-600 bg-emerald-50' },
     engineer: { label: 'Engineer', icon: 'construction', color: 'text-red-600 bg-red-50' },
 };
+
+// ─── Duty Logs ──────────────────────────────────────────────
+
+import type { DutyLogEntry, FlightLegEntry } from '../utils/ftlEngine';
+export type { DutyLogEntry, FlightLegEntry };
+
+const dutyLogRef = collection(db, 'duty_logs');
+
+/** Create a new duty log */
+export async function createDutyLog(data: Omit<DutyLogEntry, 'id'>): Promise<string> {
+    const ref = await addDoc(dutyLogRef, { ...data, createdAt: Timestamp.now() });
+    return ref.id;
+}
+
+/** Update an existing duty log */
+export async function updateDutyLog(id: string, data: Partial<DutyLogEntry>): Promise<void> {
+    await updateDoc(doc(dutyLogRef, id), { ...data, updatedAt: Timestamp.now() });
+}
+
+/** Delete a duty log */
+export async function deleteDutyLog(id: string): Promise<void> {
+    await deleteDoc(doc(dutyLogRef, id));
+}
+
+/** Get all duty logs for a crew member */
+export async function getDutyLogs(crewId: string): Promise<DutyLogEntry[]> {
+    const q = query(dutyLogRef, where('crewId', '==', crewId), orderBy('date', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as DutyLogEntry));
+}
+
+/** Get duty logs for a crew member within a date range */
+export async function getDutyLogsForPeriod(
+    crewId: string,
+    startDate: string,
+    endDate: string,
+): Promise<DutyLogEntry[]> {
+    const q = query(
+        dutyLogRef,
+        where('crewId', '==', crewId),
+        where('date', '>=', startDate),
+        where('date', '<=', endDate),
+        orderBy('date', 'desc'),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as DutyLogEntry));
+}
+
+/** Real-time subscription to duty logs for a crew member */
+export function subscribeToDutyLogs(
+    crewId: string,
+    callback: (logs: DutyLogEntry[]) => void,
+): () => void {
+    const q = query(dutyLogRef, where('crewId', '==', crewId), orderBy('date', 'desc'));
+    return onSnapshot(q, (snap) => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as DutyLogEntry)));
+    });
+}
+
+// ─── Qualification Helpers ──────────────────────────────────
+
+/** Available aircraft types for type ratings */
+export const AIRCRAFT_TYPES = ['B737', 'B757', 'B767', 'B777', 'B787', 'A319', 'A320', 'A321', 'A330', 'A340', 'ATR72', 'E190', 'CRJ900'] as const;
+
+/** Get the expiry status of a date string */
+export function getExpiryStatus(expiryDate: string, warningDays = 60): 'valid' | 'expiring' | 'expired' {
+    const now = new Date();
+    const expiry = new Date(expiryDate + 'T23:59:59');
+    if (expiry < now) return 'expired';
+    const warningDate = new Date(now.getTime() + warningDays * 24 * 60 * 60 * 1000);
+    if (expiry <= warningDate) return 'expiring';
+    return 'valid';
+}
+
+/** Check if crew member is qualified for an aircraft type */
+export function isQualifiedForAircraft(member: CrewMember, aircraftType: string): boolean {
+    if (!member.typeRatings?.length) return false;
+    return member.typeRatings.some(
+        r => r.aircraftType === aircraftType && getExpiryStatus(r.expiryDate) !== 'expired'
+    );
+}
+
+/** Check if crew member has valid medical */
+export function hasValidMedical(member: CrewMember): boolean {
+    if (!member.medicalCertificate) return false;
+    return getExpiryStatus(member.medicalCertificate.expiryDate) !== 'expired';
+}
+
+/** Check if crew member has current landing recency */
+export function hasLandingRecency(member: CrewMember): boolean {
+    if (!member.recency) return false;
+    return member.recency.landingsLast90Days >= 3;
+}
+
+/** Get all crew members with qualifications expiring within N days */
+export function getExpiringQualifications(
+    crewList: CrewMember[],
+    withinDays: number = 60,
+): { member: CrewMember; type: string; expiryDate: string; daysRemaining: number }[] {
+    const results: { member: CrewMember; type: string; expiryDate: string; daysRemaining: number }[] = [];
+    const now = new Date();
+
+    for (const m of crewList) {
+        for (const r of m.typeRatings || []) {
+            const days = Math.ceil((new Date(r.expiryDate).getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+            if (days > 0 && days <= withinDays) {
+                results.push({ member: m, type: `Type Rating: ${r.aircraftType}`, expiryDate: r.expiryDate, daysRemaining: days });
+            }
+        }
+        if (m.medicalCertificate) {
+            const days = Math.ceil((new Date(m.medicalCertificate.expiryDate).getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+            if (days > 0 && days <= withinDays) {
+                results.push({ member: m, type: `Medical (${m.medicalCertificate.class})`, expiryDate: m.medicalCertificate.expiryDate, daysRemaining: days });
+            }
+        }
+        if (m.passportExpiry) {
+            const days = Math.ceil((new Date(m.passportExpiry).getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+            if (days > 0 && days <= withinDays) {
+                results.push({ member: m, type: 'Passport', expiryDate: m.passportExpiry, daysRemaining: days });
+            }
+        }
+    }
+
+    return results.sort((a, b) => a.daysRemaining - b.daysRemaining);
+}
+
+/** Get crew members qualified for a specific aircraft on a given date */
+export function getQualifiedCrew(
+    crewList: CrewMember[],
+    aircraftType: string,
+): CrewMember[] {
+    return crewList.filter(m =>
+        m.status === 'active' &&
+        isQualifiedForAircraft(m, aircraftType) &&
+        hasValidMedical(m)
+    );
+}
+
+// ─── Sleep Log Operations (Phase 3: FRMS) ───────────────
+
+const sleepLogRef = collection(db, 'sleep_logs');
+
+export interface SleepLogEntry {
+    id: string;
+    crewId: string;
+    date: string;            // YYYY-MM-DD
+    hoursSlept: number;      // 0–16
+    quality: 'poor' | 'fair' | 'good' | 'excellent';
+    notes?: string;
+    createdAt?: any;
+}
+
+/** Create a sleep log entry */
+export async function createSleepLog(data: Omit<SleepLogEntry, 'id'>): Promise<string> {
+    const ref = await addDoc(sleepLogRef, { ...data, createdAt: Timestamp.now() });
+    return ref.id;
+}
+
+/** Update a sleep log entry */
+export async function updateSleepLog(id: string, data: Partial<SleepLogEntry>): Promise<void> {
+    await updateDoc(doc(sleepLogRef, id), { ...data });
+}
+
+/** Delete a sleep log entry */
+export async function deleteSleepLog(id: string): Promise<void> {
+    await deleteDoc(doc(sleepLogRef, id));
+}
+
+/** Get sleep logs for a crew member */
+export async function getSleepLogs(crewId: string): Promise<SleepLogEntry[]> {
+    const q = query(sleepLogRef, where('crewId', '==', crewId), orderBy('date', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as SleepLogEntry));
+}
+
+/** Get all sleep logs (for fleet view) */
+export async function getAllSleepLogs(): Promise<SleepLogEntry[]> {
+    const q = query(sleepLogRef, orderBy('date', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as SleepLogEntry));
+}
+
+/** Real-time subscription to sleep logs for a crew member */
+export function subscribeToSleepLogs(
+    crewId: string,
+    callback: (logs: SleepLogEntry[]) => void,
+): () => void {
+    const q = query(sleepLogRef, where('crewId', '==', crewId), orderBy('date', 'desc'));
+    return onSnapshot(q, snap => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as SleepLogEntry)));
+    });
+}
+
+/** Real-time subscription to all sleep logs */
+export function subscribeToAllSleepLogs(
+    callback: (logs: SleepLogEntry[]) => void,
+): () => void {
+    const q = query(sleepLogRef, orderBy('date', 'desc'));
+    return onSnapshot(q, snap => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as SleepLogEntry)));
+    });
+}

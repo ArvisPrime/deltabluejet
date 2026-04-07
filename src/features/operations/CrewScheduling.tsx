@@ -7,10 +7,14 @@ import {
     updateAssignment,
     deleteAssignment,
     ROLE_META,
+    isQualifiedForAircraft,
+    hasValidMedical,
+    getDutyLogs,
     type CrewMember,
     type CrewAssignment,
     type AssignmentType,
 } from '../../services/crewService';
+import { calculateFtlCounters, getFtlAlerts, type FtlAlert } from '../../utils/ftlEngine';
 import { getAllScheduledFlights } from '../../services/firestore';
 import type { FlightDoc } from '../../types/firestore';
 import { downloadCSV, printTable } from '../../utils/tableExport';
@@ -52,6 +56,8 @@ const CrewScheduling: React.FC = () => {
     const [confirmDelete, setConfirmDelete] = useState<CrewAssignment | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [form, setForm] = useState({ ...EMPTY_FORM });
+    const [ftlAlerts, setFtlAlerts] = useState<FtlAlert[]>([]);
+    const [ftlLoading, setFtlLoading] = useState(false);
 
     // Tab state: 'individual' | 'group'
     const [formTab, setFormTab] = useState<'individual' | 'group'>('individual');
@@ -79,6 +85,16 @@ const CrewScheduling: React.FC = () => {
 
         return () => { unsubCrew(); unsubAssign(); };
     }, []);
+
+    // Load FTL data when crew member selection changes
+    useEffect(() => {
+        if (!form.crewMemberId) { setFtlAlerts([]); return; }
+        setFtlLoading(true);
+        getDutyLogs(form.crewMemberId).then(logs => {
+            const counters = calculateFtlCounters(logs, new Date());
+            setFtlAlerts(getFtlAlerts(counters));
+        }).catch(() => setFtlAlerts([])).finally(() => setFtlLoading(false));
+    }, [form.crewMemberId]);
 
     // Filtered flights for selected date
     const flightsForDate = useMemo(() => {
@@ -402,6 +418,35 @@ const CrewScheduling: React.FC = () => {
                                         <option value="">Select Crew Member</option>
                                         {activeCrew.map(c => <option key={c.id} value={c.id}>{c.name} ({ROLE_META[c.role].label})</option>)}
                                     </select>
+                                    {/* FTL & Qualification badges */}
+                                    {form.crewMemberId && (
+                                        <div className="flex flex-wrap gap-1 mt-1 px-1">
+                                            {ftlLoading ? (
+                                                <span className="text-[8px] font-bold text-navy-300 animate-pulse">Loading FTL…</span>
+                                            ) : ftlAlerts.filter(a => a.severity !== 'ok').length > 0 ? (
+                                                ftlAlerts.filter(a => a.severity !== 'ok').map((a, i) => (
+                                                    <span key={i} className={`px-1.5 py-0.5 rounded text-[7px] font-black uppercase ${
+                                                        a.severity === 'blocked' ? 'bg-red-100 text-red-700' : a.severity === 'critical' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
+                                                    }`}>{a.period} {a.percentage}%</span>
+                                                ))
+                                            ) : (
+                                                <span className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase bg-emerald-50 text-emerald-600">FTL OK</span>
+                                            )}
+                                            {(() => {
+                                                const m = activeCrew.find(c => c.id === form.crewMemberId);
+                                                if (!m) return null;
+                                                return (
+                                                    <>
+                                                        {hasValidMedical(m) ? (
+                                                            <span className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase bg-emerald-50 text-emerald-600">Med ✓</span>
+                                                        ) : (
+                                                            <span className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase bg-red-50 text-red-600">Med ✗</span>
+                                                        )}
+                                                    </>
+                                                );
+                                            })()}
+                                        </div>
+                                    )}
                                 </div>
                                 {/* Assignment Type */}
                                 <div className="space-y-1">

@@ -161,8 +161,9 @@ const ExperimentsAuditLog = lazyRetry(() => import('../features/experiments/Expe
 const LoyaltyAdmin = lazyRetry(() => import('../features/dashboard/LoyaltyAdmin'));
 const AncillaryAdmin = lazyRetry(() => import('../features/dashboard/AncillaryAdmin'));
 const BaggageAdmin = lazyRetry(() => import('../features/dashboard/BaggageAdmin'));
-const CrewManagement = lazyRetry(() => import('../features/operations/CrewManagement'));
+const CrewHub = lazyRetry(() => import('../features/operations/CrewHub'));
 const CrewScheduling = lazyRetry(() => import('../features/operations/CrewScheduling'));
+const FRMSReport = lazyRetry(() => import('../features/operations/FRMSReport'));
 const BoardingScanner = lazyRetry(() => import('../features/operations/BoardingScanner'));
 
 // --- Phase 3D: IROP & Revenue ---
@@ -393,8 +394,9 @@ export const router = createBrowserRouter([
             { path: ROUTES.LOYALTY_ADMIN, element: withSuspense(LoyaltyAdmin) },
             { path: ROUTES.ANCILLARY_ADMIN, element: withSuspense(AncillaryAdmin) },
             { path: ROUTES.BAGGAGE_ADMIN, element: withSuspense(BaggageAdmin) },
-            { path: ROUTES.CREW_MANAGEMENT, element: withSuspense(CrewManagement) },
+            { path: ROUTES.CREW_MANAGEMENT, element: withSuspense(CrewHub) },
             { path: ROUTES.CREW_SCHEDULING, element: withSuspense(CrewScheduling) },
+            { path: ROUTES.CREW_FRMS_REPORT, element: withSuspense(FRMSReport) },
             { path: ROUTES.BOARDING_SCANNER, element: withSuspense(BoardingScanner) },
 
             // --- IROP & Revenue ---
