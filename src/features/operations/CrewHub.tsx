@@ -1,5 +1,5 @@
 import React, { useState, Suspense, lazy } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 
 // ─── Lazy-loaded Tab Panels ─────────────────────────────
 
