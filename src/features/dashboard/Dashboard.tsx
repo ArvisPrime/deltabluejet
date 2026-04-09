@@ -121,7 +121,7 @@ const Dashboard: React.FC = () => {
 
   // ─── Computed metrics ────────────────────
   const activeFlights = flights.filter(f =>
-    ['scheduled', 'boarding', 'departed', 'in_air'].includes(f.status)
+    ['scheduled', 'boarding', 'doors_closed', 'taxi_out', 'departed', 'airborne', 'in_air', 'cruise', 'descent'].includes(f.status)
   ).length;
 
   const totalDelays = flights.filter(f => f.status === 'delayed').length;

@@ -84,6 +84,12 @@ service cloud.firestore {
       allow write: if isOpsStaff();
     }
 
+    // ─── Flight Events (status transition audit log) ──────
+    match /flight_events/{eventId} {
+      allow read: if isOpsStaff();
+      allow write: if false; // Server-only (Cloud Functions)
+    }
+
     // ─── Aircraft ──────────────────────────────────────────
     match /aircraft/{aircraftId} {
       allow read: if isAuthenticated();

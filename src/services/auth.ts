@@ -32,15 +32,18 @@ function isAdminRole(role: string): boolean {
  * No Firestore fallback — custom claims are the single source of truth.
  */
 async function mapFirebaseUser(user: User): Promise<AuthUser> {
-    const tokenResult = await user.getIdTokenResult();
-    const role = tokenResult.claims.role as UserRole | undefined;
+    const tokenResult = await user.getIdTokenResult(true); // Force refresh to get latest claims
+    const claimRole = tokenResult.claims.role as UserRole | undefined;
+    // Custom roles store the original role doc ID in customRoleId; use it for UI display
+    const customRoleId = tokenResult.claims.customRoleId as string | undefined;
+    const role = customRoleId || claimRole || 'customer';
 
     return {
         uid: user.uid,
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        role: role || 'customer',
+        role: role as UserRole,
     };
 }
 

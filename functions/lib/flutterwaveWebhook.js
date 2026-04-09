@@ -15,14 +15,16 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleFlutterwaveWebhook = void 0;
 const https_1 = require("firebase-functions/v2/https");
+const params_1 = require("firebase-functions/params");
 const firestore_1 = require("firebase-admin/firestore");
 const app_1 = require("firebase-admin/app");
 const flutterwave_1 = require("./flutterwave");
 if (!(0, app_1.getApps)().length)
     (0, app_1.initializeApp)();
 const db = (0, firestore_1.getFirestore)();
-const FLW_WEBHOOK_HASH = process.env.FLUTTERWAVE_WEBHOOK_HASH || '';
-exports.handleFlutterwaveWebhook = (0, https_1.onRequest)({ cors: false }, async (req, res) => {
+const flwWebhookHash = (0, params_1.defineSecret)('FLUTTERWAVE_WEBHOOK_HASH');
+const flwSecretKey = (0, params_1.defineSecret)('FLUTTERWAVE_SECRET_KEY');
+exports.handleFlutterwaveWebhook = (0, https_1.onRequest)({ cors: false, secrets: [flwWebhookHash, flwSecretKey] }, async (req, res) => {
     // ── Method check ─────────────────────────────────────
     if (req.method !== 'POST') {
         res.status(405).send('Method Not Allowed');
@@ -30,12 +32,12 @@ exports.handleFlutterwaveWebhook = (0, https_1.onRequest)({ cors: false }, async
     }
     // ── Signature verification ───────────────────────────
     const verifHash = req.headers['verif-hash'];
-    if (!FLW_WEBHOOK_HASH) {
+    if (!flwWebhookHash.value()) {
         console.warn('FLUTTERWAVE_WEBHOOK_HASH not configured — webhook ignored');
         res.status(200).send('Webhook hash not configured');
         return;
     }
-    if (!verifHash || verifHash !== FLW_WEBHOOK_HASH) {
+    if (!verifHash || verifHash !== flwWebhookHash.value()) {
         console.error('Flutterwave webhook signature mismatch');
         res.status(401).send('Unauthorized');
         return;

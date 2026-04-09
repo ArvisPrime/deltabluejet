@@ -104,38 +104,20 @@ const Dashboard = lazyRetry(() => import('../features/dashboard/Dashboard'));
 const SalesDashboard = lazyRetry(() => import('../features/dashboard/SalesDashboard'));
 const PricingRulesAdmin = lazyRetry(() => import('../features/dashboard/PricingRulesAdmin'));
 
-// --- Flights & Ops ---
-const FleetManagement = lazyRetry(() => import('../features/flights/FleetManagement'));
-const FlightScheduling = lazyRetry(() => import('../features/flights/FlightScheduling'));
-const GateAssignment = lazyRetry(() => import('../features/operations/GateAssignment'));
-const ManageDelay = lazyRetry(() => import('../features/operations/ManageDelay'));
-const DisruptionResolution = lazyRetry(() => import('../features/operations/DisruptionResolution'));
-const AircraftSwap = lazyRetry(() => import('../features/operations/AircraftSwap'));
-const RegulatoryManifest = lazyRetry(() => import('../features/operations/RegulatoryManifest'));
+// --- Flights & Ops (Hub pages) ---
+const FlightOpsHub = lazyRetry(() => import('../features/flights/FlightOpsHub'));
+const DelayOpsHub = lazyRetry(() => import('../features/operations/DelayOpsHub'));
 const OperationalTriggers = lazyRetry(() => import('../features/operations/OperationalTriggers'));
 const AlertAuditLog = lazyRetry(() => import('../features/operations/AlertAuditLog'));
-const SeatMapCMS = lazyRetry(() => import('../features/operations/SeatMapCMS'));
-const RouteManagement = lazyRetry(() => import('../features/operations/RouteManagement'));
-const AirportManagement = lazyRetry(() => import('../features/operations/AirportManagement'));
 
 // --- Users ---
 const UserManagement = lazyRetry(() => import('../features/users/UserManagement'));
 const AccountSettings = lazyRetry(() => import('../features/users/AccountSettings'));
 const NotificationPreferences = lazyRetry(() => import('../features/users/NotificationPreferences'));
 
-// --- CMS ---
-const LandingPageEditor = lazyRetry(() => import('../features/cms/LandingPageEditor'));
-const PageEditor = lazyRetry(() => import('../features/cms/PageEditor'));
-const HeaderManagement = lazyRetry(() => import('../features/cms/HeaderManagement'));
-const FooterManagement = lazyRetry(() => import('../features/cms/FooterManagement'));
-const MenuManagement = lazyRetry(() => import('../features/cms/MenuManagement'));
-const FaviconSEOAuditLog = lazyRetry(() => import('../features/cms/FaviconSEOAuditLog'));
-const AboutValuesManagement = lazyRetry(() => import('../features/cms/AboutValuesManagement'));
-const DestinationsCMS = lazyRetry(() => import('../features/cms/DestinationsCMS'));
-const FAQCMS = lazyRetry(() => import('../features/cms/FAQCMS'));
-const CareersCMS = lazyRetry(() => import('../features/cms/CareersCMS'));
-const HealthCMS = lazyRetry(() => import('../features/cms/HealthCMS'));
-const LegalCMS = lazyRetry(() => import('../features/cms/LegalCMS'));
+// --- CMS (Hub pages) ---
+const PageBuilderHub = lazyRetry(() => import('../features/cms/PageBuilderHub'));
+const SEOBrandingHub = lazyRetry(() => import('../features/cms/SEOBrandingHub'));
 
 // --- Security ---
 const SessionMonitor = lazyRetry(() => import('../features/security/SessionMonitor'));
@@ -334,19 +316,11 @@ export const router = createBrowserRouter([
             { path: ROUTES.SALES_DASHBOARD, element: withSuspense(SalesDashboard) },
             { path: ROUTES.PRICING_RULES, element: withSuspense(PricingRulesAdmin) },
 
-            // --- Flight Operations ---
-            { path: ROUTES.FLEET_MANAGEMENT, element: withSuspense(FleetManagement) },
-            { path: ROUTES.FLIGHT_SCHEDULING, element: withSuspense(FlightScheduling) },
-            { path: ROUTES.GATE_ASSIGNMENT, element: withSuspense(GateAssignment) },
-            { path: ROUTES.MANAGE_DELAY, element: withSuspense(ManageDelay) },
-            { path: ROUTES.DISRUPTION_RESOLUTION, element: withSuspense(DisruptionResolution) },
-            { path: ROUTES.AIRCRAFT_SWAP, element: withSuspense(AircraftSwap) },
-            { path: ROUTES.REGULATORY_MANIFEST, element: withSuspense(RegulatoryManifest) },
+            // --- Flight Operations (Hub pages) ---
+            { path: ROUTES.FLIGHT_SCHEDULING, element: withSuspense(FlightOpsHub) },
+            { path: ROUTES.MANAGE_DELAY, element: withSuspense(DelayOpsHub) },
             { path: ROUTES.OPERATIONAL_TRIGGERS, element: withSuspense(OperationalTriggers) },
             { path: ROUTES.ALERT_AUDIT_LOG, element: withSuspense(AlertAuditLog) },
-            { path: ROUTES.SEAT_MAP_CMS, element: withSuspense(SeatMapCMS) },
-            { path: ROUTES.ROUTE_MANAGEMENT, element: withSuspense(RouteManagement) },
-            { path: ROUTES.AIRPORT_MANAGEMENT, element: withSuspense(AirportManagement) },
 
             // --- User & Account Management ---
             { path: ROUTES.USER_MANAGEMENT, element: withSuspense(UserManagement) },
@@ -358,19 +332,9 @@ export const router = createBrowserRouter([
             { path: ROUTES.BOOKING_DETAIL_ADMIN, element: withSuspense(BookingDetailAdmin) },
             { path: ROUTES.TICKET_REISSUE, element: withSuspense(TicketReissue) },
 
-            // --- CMS ---
-            { path: ROUTES.LANDING_PAGE_EDITOR, element: withSuspense(LandingPageEditor) },
-            { path: ROUTES.PAGE_EDITOR, element: withSuspense(PageEditor) },
-            { path: ROUTES.HEADER_MANAGEMENT, element: withSuspense(HeaderManagement) },
-            { path: ROUTES.FOOTER_MANAGEMENT, element: withSuspense(FooterManagement) },
-            { path: ROUTES.MENU_MANAGEMENT, element: withSuspense(MenuManagement) },
-            { path: ROUTES.FAVICON_SEO, element: withSuspense(FaviconSEOAuditLog) },
-            { path: ROUTES.ABOUT_VALUES_CMS, element: withSuspense(AboutValuesManagement) },
-            { path: ROUTES.DESTINATIONS_CMS, element: withSuspense(DestinationsCMS) },
-            { path: ROUTES.FAQ_CMS, element: withSuspense(FAQCMS) },
-            { path: ROUTES.CAREERS_CMS, element: withSuspense(CareersCMS) },
-            { path: ROUTES.HEALTH_CMS, element: withSuspense(HealthCMS) },
-            { path: ROUTES.LEGAL_CMS, element: withSuspense(LegalCMS) },
+            // --- CMS (Hub pages) ---
+            { path: ROUTES.PAGE_EDITOR, element: withSuspense(PageBuilderHub) },
+            { path: ROUTES.FAVICON_SEO, element: withSuspense(SEOBrandingHub) },
 
             // --- Security ---
             { path: ROUTES.SESSION_MONITOR, element: withSuspense(SessionMonitor) },

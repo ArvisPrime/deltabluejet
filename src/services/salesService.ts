@@ -255,7 +255,7 @@ export async function getSalesSummary(): Promise<SalesSummary> {
     }
 
     const activeFlights = flights.filter(f =>
-        ['scheduled', 'boarding', 'departed', 'in_air'].includes(f.status)
+        ['scheduled', 'boarding', 'doors_closed', 'taxi_out', 'departed', 'airborne', 'in_air', 'cruise', 'descent'].includes(f.status)
     ).length;
 
     return {

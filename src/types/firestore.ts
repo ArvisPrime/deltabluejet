@@ -38,13 +38,87 @@ export interface FlightDoc {
 export type FlightStatus =
     | 'scheduled'
     | 'boarding'
+    | 'doors_closed'
+    | 'taxi_out'
     | 'departed'
+    | 'airborne'
     | 'in_air'
+    | 'cruise'
+    | 'descent'
     | 'landed'
+    | 'taxi_in'
     | 'arrived'
     | 'delayed'
     | 'cancelled'
     | 'diverted';
+
+/**
+ * Ordered phases for the flight progress timeline.
+ * Used by UI to calculate multi-step progress.
+ */
+export const FLIGHT_PHASES = [
+    'scheduled', 'boarding', 'doors_closed', 'taxi_out',
+    'airborne', 'cruise', 'descent', 'landed', 'taxi_in', 'arrived',
+] as const;
+
+/**
+ * Human-friendly labels for each flight status.
+ */
+export const FLIGHT_STATUS_LABELS: Record<FlightStatus, string> = {
+    scheduled:    'Scheduled',
+    boarding:     'Boarding',
+    doors_closed: 'Doors Closed',
+    taxi_out:     'Taxi Out',
+    departed:     'Departed',
+    airborne:     'Airborne',
+    in_air:       'In Flight',
+    cruise:       'Cruising',
+    descent:      'Descending',
+    landed:       'Landed',
+    taxi_in:      'Taxi In',
+    arrived:      'Arrived',
+    delayed:      'Delayed',
+    cancelled:    'Cancelled',
+    diverted:     'Diverted',
+};
+
+/**
+ * Color config for each flight status — used by all UI components.
+ */
+export const FLIGHT_STATUS_CONFIG: Record<FlightStatus, {
+    dot: string; border: string; bg: string; text: string; icon: string; pulse?: boolean;
+}> = {
+    scheduled:    { dot: 'bg-slate-400',   border: 'border-l-slate-400',   bg: 'bg-slate-50',   text: 'text-slate-600',   icon: 'schedule' },
+    boarding:     { dot: 'bg-amber-500',   border: 'border-l-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700',   icon: 'door_front', pulse: true },
+    doors_closed: { dot: 'bg-orange-500',  border: 'border-l-orange-500',  bg: 'bg-orange-50',  text: 'text-orange-700',  icon: 'door_sliding' },
+    taxi_out:     { dot: 'bg-orange-400',  border: 'border-l-orange-400',  bg: 'bg-orange-50',  text: 'text-orange-600',  icon: 'directions_car', pulse: true },
+    departed:     { dot: 'bg-blue-500',    border: 'border-l-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-700',    icon: 'flight_takeoff' },
+    airborne:     { dot: 'bg-emerald-500', border: 'border-l-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', icon: 'flight_takeoff', pulse: true },
+    in_air:       { dot: 'bg-emerald-500', border: 'border-l-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', icon: 'flight', pulse: true },
+    cruise:       { dot: 'bg-blue-600',    border: 'border-l-blue-600',    bg: 'bg-blue-50',    text: 'text-blue-800',    icon: 'altitude' },
+    descent:      { dot: 'bg-purple-500',  border: 'border-l-purple-500',  bg: 'bg-purple-50',  text: 'text-purple-700',  icon: 'flight_land' },
+    landed:       { dot: 'bg-emerald-600', border: 'border-l-emerald-600', bg: 'bg-emerald-50', text: 'text-emerald-700', icon: 'flight_land' },
+    taxi_in:      { dot: 'bg-teal-500',    border: 'border-l-teal-500',    bg: 'bg-teal-50',    text: 'text-teal-700',    icon: 'directions_car' },
+    arrived:      { dot: 'bg-green-700',   border: 'border-l-green-700',   bg: 'bg-green-50',   text: 'text-green-800',   icon: 'check_circle' },
+    delayed:      { dot: 'bg-red-500',     border: 'border-l-red-500',     bg: 'bg-red-50',     text: 'text-red-700',     icon: 'warning', pulse: true },
+    cancelled:    { dot: 'bg-gray-400',    border: 'border-l-gray-400',    bg: 'bg-gray-50',    text: 'text-gray-600',    icon: 'cancel' },
+    diverted:     { dot: 'bg-red-600',     border: 'border-l-red-600',     bg: 'bg-red-50',     text: 'text-red-700',     icon: 'alt_route' },
+};
+
+// ─── Flight Events ─────────────────────────────────────────
+
+export interface FlightEventDoc {
+    id: string;
+    flightId: string;
+    flightNumber: string;
+    fromStatus: FlightStatus;
+    toStatus: FlightStatus;
+    source: 'auto' | 'manual' | 'api';       // Who triggered it
+    triggeredBy: string;                       // userId or 'system'
+    trigger: string;                           // e.g. 'boarding_window_reached'
+    metadata?: Record<string, unknown>;        // Extra data (ETA, altitude, etc.)
+    createdAt: Timestamp;
+}
 
 export interface AirportRef {
     code: string;     // IATA 3-letter

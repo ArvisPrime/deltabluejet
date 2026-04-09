@@ -42,8 +42,37 @@ async function assertCallerIsAdmin(request: any): Promise<string> {
 }
 
 /**
+ * Built-in role IDs that Firestore security rules recognize.
+ * Custom roles (stored in `roles` collection) are mapped to 'ops_manager' for security purposes.
+ */
+const BUILT_IN_ROLE_IDS = ['super_admin', 'ops_manager', 'crew_sched', 'cs_agent', 'finance', 'customer'];
+
+/**
+ * Resolve a role identifier to its security-level claim.
+ * Built-in roles pass through unchanged.
+ * Custom roles (Firestore doc IDs) are mapped to 'ops_manager' since they are staff roles.
+ */
+async function resolveSecurityClaim(roleId: string): Promise<string> {
+    if (BUILT_IN_ROLE_IDS.includes(roleId)) return roleId;
+
+    // It's a custom role document ID — verify it exists in the roles collection
+    const roleDoc = await db.doc(`roles/${roleId}`).get();
+    if (roleDoc.exists) {
+        // Custom roles are all operational staff, so map to ops_manager for security rules
+        return 'ops_manager';
+    }
+
+    // Unknown role — treat as customer for safety
+    console.warn(`Unknown role ID: ${roleId}, defaulting to customer`);
+    return 'customer';
+}
+
+/**
  * Set a user's role via custom claims.
  * Callable by any admin (non-customer) role.
+ *
+ * For custom roles (Firestore doc IDs), stores the role ID in the user document
+ * but sets the security claim to the resolved base role (e.g. ops_manager).
  */
 export const setUserRole = onCall(async (request) => {
     await assertCallerIsAdmin(request);
@@ -53,7 +82,13 @@ export const setUserRole = onCall(async (request) => {
         throw new HttpsError('invalid-argument', 'uid and role are required.');
     }
 
-    await getAuth().setCustomUserClaims(uid, { role });
+    // Resolve the role to a security claim that Firestore rules understand
+    const securityClaim = await resolveSecurityClaim(role);
+
+    // Set the security claim on the Auth token, and preserve the original role ID
+    await getAuth().setCustomUserClaims(uid, { role: securityClaim, customRoleId: role !== securityClaim ? role : null });
+
+    // Store the original role ID in Firestore for UI display purposes
     await db.doc(`users/${uid}`).update({ role, updatedAt: FieldValue.serverTimestamp() });
 
     // Audit log
@@ -63,11 +98,11 @@ export const setUserRole = onCall(async (request) => {
         entityId: uid,
         userId: request.auth!.uid,
         userEmail: request.auth!.token.email || '',
-        details: { newRole: role },
+        details: { newRole: role, securityClaim },
         timestamp: FieldValue.serverTimestamp(),
     });
 
-    return { success: true, message: `Role '${role}' assigned to user ${uid}` };
+    return { success: true, message: `Role '${role}' assigned to user ${uid} (security: ${securityClaim})` };
 });
 
 /**
@@ -97,8 +132,9 @@ export const createUserAccount = onCall(async (request) => {
             disabled: false,
         });
 
-        // 2. Set custom claims
-        await getAuth().setCustomUserClaims(userRecord.uid, { role: assignRole });
+        // 2. Set custom claims — resolve custom roles to security-level claims
+        const securityClaim = await resolveSecurityClaim(assignRole);
+        await getAuth().setCustomUserClaims(userRecord.uid, { role: securityClaim, customRoleId: assignRole !== securityClaim ? assignRole : null });
 
         // 3. Create Firestore user document
         await db.doc(`users/${userRecord.uid}`).set({
@@ -260,11 +296,12 @@ export const syncAllClaims = onCall(async (request) => {
         if (!role) { skipped++; continue; }
 
         try {
+            const securityClaim = await resolveSecurityClaim(role);
             const userRecord = await getAuth().getUser(uid);
-            if (userRecord.customClaims?.role !== role) {
-                await getAuth().setCustomUserClaims(uid, { role });
+            if (userRecord.customClaims?.role !== securityClaim) {
+                await getAuth().setCustomUserClaims(uid, { role: securityClaim, customRoleId: role !== securityClaim ? role : null });
                 synced++;
-                console.log(`Synced ${email}: → ${role}`);
+                console.log(`Synced ${email}: ${role} → claim:${securityClaim}`);
             } else {
                 skipped++;
             }
@@ -289,9 +326,10 @@ export const onUserCreated = onDocumentCreated('users/{userId}', async (event) =
     const role = userData?.role || 'customer';
 
     try {
-        // Set custom auth claims
-        await getAuth().setCustomUserClaims(userId, { role });
-        console.log(`Custom claim set for user ${userId}: role=${role}`);
+        // Resolve custom role IDs to security-level claims
+        const securityClaim = await resolveSecurityClaim(role);
+        await getAuth().setCustomUserClaims(userId, { role: securityClaim, customRoleId: role !== securityClaim ? role : null });
+        console.log(`Custom claim set for user ${userId}: role=${role} → claim:${securityClaim}`);
 
         // Auto-create loyalty document for DeltaBlue Club enrollment
         await db.doc(`loyalty/${userId}`).set({

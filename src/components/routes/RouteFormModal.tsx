@@ -107,9 +107,12 @@ const RouteFormModal: React.FC<RouteFormModalProps> = ({ route, onClose, onSaved
                 await createRoute(data);
             }
             onSaved();
-        } catch (err) {
-            console.error(err);
-            setError('Failed to save route.');
+        } catch (err: any) {
+            console.error('Route save error:', err);
+            const msg = err?.code === 'permission-denied'
+                ? 'Permission denied. Your account role may not have route editing access.'
+                : err?.message || 'Failed to save route.';
+            setError(msg);
         } finally {
             setSaving(false);
         }

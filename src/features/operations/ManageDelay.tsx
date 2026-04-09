@@ -85,7 +85,7 @@ const ManageDelay: React.FC = () => {
                      </p>
                   </div>
                   {selectedFlight && (
-                     <Link to={ROUTES.DISRUPTION_RESOLUTION} className={`flex items-center gap-4 px-6 py-3 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border shadow-sm hover:shadow-md transition-shadow ${selectedFlight.status === 'delayed'
+                     <Link to={`${ROUTES.MANAGE_DELAY}?tab=disruptions`} className={`flex items-center gap-4 px-6 py-3 rounded-[1.5rem] text-xs font-black uppercase tracking-widest border shadow-sm hover:shadow-md transition-shadow ${selectedFlight.status === 'delayed'
                         ? 'bg-red-50 text-red-700 border-red-100'
                         : 'bg-emerald-50 text-emerald-700 border-emerald-100'
                         }`}>
