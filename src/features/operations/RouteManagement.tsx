@@ -92,49 +92,38 @@ const RouteManagement: React.FC = () => {
 
     return (
         <div className="space-y-8">
-            {/* ── Page Header with gradient mesh ─────────────────── */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-8 shadow-2xl">
-                {/* decorative shapes */}
-                <div className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full bg-white/10 blur-3xl" />
-                <div className="pointer-events-none absolute -left-16 bottom-0 size-56 rounded-full bg-fuchsia-400/20 blur-2xl" />
-
-                <div className="relative z-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white/90 backdrop-blur">
-                            <span className="material-symbols-outlined text-sm">public</span>
-                            Network Overview
-                        </div>
-                        <h1 className="text-4xl font-black tracking-tight text-white drop-shadow-lg sm:text-5xl">Route Management</h1>
-                        <p className="mt-1 text-sm font-bold text-white/60 uppercase tracking-widest">
-                            Routes &amp; Fare Configuration
-                        </p>
-                    </div>
-                    <button
-                        onClick={() => setShowAddModal(true)}
-                        className="flex items-center gap-2 self-start rounded-2xl bg-white px-6 py-3 font-black text-[11px] uppercase tracking-widest text-indigo-700 shadow-xl shadow-indigo-900/30 transition-all hover:scale-105 hover:shadow-2xl active:scale-95 sm:self-auto"
-                    >
-                        <span className="material-symbols-outlined text-sm">add_circle</span>
-                        Add Route
-                    </button>
+            {/* ── Page Header ─────────────────────────────────── */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-black text-navy-950 tracking-tight uppercase">Route Management</h1>
+                    <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest mt-1">
+                        Routes & Fare Configuration
+                    </p>
                 </div>
+                <button
+                    onClick={() => setShowAddModal(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-primary/20"
+                >
+                    <span className="material-symbols-outlined text-sm">add_circle</span>
+                    Add Route
+                </button>
             </div>
 
             {/* ── Stat Cards ────────────────────────────────────── */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {[
-                    { label: 'Total Routes', value: stats.total, icon: 'route', gradient: 'from-indigo-500 to-violet-600', shadow: 'shadow-indigo-500/25' },
-                    { label: 'Active', value: stats.active, icon: 'check_circle', gradient: 'from-emerald-500 to-teal-600', shadow: 'shadow-emerald-500/25' },
-                    { label: 'Inactive', value: stats.inactive, icon: 'cancel', gradient: 'from-rose-500 to-pink-600', shadow: 'shadow-rose-500/25' },
+                    { label: 'Total Routes', value: stats.total, icon: 'route', color: 'text-primary', bg: 'bg-primary/5' },
+                    { label: 'Active', value: stats.active, icon: 'check_circle', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { label: 'Inactive', value: stats.inactive, icon: 'cancel', color: 'text-red-600', bg: 'bg-red-50' },
                 ].map((stat) => (
-                    <div key={stat.label} className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${stat.gradient} p-5 shadow-lg ${stat.shadow} transition-all hover:-translate-y-1 hover:shadow-xl`}>
-                        <div className="pointer-events-none absolute -right-4 -top-4 size-24 rounded-full bg-white/10 blur-xl transition-all group-hover:scale-150" />
-                        <div className="relative flex items-center gap-4">
-                            <div className="flex size-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm shadow-inner">
-                                <span className="material-symbols-outlined text-2xl text-white">{stat.icon}</span>
+                    <div key={stat.label} className="p-5 bg-white rounded-2xl border border-navy-100 hover:shadow-md transition-all">
+                        <div className="flex items-center gap-3">
+                            <div className={`size-10 rounded-xl ${stat.bg} flex items-center justify-center`}>
+                                <span className={`material-symbols-outlined text-lg ${stat.color}`}>{stat.icon}</span>
                             </div>
                             <div>
-                                <p className="text-3xl font-black text-white tracking-tight">{stat.value}</p>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-white/70">{stat.label}</p>
+                                <p className="text-2xl font-black text-navy-950 tracking-tight">{stat.value}</p>
+                                <p className="text-[9px] font-black text-navy-400 uppercase tracking-widest">{stat.label}</p>
                             </div>
                         </div>
                     </div>
@@ -168,7 +157,7 @@ const RouteManagement: React.FC = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search by airport code or city..."
-                        className="h-11 w-full rounded-2xl border border-navy-100 bg-white pl-10 pr-4 text-sm font-medium text-navy-950 outline-none focus:ring-2 focus:ring-violet-300"
+                        className="h-11 w-full rounded-2xl border border-navy-100 bg-white pl-10 pr-4 text-sm font-medium text-navy-950 outline-none focus:ring-2 focus:ring-primary/20"
                     />
                 </div>
 
@@ -178,7 +167,7 @@ const RouteManagement: React.FC = () => {
                         onClick={() => setViewMode('grid')}
                         className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
                             viewMode === 'grid'
-                                ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-sm'
+                                ? 'bg-white text-navy-950 shadow-sm'
                                 : 'text-navy-400 hover:text-navy-700'
                         }`}
                     >
@@ -189,7 +178,7 @@ const RouteManagement: React.FC = () => {
                         onClick={() => setViewMode('list')}
                         className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
                             viewMode === 'list'
-                                ? 'bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-sm'
+                                ? 'bg-white text-navy-950 shadow-sm'
                                 : 'text-navy-400 hover:text-navy-700'
                         }`}
                     >
@@ -205,13 +194,13 @@ const RouteManagement: React.FC = () => {
                 <div>
                     {loading ? (
                         <div className="flex flex-col items-center justify-center rounded-3xl border border-navy-100 bg-white p-16">
-                            <div className="mb-4 size-10 animate-spin rounded-full border-[3px] border-violet-200 border-t-violet-600" />
+                            <div className="mb-4 size-10 animate-spin rounded-full border-[3px] border-navy-200 border-t-primary" />
                             <p className="text-xs font-bold text-navy-400">Loading route network...</p>
                         </div>
                     ) : filteredRoutes.length === 0 ? (
                         <div className="flex flex-col items-center justify-center rounded-3xl border border-navy-100 bg-white p-16 text-center">
-                            <div className="mb-4 flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100">
-                                <span className="material-symbols-outlined text-4xl text-violet-400">route</span>
+                            <div className="mb-4 flex size-20 items-center justify-center rounded-full bg-primary/5">
+                                <span className="material-symbols-outlined text-4xl text-navy-300">route</span>
                             </div>
                             <p className="text-sm font-bold text-navy-500">No routes found</p>
                             <p className="mt-1 text-xs text-navy-300">
@@ -227,7 +216,7 @@ const RouteManagement: React.FC = () => {
                                     <div
                                         key={rt.id}
                                         className={`group relative overflow-hidden rounded-2xl border bg-white shadow-md transition-all hover:-translate-y-1 hover:shadow-xl ${
-                                            isSelected ? 'ring-2 ring-violet-400 border-violet-300' : 'border-navy-100'
+                                            isSelected ? 'ring-2 ring-primary border-primary/30' : 'border-navy-100'
                                         }`}
                                     >
                                         {/* Card Header — gradient strip */}
@@ -307,7 +296,7 @@ const RouteManagement: React.FC = () => {
                                                         key={i}
                                                         className={`flex size-7 items-center justify-center rounded-lg text-[9px] font-black transition-all ${
                                                             rt.frequency?.includes(i + 1)
-                                                                ? 'bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm shadow-violet-500/30'
+                                                                ? 'bg-primary text-white shadow-sm shadow-primary/30'
                                                                 : 'bg-navy-50 text-navy-300'
                                                         }`}
                                                     >
@@ -320,7 +309,7 @@ const RouteManagement: React.FC = () => {
                                             <div className="flex items-center gap-2 border-t border-navy-50 pt-3">
                                                 <button
                                                     onClick={() => setSelectedRouteId(isSelected ? null : rt.id)}
-                                                    className="flex items-center gap-1 rounded-xl bg-navy-50 px-3 py-2 text-[9px] font-black uppercase tracking-widest text-navy-600 transition-all hover:bg-violet-50 hover:text-violet-700"
+                                                    className="flex items-center gap-1 rounded-xl bg-navy-50 px-3 py-2 text-[9px] font-black uppercase tracking-widest text-navy-600 transition-all hover:bg-primary/5 hover:text-primary"
                                                 >
                                                     <span className="material-symbols-outlined text-xs">visibility</span>
                                                     {isSelected ? 'Close' : 'Details'}
@@ -366,7 +355,7 @@ const RouteManagement: React.FC = () => {
                                                 key={rt.id}
                                                 className={`group border-b border-navy-50 transition-all cursor-pointer ${
                                                     isSelected
-                                                        ? 'bg-violet-50/50 border-l-4 border-l-violet-500'
+                                                        ? 'bg-primary/5 border-l-4 border-l-primary'
                                                         : 'hover:bg-navy-50/50'
                                                 }`}
                                                 onClick={() => setSelectedRouteId(isSelected ? null : rt.id)}
@@ -413,7 +402,7 @@ const RouteManagement: React.FC = () => {
                                                                 title={DAY_FULL[i]}
                                                                 className={`flex size-5 items-center justify-center rounded text-[8px] font-black ${
                                                                     rt.frequency?.includes(i + 1)
-                                                                        ? 'bg-violet-100 text-violet-700'
+                                                                        ? 'bg-primary/10 text-primary'
                                                                         : 'bg-navy-50 text-navy-300'
                                                                 }`}
                                                             >
