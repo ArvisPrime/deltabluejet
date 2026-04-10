@@ -38,6 +38,7 @@ const navGroups = [
             { label: 'Bookings', path: ROUTES.BOOKINGS, icon: 'confirmation_number' },
             { label: 'Ticket Reissue', path: ROUTES.TICKET_REISSUE, icon: 'receipt_long' },
             { label: 'User Management', path: ROUTES.USER_MANAGEMENT, icon: 'manage_accounts' },
+            { label: 'Boarding Scanner', path: ROUTES.BOARDING_SCANNER, icon: 'qr_code_scanner' },
             { label: 'Account Settings', path: ROUTES.ACCOUNT_SETTINGS, icon: 'settings' },
             { label: 'Notifications', path: ROUTES.NOTIFICATION_PREFERENCES, icon: 'notifications' },
         ],
@@ -97,7 +98,6 @@ const navGroups = [
             { label: 'Crew Management', path: ROUTES.CREW_MANAGEMENT, icon: 'group' },
             { label: 'Crew Scheduling', path: ROUTES.CREW_SCHEDULING, icon: 'calendar_month' },
             { label: 'FRMS Report', path: ROUTES.CREW_FRMS_REPORT, icon: 'summarize' },
-            { label: 'Boarding Scanner', path: ROUTES.BOARDING_SCANNER, icon: 'qr_code_scanner' },
         ],
     },
 ];

@@ -15,6 +15,7 @@ export const MODULE_GROUPS = [
       { id: 'MANAGE_DELAY', label: 'Delay Management', icon: 'timer_off' },
       { id: 'OPERATIONAL_TRIGGERS', label: 'Op Triggers', icon: 'bolt' },
       { id: 'ALERT_AUDIT_LOG', label: 'Alert Audit Log', icon: 'notification_important' },
+      { id: 'MANIFEST_DOCS', label: 'Manifest & Docs', icon: 'description' },
     ],
   },
   {
@@ -24,6 +25,7 @@ export const MODULE_GROUPS = [
       { id: 'BOOKINGS', label: 'Bookings', icon: 'confirmation_number' },
       { id: 'TICKET_REISSUE', label: 'Ticket Reissue', icon: 'receipt_long' },
       { id: 'USER_MANAGEMENT', label: 'User Management', icon: 'manage_accounts' },
+      { id: 'BOARDING_SCANNER', label: 'Boarding Scanner', icon: 'qr_code_scanner' },
       { id: 'ACCOUNT_SETTINGS', label: 'Account Settings', icon: 'settings' },
       { id: 'NOTIFICATION_PREFERENCES', label: 'Notifications', icon: 'notifications' },
     ],
@@ -82,6 +84,7 @@ export const MODULE_GROUPS = [
     modules: [
       { id: 'CREW_MANAGEMENT', label: 'Crew Management', icon: 'group' },
       { id: 'CREW_SCHEDULING', label: 'Crew Scheduling', icon: 'calendar_month' },
+      { id: 'CREW_FRMS_REPORT', label: 'FRMS Report', icon: 'summarize' },
     ],
   },
 ] as const;

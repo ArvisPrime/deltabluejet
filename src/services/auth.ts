@@ -31,8 +31,8 @@ function isAdminRole(role: string): boolean {
  * Reads role exclusively from custom claims (set by Cloud Function).
  * No Firestore fallback — custom claims are the single source of truth.
  */
-async function mapFirebaseUser(user: User): Promise<AuthUser> {
-    const tokenResult = await user.getIdTokenResult(true); // Force refresh to get latest claims
+async function mapFirebaseUser(user: User, forceRefresh = false): Promise<AuthUser> {
+    const tokenResult = await user.getIdTokenResult(forceRefresh);
     const claimRole = tokenResult.claims.role as UserRole | undefined;
     // Custom roles store the original role doc ID in customRoleId; use it for UI display
     const customRoleId = tokenResult.claims.customRoleId as string | undefined;
@@ -125,7 +125,7 @@ async function checkMfaRequirements(firebaseUser: User, authUser: AuthUser): Pro
  */
 export async function loginWithEmail(email: string, password: string): Promise<AuthUser> {
     const { user } = await signInWithEmailAndPassword(auth, email, password);
-    const authUser = await mapFirebaseUser(user);
+    const authUser = await mapFirebaseUser(user, true); // force refresh at login
 
     // Check MFA requirements for admin users
     await checkMfaRequirements(user, authUser);
@@ -195,7 +195,7 @@ export async function loginWithGoogle(): Promise<AuthUser> {
         }, { merge: true });
     }
 
-    const authUser = await mapFirebaseUser(user);
+    const authUser = await mapFirebaseUser(user, true); // force refresh at login
 
     // Check MFA requirements for admin users
     await checkMfaRequirements(user, authUser);
@@ -348,23 +348,34 @@ function stopIdleTimer(): void {
  * Returns an unsubscribe function.
  */
 export function onAuthChange(callback?: (user: AuthUser | null) => void): () => void {
+    let processing = false; // reentrancy guard
     return onAuthStateChanged(auth, async (firebaseUser) => {
-        if (firebaseUser) {
-            const authUser = await mapFirebaseUser(firebaseUser);
+        if (processing) return; // prevent recursive calls from token refreshes
+        processing = true;
+        try {
+            if (firebaseUser) {
+                // On session resume, use CACHED token — no force refresh.
+                // This prevents triggering another onAuthStateChanged.
+                const authUser = await mapFirebaseUser(firebaseUser, false);
 
-            // Check MFA requirements on session resume (e.g. page refresh)
-            await checkMfaRequirements(firebaseUser, authUser);
+                // On session resume (page refresh / tab focus), do NOT re-run
+                // checkMfaRequirements — MFA is only enforced at login time.
+                // The login functions (loginWithEmail, loginWithGoogle) already
+                // set the MFA flags before calling setUser.
 
-            useAuthStore.getState().setUser(authUser);
-            // Start idle timer for admin/staff users only
-            if (authUser.role !== 'customer') {
-                startIdleTimer();
+                useAuthStore.getState().setUser(authUser);
+                // Start idle timer for admin/staff users only
+                if (authUser.role !== 'customer') {
+                    startIdleTimer();
+                }
+                callback?.(authUser);
+            } else {
+                stopIdleTimer();
+                useAuthStore.getState().setUser(null);
+                callback?.(null);
             }
-            callback?.(authUser);
-        } else {
-            stopIdleTimer();
-            useAuthStore.getState().setUser(null);
-            callback?.(null);
+        } finally {
+            processing = false;
         }
     });
 }
