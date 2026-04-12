@@ -15,7 +15,7 @@ const MassRebooking: React.FC = () => {
     const addToast = useToastStore(s => s.addToast);
     const [cancelledFlights, setCancelledFlights] = useState<FlightDoc[]>([]);
     const [selectedFlight, setSelectedFlight] = useState<FlightDoc | null>(null);
-    const [affectedBookings, setAffectedBookings] = useState<(BookingDoc & { id: string })[]>([]);
+    const [affectedBookings, setAffectedBookings] = useState<(BookingDoc & { id: string, passengers?: any[] })[]>([]);
     const [alternatives, setAlternatives] = useState<AlternativeFlight[]>([]);
     const [rebookings, setRebookings] = useState<RebookingRecord[]>([]);
     const [loading, setLoading] = useState(true);

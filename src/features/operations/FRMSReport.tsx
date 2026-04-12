@@ -11,6 +11,7 @@ import {
     type SleepEntry,
 } from '../../utils/fatigueEngine';
 import { downloadCSV } from '../../utils/tableExport';
+import { toLocalDateString } from '../../utils/localDate';
 
 // ─── Helpers ────────────────────────────────────────────
 
@@ -58,8 +59,8 @@ const FRMSReport: React.FC = () => {
             start.setMonth(start.getMonth() - 3);
         }
         return {
-            start: start.toISOString().slice(0, 10),
-            end: end.toISOString().slice(0, 10),
+            start: toLocalDateString(start),
+            end: toLocalDateString(end),
             label: period === 'monthly'
                 ? `${start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
                 : `${start.toLocaleDateString('en-US', { month: 'short' })} – ${end.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`,

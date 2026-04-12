@@ -95,38 +95,4 @@ export async function getPaymentByTxRef(txRef: string): Promise<PaymentDoc | nul
     return { id: doc.id, ...doc.data() } as PaymentDoc;
 }
 
-/**
- * Mobile money provider display metadata.
- */
-export const MOBILE_MONEY_PROVIDERS = [
-    {
-        id: 'wave' as const,
-        name: 'Wave',
-        icon: 'waves',
-        color: '#1B3A5C',
-        description: 'Pay with your Wave wallet',
-    },
-    {
-        id: 'orange_money' as const,
-        name: 'Orange Money',
-        icon: 'smartphone',
-        color: '#FF6600',
-        description: 'Pay with Orange Money',
-    },
-    {
-        id: 'afrimoney' as const,
-        name: 'AfriMoney',
-        icon: 'account_balance_wallet',
-        color: '#E31937',
-        description: 'Pay with AfriMoney (Africell)',
-    },
-    {
-        id: 'qmoney' as const,
-        name: 'QMoney',
-        icon: 'phonelink_ring',
-        color: '#00A651',
-        description: 'Pay with QMoney (QCell)',
-    },
-] as const;
-
-export type MobileMoneyProviderId = typeof MOBILE_MONEY_PROVIDERS[number]['id'];
+export type MobileMoneyProviderId = string;

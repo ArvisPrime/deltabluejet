@@ -22,6 +22,7 @@ export interface SelectedFlight {
     departureTime: string;
     arrivalTime: string;
     price: number;
+    basePrice: number;
     fareClass: string;
     aircraft: string;
 }

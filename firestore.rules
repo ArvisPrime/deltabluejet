@@ -195,6 +195,18 @@ service cloud.firestore {
       allow write: if isOpsStaff();
     }
 
+    // ─── System Configs ──────────────────────────────────────────
+    match /system_configs/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─── Aircraft Layouts ────────────────────────────────────────
+    match /aircraft_layouts/{layoutId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // ─── SEO Config ────────────────────────────────────────────
     match /seo_config/{configId} {
       allow read: if true;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
-import { getBookingByPNR } from '../../services/booking';
+import { getBookingByPNR, cancelBooking } from '../../services/booking';
 import { calculateCancellationFee, getFareRules, type CancellationResult } from '../../services/fareRulesService';
 import { useCurrency } from '../../hooks/useCurrency';
 import type { BookingDoc } from '../../types/firestore';
@@ -47,16 +47,16 @@ const CancelBooking: React.FC = () => {
     }, [pnr]);
 
     const handleCancel = async () => {
-        if (!booking) return;
+        if (!booking || !booking.id) return;
         setProcessing(true);
         try {
-            // In production, this would call the cancellation Cloud Function
-            // For now, simulate a short delay
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            await cancelBooking(booking.id);
             setCompleted(true);
             setShowConfirm(false);
-        } catch {
+        } catch (err: any) {
+            console.error('Cancellation failed', err);
             setError('Failed to process cancellation. Please contact customer service.');
+            setShowConfirm(false);
         } finally {
             setProcessing(false);
         }

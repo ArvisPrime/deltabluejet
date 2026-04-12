@@ -6,12 +6,18 @@ import { useCmsHeaderStore } from '../stores/cmsHeaderStore';
 import ToastContainer from '../components/ui/ToastContainer';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
+import { useConfigStore } from '../stores/configStore';
+
 const App: React.FC = () => {
-  // Subscribe to Firebase auth state changes at the top level
+  // Subscribe to Firebase auth state changes and initial system configs
   useEffect(() => {
-    const unsubscribe = onAuthChange();
+    const unsubAuth = onAuthChange();
+    const unsubConfig = useConfigStore.getState().initializeConfigs();
     useCmsHeaderStore.getState().load();
-    return unsubscribe;
+    return () => {
+        unsubAuth();
+        unsubConfig();
+    };
   }, []);
 
   return (

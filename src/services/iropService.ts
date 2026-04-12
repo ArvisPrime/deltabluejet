@@ -249,13 +249,20 @@ export function calculateCompensation(distanceKm: number, delayHours: number): n
 // ─── Get Affected Bookings ─────────────────────────────────
 
 /**
- * Find all bookings on a given flight.
+ * Find all bookings on a given flight, including their passengers.
  */
-export async function getAffectedBookings(flightId: string): Promise<(BookingDoc & { id: string })[]> {
+export async function getAffectedBookings(flightId: string): Promise<(BookingDoc & { id: string, passengers: any[] })[]> {
     const bookingsRef = collection(db, 'bookings');
     const q = query(bookingsRef, where('flightId', '==', flightId));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as BookingDoc & { id: string }));
+    
+    const bookings = await Promise.all(snap.docs.map(async (d) => {
+        const bookingData = { id: d.id, ...d.data() } as BookingDoc & { id: string };
+        const paxSnap = await getDocs(collection(db, 'bookings', d.id, 'passengers'));
+        const passengers = paxSnap.docs.map(p => ({ id: p.id, ...p.data() }));
+        return { ...bookingData, passengers };
+    }));
+    return bookings;
 }
 
 // ─── Rebooking Records ────────────────────────────────────

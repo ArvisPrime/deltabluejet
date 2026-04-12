@@ -7,6 +7,7 @@ import {
 } from '../../services/crewService';
 import { calcAvgSleep, calcSleepDebt } from '../../utils/fatigueEngine';
 import type { SleepEntry } from '../../utils/fatigueEngine';
+import { todayString } from '../../utils/localDate';
 
 // ─── Helpers ────────────────────────────────────────────
 
@@ -23,7 +24,7 @@ function toSleepEntry(e: SleepLogEntry): SleepEntry {
 
 const EMPTY_FORM = {
     crewId: '',
-    date: new Date().toISOString().slice(0, 10),
+    date: todayString(),
     hoursSlept: 7,
     quality: 'good' as SleepLogEntry['quality'],
     notes: '',

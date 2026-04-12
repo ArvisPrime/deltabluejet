@@ -9,6 +9,7 @@ import {
     query, where, orderBy, onSnapshot, Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase.config';
+import { toLocalDateString } from '../utils/localDate';
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -116,7 +117,7 @@ export function checkFatigueRules(
     const d = new Date(newAssignment.date);
     for (let i = 1; i <= MAX_CONSECUTIVE_DAYS; i++) {
         d.setDate(d.getDate() - 1);
-        if (recentDates.has(d.toISOString().slice(0, 10))) {
+        if (recentDates.has(toLocalDateString(d))) {
             consecutiveDays++;
         } else { break; }
     }
@@ -127,7 +128,7 @@ export function checkFatigueRules(
     // Check weekly hours
     const weekStart = new Date(newAssignment.date);
     weekStart.setDate(weekStart.getDate() - 6);
-    const weekAssignments = assignments.filter(a => a.date >= weekStart.toISOString().slice(0, 10) && a.date <= newAssignment.date);
+    const weekAssignments = assignments.filter(a => a.date >= toLocalDateString(weekStart) && a.date <= newAssignment.date);
     const weeklyHours = weekAssignments.reduce((sum, a) => sum + timeDiffHours(a.dutyStart, a.dutyEnd), 0) + dutyH;
     if (weeklyHours > MAX_WEEKLY_HOURS) {
         violations.push(`Weekly hours ${weeklyHours.toFixed(1)}h exceeds ${MAX_WEEKLY_HOURS}h limit`);

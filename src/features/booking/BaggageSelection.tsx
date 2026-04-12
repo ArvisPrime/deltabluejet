@@ -1,40 +1,83 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { useBookingStore } from '../../stores/bookingStore';
 import { useCurrency } from '../../hooks/useCurrency';
-import {
-    getDefaultAllowance,
-    calculateExcessFee,
-    SPECIAL_ITEMS,
-    type BaggageAllowance,
-    type SpecialItemOption,
-} from '../../services/baggageService';
+import { useConfigStore } from '../../stores/configStore';
 
 const BaggageSelection: React.FC = () => {
     const navigate = useNavigate();
     const selectedFlight = useBookingStore(s => s.selectedFlight);
     const fareClass = selectedFlight?.fareClass || 'economy';
-    const allowance: BaggageAllowance = getDefaultAllowance(fareClass);
     const { display } = useCurrency();
+    const baggageConfig = useConfigStore(s => s.baggage);
+
+    // Fallback allowance if config isn't loaded yet
+    const defaultAllowance = {
+        cabin: { count: 1, maxWeightKg: 7 },
+        checked: { count: 0, maxWeightKg: 0 },
+        personalItem: true,
+        displayName: 'Light',
+        extraBagFeeCents: 5000,
+    };
+
+    const allowance = baggageConfig?.fareAllowances?.[fareClass] || defaultAllowance;
+    const excessFeePerKgCents = baggageConfig?.excessFeePerKgCents || 1500;
+    const specialItemsList = baggageConfig?.specialItems || [];
 
     // ── State ────────────────────────────────────────────
     const [checkedBags, setCheckedBags] = useState(allowance.checked.count);
-    const [totalWeightKg, setTotalWeightKg] = useState(allowance.checked.maxWeightKg * allowance.checked.count);
+    const [totalWeightKg, setTotalWeightKg] = useState(allowance.checked.maxWeightKg * Math.max(1, allowance.checked.count));
     const [selectedSpecials, setSelectedSpecials] = useState<Set<string>>(new Set());
 
+    useEffect(() => {
+        if (checkedBags === allowance.checked.count && totalWeightKg < allowance.checked.maxWeightKg * allowance.checked.count) {
+             setTotalWeightKg(allowance.checked.maxWeightKg * allowance.checked.count);
+        }
+    }, [checkedBags, allowance, totalWeightKg]);
+
     // ── Calculations ─────────────────────────────────────
-    const excessResult = useMemo(
-        () => calculateExcessFee(fareClass, checkedBags, totalWeightKg),
-        [fareClass, checkedBags, totalWeightKg],
-    );
+    const excessResult = useMemo(() => {
+        const breakdown: string[] = [];
+        const MAX_TOTAL_BAGS = 5;
+
+        // Extra bags fee
+        const extraBags = Math.max(0, Math.min(checkedBags, MAX_TOTAL_BAGS) - allowance.checked.count);
+        const perBagFee = allowance.extraBagFeeCents ?? 5000;
+        const extraBagFee = extraBags * perBagFee;
+
+        if (extraBags > 0) {
+            breakdown.push(`${extraBags} extra bag${extraBags > 1 ? 's' : ''} × ${display(perBagFee / 100)} = ${display(extraBagFee / 100)}`);
+        }
+
+        // Overweight fee
+        const allowedWeight = allowance.checked.maxWeightKg * Math.max(checkedBags, allowance.checked.count);
+        const overweightKg = Math.max(0, totalWeightKg - allowedWeight);
+        const overweightFee = overweightKg * excessFeePerKgCents;
+
+        if (overweightKg > 0) {
+            breakdown.push(`${overweightKg}kg overweight × ${display(excessFeePerKgCents / 100)}/kg = ${display(overweightFee / 100)}`);
+        }
+
+        if (breakdown.length === 0) {
+            breakdown.push('Within your free baggage allowance');
+        }
+
+        return {
+            extraBags,
+            extraBagFee,
+            overweightFee,
+            totalFee: extraBagFee + overweightFee,
+            breakdown,
+        };
+    }, [checkedBags, totalWeightKg, allowance, excessFeePerKgCents, display]);
 
     const specialItemsFee = useMemo(() => {
         return Array.from(selectedSpecials).reduce((sum, id) => {
-            const item = SPECIAL_ITEMS.find(i => i.id === id);
+            const item = specialItemsList.find((i: any) => i.id === id);
             return sum + (item?.feeCents || 0);
         }, 0);
-    }, [selectedSpecials]);
+    }, [selectedSpecials, specialItemsList]);
 
     const grandTotal = excessResult.totalFee + specialItemsFee;
 
@@ -150,7 +193,7 @@ const BaggageSelection: React.FC = () => {
                         <h3 className="text-sm font-black text-navy-900 uppercase tracking-widest">Special Items</h3>
                     </div>
                     <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {SPECIAL_ITEMS.map(item => {
+                                {specialItemsList.map((item: any) => {
                             const isSelected = selectedSpecials.has(item.id);
                             return (
                                 <button
@@ -226,7 +269,7 @@ const BaggageSelection: React.FC = () => {
                                 <>
                                     <hr className="border-dashed border-navy-100" />
                                     {Array.from(selectedSpecials).map(id => {
-                                        const item = SPECIAL_ITEMS.find(i => i.id === id);
+                                        const item = specialItemsList.find((i: any) => i.id === id);
                                         return item ? (
                                             <div key={id} className="flex justify-between font-bold text-xs">
                                                 <span className="text-navy-500">{item.name}</span>

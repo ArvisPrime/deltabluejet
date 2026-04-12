@@ -6,6 +6,7 @@ import { getFlights } from '../../services/firestore';
 import { assignGate, getUnassignedFlights, type GateConflict } from '../../services/disruptionService';
 import type { FlightDoc } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
+import { toLocalDateString } from '../../utils/localDate';
 
 const GATES = ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C2', 'C3', 'C4'];
 const TERMINALS = ['Terminal 1', 'Terminal 2', 'Terminal 3'];
@@ -86,7 +87,7 @@ const GateAssignment: React.FC = () => {
       if (filterDate) {
          list = list.filter(f => {
             const dep = f.departureTime.toDate();
-            return dep.toISOString().slice(0, 10) === filterDate;
+            return toLocalDateString(dep) === filterDate;
          });
       }
       list.sort((a, b) => {

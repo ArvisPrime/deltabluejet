@@ -4,6 +4,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { BRAND } from '../../config/brand';
 import { ROUTES } from '../../config/routes';
 import { useBookingStore } from '../../stores/bookingStore';
+import { useConfigStore } from '../../stores/configStore';
+import { getAirportByCode } from '../../data/airports';
 
 interface ConfirmationState {
    paymentId?: string;
@@ -17,12 +19,17 @@ interface ConfirmationState {
    flightNumber?: string;
    fareClass?: string;
    bookingId?: string;
+   mobileMoneyProvider?: string;
+   gateway?: string;
 }
 
 const TicketConfirmation: React.FC = () => {
    const navigate = useNavigate();
    const location = useLocation();
    const state = (location.state as ConfirmationState) || {};
+   
+   // Provider Config
+   const paymentProviders = useConfigStore(s => s.paymentProviders?.providers || []);
 
    // Read from navigation state (passed by PaymentProcessing) or fall back to booking store
    const storePnr = useBookingStore((s) => s.pnr);
@@ -39,14 +46,10 @@ const TicketConfirmation: React.FC = () => {
    const flightNum = state.flightNumber || storeFlight?.flightNumber || '—';
    const fareClass = state.fareClass || storeFlight?.fareClass || 'economy';
 
-   // Friendly city names (can be enhanced with a lookup)
+   // Friendly city names
    const cityName = (code: string) => {
-      const cities: Record<string, string> = {
-         BJL: 'Banjul', DSS: 'Dakar', LHR: 'London', ACC: 'Accra',
-         LOS: 'Lagos', FNA: 'Freetown', ABV: 'Abuja', DKR: 'Dakar',
-         NBO: 'Nairobi', JNB: 'Johannesburg',
-      };
-      return cities[code] || code;
+      const airport = getAirportByCode(code);
+      return airport ? airport.city : code;
    };
 
    const onDone = () => {
@@ -135,8 +138,16 @@ const TicketConfirmation: React.FC = () => {
                            <p className="text-lg font-black text-navy-950 mt-1">${amount}</p>
                         </div>
                         <div className="p-3 bg-navy-50/30 rounded-xl text-center">
-                           <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest">Card</p>
-                           <p className="text-sm font-black text-navy-950 mt-1 capitalize">{cardBrand} •••• {last4}</p>
+                           <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest">Method</p>
+                           {state.gateway === 'flutterwave' ? (
+                               <p className="text-sm font-black text-navy-950 mt-1 capitalize">
+                                   {paymentProviders.find(p => p.id === state.mobileMoneyProvider)?.name || 'Mobile Money'}
+                               </p>
+                           ) : (
+                               <p className="text-sm font-black text-navy-950 mt-1 capitalize">
+                                   {cardBrand} •••• {last4}
+                               </p>
+                           )}
                         </div>
                         <div className="p-3 bg-navy-50/30 rounded-xl text-center">
                            <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest">Date</p>

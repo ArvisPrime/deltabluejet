@@ -5,6 +5,7 @@ import { ROUTES } from '../../config/routes';
 import { useBookingStore, type SearchCriteria } from '../../stores/bookingStore';
 import { getRoutes } from '../../services/firestore';
 import type { RouteDoc } from '../../types/firestore';
+import { toLocalDateString } from '../../utils/localDate';
 
 interface AirportOption {
   code: string;
@@ -110,10 +111,10 @@ const FlightSearch: React.FC = () => {
   // Default departure to tomorrow
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const defaultDep = tomorrow.toISOString().slice(0, 10);
+  const defaultDep = toLocalDateString(tomorrow);
   const weekLater = new Date(tomorrow);
   weekLater.setDate(weekLater.getDate() + 7);
-  const defaultRet = weekLater.toISOString().slice(0, 10);
+  const defaultRet = toLocalDateString(weekLater);
 
   const [departureDate, setDepartureDate] = useState(defaultDep);
   const [returnDate, setReturnDate] = useState(defaultRet);
@@ -199,7 +200,7 @@ const FlightSearch: React.FC = () => {
                   <input
                     type="date"
                     value={departureDate}
-                    min={new Date().toISOString().slice(0, 10)}
+                    min={toLocalDateString(new Date())}
                     onChange={(e) => setDepartureDate(e.target.value)}
                     className="w-full h-14 px-4 bg-navy-50 border border-navy-100 rounded-xl font-bold text-sm"
                   />

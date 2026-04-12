@@ -6,6 +6,7 @@ import { getOrCreateCustomer, updateCustomer } from '../../services/customerServ
 import type { CustomerDoc } from '../../types/firestore';
 import { Timestamp } from 'firebase/firestore';
 import { useToastStore } from '../../stores/toastStore';
+import { toLocalDateString } from '../../utils/localDate';
 
 /**
  * MyProfile — Passenger profile management page.
@@ -59,7 +60,7 @@ const MyProfile: React.FC = () => {
                 setDocumentType(cust.documentType || 'passport');
                 setDocumentNumber(cust.documentNumber || '');
                 if (cust.dateOfBirth?.toDate) {
-                    setDateOfBirth(cust.dateOfBirth.toDate().toISOString().split('T')[0]);
+                    setDateOfBirth(toLocalDateString(cust.dateOfBirth.toDate()));
                 }
                 if (cust.preferences) {
                     setSeatPref(cust.preferences.seatPreference || 'none');
@@ -68,7 +69,7 @@ const MyProfile: React.FC = () => {
                     setSmsNotif(cust.preferences.smsNotifications ?? false);
                 }
                 if ((cust as any).passportExpiry?.toDate) {
-                    setPassportExpiry((cust as any).passportExpiry.toDate().toISOString().split('T')[0]);
+                    setPassportExpiry(toLocalDateString((cust as any).passportExpiry.toDate()));
                 }
                 if ((cust as any).emergencyContact) {
                     setEmergencyName((cust as any).emergencyContact.name || '');

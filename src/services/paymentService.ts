@@ -25,6 +25,7 @@ import { db, functions } from '../config/firebase.config';
 import type { PaymentDoc, PaymentStatus } from '../types/firestore';
 import { logAuditEntry } from './firestore';
 import { onBookingConfirmed } from './notificationTriggers';
+import { calculateCancellationFee } from './fareRulesService';
 
 const paymentsRef = collection(db, 'payments');
 
@@ -77,8 +78,6 @@ export function calculateRefund(
     const hoursUntilDeparture = (departureDate.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     // Use the fare rules engine for fare-class-aware calculation
-    // Inline import to avoid circular deps at module level
-    const { calculateCancellationFee } = require('./fareRulesService');
     const result = calculateCancellationFee(fareClass, amountPaid, hoursUntilDeparture);
 
     return {

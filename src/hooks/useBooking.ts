@@ -133,6 +133,11 @@ export function useBooking() {
         await modifyBooking(input);
     }, []);
 
+    // Confirm booking
+    const confirm = useCallback(async (bookingId: string, paymentIntentId: string) => {
+        await confirmBooking(bookingId, paymentIntentId);
+    }, []);
+
     return {
         // Store state
         ...store,
@@ -147,5 +152,6 @@ export function useBooking() {
         getMyBookings,
         cancel,
         modify,
+        confirm,
     };
 }

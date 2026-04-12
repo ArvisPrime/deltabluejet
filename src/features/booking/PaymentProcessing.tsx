@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
-import { useBookingStore } from '../../stores/bookingStore';
+import { useConfigStore } from '../../stores/configStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useBooking } from '../../hooks/useBooking';
 import { createPayment, processPayment, confirmPaymentAndBooking } from '../../services/paymentService';
 import {
     initiateFlutterwavePayment,
-    MOBILE_MONEY_PROVIDERS,
     type MobileMoneyProviderId,
 } from '../../services/flutterwaveService';
 import { useToastStore } from '../../stores/toastStore';
@@ -24,6 +23,9 @@ const PaymentProcessing: React.FC = () => {
     const bookingId = useBookingStore((s) => s.bookingId);
     const pnr = useBookingStore((s) => s.pnr);
     const { completeBooking } = useBooking();
+    
+    // Configs
+    const paymentProviders = useConfigStore(s => s.paymentProviders?.providers.filter(p => p.active) || []);
 
     // Compute real amounts from booking store
     const pricePerPax = selectedFlight?.price || 0;
@@ -43,8 +45,14 @@ const PaymentProcessing: React.FC = () => {
 
     // ─── Payment method state ─────────────────────────────
     const [activeTab, setActiveTab] = useState<PaymentTab>('card');
-    const [selectedProvider, setSelectedProvider] = useState<MobileMoneyProviderId>('wave');
+    const [selectedProvider, setSelectedProvider] = useState<string>('');
     const [phoneNumber, setPhoneNumber] = useState('');
+
+    React.useEffect(() => {
+        if (paymentProviders.length > 0 && !selectedProvider) {
+            setSelectedProvider(paymentProviders[0].id);
+        }
+    }, [paymentProviders, selectedProvider]);
 
     // Card form state
     const [cardNumber, setCardNumber] = useState('');
@@ -55,6 +63,37 @@ const PaymentProcessing: React.FC = () => {
     // Processing state
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState('');
+    const [recoveryMode, setRecoveryMode] = useState(false);
+    const [recoveryInfo, setRecoveryInfo] = useState<{paymentId: string, bookingId: string, eTicketNumber: string} | null>(null);
+
+    React.useEffect(() => {
+        const stored = localStorage.getItem('recoveryPayment');
+        if (stored) {
+            try {
+                const info = JSON.parse(stored);
+                if (info && info.paymentId && info.bookingId && info.eTicketNumber) {
+                    setRecoveryMode(true);
+                    setRecoveryInfo(info);
+                }
+            } catch (e) {}
+        }
+    }, []);
+
+    const confirmWithRetry = async (payId: string, bId: string, eTicket: string, maxRetries = 3) => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                await confirmPaymentAndBooking(payId, bId, eTicket, user?.uid || 'anonymous');
+                return true;
+            } catch (err) {
+                if (attempt === maxRetries) {
+                    console.error('Confirm failure:', err);
+                    return false;
+                }
+                await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+            }
+        }
+        return false;
+    };
 
     const formatCardNumber = (val: string) => {
         const digits = val.replace(/\D/g, '').slice(0, 16);
@@ -118,13 +157,17 @@ const PaymentProcessing: React.FC = () => {
         const result = await processPayment(paymentId);
 
         if (result.success && result.eTicketNumber) {
-            await confirmPaymentAndBooking(
-                paymentId,
-                currentBookingId!,
-                result.eTicketNumber,
-                user?.uid || 'anonymous',
-            );
+            const confirmed = await confirmWithRetry(paymentId, currentBookingId!, result.eTicketNumber);
+            
+            if (!confirmed) {
+                const info = { paymentId, bookingId: currentBookingId!, eTicketNumber: result.eTicketNumber };
+                localStorage.setItem('recoveryPayment', JSON.stringify(info));
+                setRecoveryInfo(info);
+                setRecoveryMode(true);
+                return;
+            }
 
+            localStorage.removeItem('recoveryPayment');
             navigate(ROUTES.TICKET_CONFIRMATION, {
                 state: {
                     paymentId,
@@ -204,7 +247,69 @@ const PaymentProcessing: React.FC = () => {
     };
 
     // ─── Provider display helper ─────────────────────────
-    const currentProvider = MOBILE_MONEY_PROVIDERS.find((p) => p.id === selectedProvider);
+    const currentProvider = paymentProviders.find((p) => p.id === selectedProvider);
+
+    if (recoveryMode && recoveryInfo) {
+        return (
+            <div className="p-8 max-w-3xl mx-auto text-center space-y-8 mt-12 bg-white rounded-3xl border border-red-100 shadow-sm">
+                <div className="size-20 mx-auto bg-red-50 text-red-500 flex items-center justify-center rounded-2xl">
+                    <span className="material-symbols-outlined text-4xl">warning</span>
+                </div>
+                <div>
+                    <h2 className="text-2xl font-black text-navy-950 uppercase tracking-tight">Action Required</h2>
+                    <p className="text-navy-500 font-medium mt-2">
+                        Your payment was received but we couldn't confirm your booking. <br />
+                        Reference: <span className="font-mono bg-navy-50 px-2 rounded text-navy-900">{recoveryInfo.paymentId}</span>
+                    </p>
+                </div>
+
+                {error && (
+                    <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-center gap-3">
+                        <span className="material-symbols-outlined text-red-500">error</span>
+                        <p className="text-sm font-bold text-red-600">{error}</p>
+                    </div>
+                )}
+                
+                <div className="flex gap-4 justify-center">
+                    <button 
+                        onClick={async () => {
+                            setProcessing(true);
+                            setError('');
+                            const confirmed = await confirmWithRetry(recoveryInfo.paymentId, recoveryInfo.bookingId, recoveryInfo.eTicketNumber);
+                            setProcessing(false);
+                            if (confirmed) {
+                                localStorage.removeItem('recoveryPayment');
+                                navigate(ROUTES.TICKET_CONFIRMATION, {
+                                    state: {
+                                        paymentId: recoveryInfo.paymentId,
+                                        eTicketNumber: recoveryInfo.eTicketNumber,
+                                        amount: displayAmount,
+                                        pnr: pnr || 'UNKNOWN',
+                                        origin: originCode,
+                                        destination: destCode,
+                                        flightNumber,
+                                        fareClass,
+                                        bookingId: recoveryInfo.bookingId,
+                                    }
+                                });
+                            } else {
+                                setError('Recovery confirmation failed again. Please contact support immediately with your reference number.');
+                            }
+                        }}
+                        className="px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-primary/30 transition-transform hover:scale-105 disabled:opacity-50 flex items-center gap-2"
+                        disabled={processing}
+                    >
+                        {processing ? <span className="material-symbols-outlined animate-spin">refresh</span> : <span className="material-symbols-outlined">sync</span>}
+                        {processing ? 'Recovering...' : 'Retry Confirmation'}
+                    </button>
+                    <button onClick={() => navigate(ROUTES.HOME)} className="px-8 py-4 border-2 border-navy-100 text-navy-600 rounded-2xl font-black uppercase tracking-widest hover:bg-navy-50 transition-colors">
+                        Return Home
+                    </button>
+                </div>
+                <p className="text-xs text-navy-400">If the issue persists, please do not attempt to pay again. Contact support.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-500">
@@ -352,7 +457,7 @@ const PaymentProcessing: React.FC = () => {
                             <div className="bg-white rounded-3xl border border-navy-100 p-8 shadow-sm space-y-6">
                                 <h3 className="text-xs font-black text-navy-400 uppercase tracking-widest">Select Provider</h3>
                                 <div className="grid grid-cols-2 gap-3">
-                                    {MOBILE_MONEY_PROVIDERS.map((provider) => (
+                                    {paymentProviders.map((provider) => (
                                         <button
                                             key={provider.id}
                                             onClick={() => setSelectedProvider(provider.id)}
@@ -531,7 +636,7 @@ const PaymentProcessing: React.FC = () => {
                         <div className="p-4 bg-white rounded-2xl border border-navy-100 space-y-3 animate-in fade-in duration-300">
                             <h4 className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Accepted Providers</h4>
                             <div className="flex justify-center gap-3">
-                                {MOBILE_MONEY_PROVIDERS.map((p) => (
+                                {paymentProviders.map((p) => (
                                     <div
                                         key={p.id}
                                         className="size-8 rounded-lg flex items-center justify-center text-white"

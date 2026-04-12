@@ -96,12 +96,40 @@ const FlightResults: React.FC = () => {
       }
    }, [searchCriteria, navigate]);
 
+   const [cursor, setCursor] = useState<any>(null);
+   const [hasMore, setHasMore] = useState(false);
+   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+   // Fallback loader
+   const loadAllFlightsFallback = async (reset = false) => {
+      try {
+         const currentCursor = reset ? null : cursor;
+         const { flights: newFlights, lastDoc, hasMore: more } = await getAllScheduledFlights(currentCursor, 20);
+         
+         if (reset) {
+            setAllFlights(newFlights);
+         } else {
+            setAllFlights(prev => [...prev, ...newFlights]);
+         }
+         
+         setCursor(lastDoc);
+         setHasMore(more);
+         setShowingAll(true);
+         if (reset) setFlights([]);
+      } catch (err) {
+         console.error('Fallback fetching flights failed:', err);
+         setError('Unable to load flights. Please try again.');
+      }
+   };
+
    // Fetch flights from Firestore — if no match, fall back to all scheduled flights
    useEffect(() => {
       if (!searchCriteria) return;
       setLoading(true);
       setError('');
       setShowingAll(false);
+      setCursor(null);
+      setHasMore(false);
 
       searchFlights(
          searchCriteria.origin,
@@ -117,28 +145,23 @@ const FlightResults: React.FC = () => {
                setFlights(bookable);
             } else {
                // Fallback: load ALL scheduled flights so passengers can still browse
-               await loadAllFlightsFallback();
+               await loadAllFlightsFallback(true);
             }
          })
          .catch(async (err) => {
             console.error('Flight search failed:', err);
             // Fallback: try loading all flights instead of showing error
-            try {
-               await loadAllFlightsFallback();
-            } catch (fallbackErr) {
-               console.error('Fallback also failed:', fallbackErr);
-               setError('Unable to search flights. Please try again.');
-            }
+            await loadAllFlightsFallback(true);
          })
          .finally(() => setLoading(false));
-
-      async function loadAllFlightsFallback() {
-         const all = await getAllScheduledFlights();
-         setAllFlights(all);
-         setShowingAll(true);
-         setFlights([]);
-      }
    }, [searchCriteria]);
+
+   const handleLoadMore = async () => {
+      if (isLoadingMore || !hasMore) return;
+      setIsLoadingMore(true);
+      await loadAllFlightsFallback(false);
+      setIsLoadingMore(false);
+   };
 
    // Sort flights based on filter
    const sortedFlights = [...flights].sort((a, b) => {
@@ -155,14 +178,20 @@ const FlightResults: React.FC = () => {
    });
 
    const selectFlight = (f: FlightDoc) => {
+      // Store ISO strings so downstream components can parse/format them
+      const depDate = typeof (f.departureTime as any)?.toDate === 'function'
+         ? (f.departureTime as any).toDate() : f.departureTime instanceof Date ? f.departureTime : null;
+      const arrDate = typeof (f.arrivalTime as any)?.toDate === 'function'
+         ? (f.arrivalTime as any).toDate() : f.arrivalTime instanceof Date ? f.arrivalTime : null;
       setSelectedFlight({
          flightId: f.id,
          flightNumber: f.flightNumber,
          origin: f.origin.code,
          destination: f.destination.code,
-         departureTime: formatTime(f.departureTime),
-         arrivalTime: formatTime(f.arrivalTime),
+         departureTime: depDate ? depDate.toISOString() : formatTime(f.departureTime),
+         arrivalTime: arrDate ? arrDate.toISOString() : formatTime(f.arrivalTime),
          price: f.baseFare?.economy || 0,
+         basePrice: f.baseFare?.economy || 0,
          fareClass: 'economy',
          aircraft: f.aircraft?.type || 'Unknown',
       });
@@ -384,6 +413,29 @@ const FlightResults: React.FC = () => {
                                     );
                                  })}
                               </div>
+
+                              {/* Load More Button for paginated fallback results */}
+                              {hasMore && (
+                                 <div className="flex justify-center pt-8">
+                                    <button
+                                       onClick={(e) => { e.stopPropagation(); handleLoadMore(); }}
+                                       disabled={isLoadingMore}
+                                       className="px-12 py-5 bg-navy-950 text-white font-black uppercase text-[11px] tracking-[0.25em] rounded-[1.5rem] shadow-2xl shadow-navy-950/20 hover:bg-primary hover:shadow-primary/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-3"
+                                    >
+                                       {isLoadingMore ? (
+                                          <>
+                                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                             Loading More Flights...
+                                          </>
+                                       ) : (
+                                          <>
+                                             <span className="material-symbols-outlined text-sm">expand_more</span>
+                                             Load More Flights
+                                          </>
+                                       )}
+                                    </button>
+                                 </div>
+                              )}
                            </>
                         )}
 

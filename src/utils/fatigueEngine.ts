@@ -13,6 +13,7 @@
 
 import type { DutyLogEntry } from './ftlEngine';
 import { FTL_LIMITS } from './ftlEngine';
+import { toLocalDateString } from './localDate';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -339,7 +340,7 @@ export function calculateFatigueTrend(
     for (let i = days - 1; i >= 0; i--) {
         const date = new Date(now);
         date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().slice(0, 10);
+        const dateStr = toLocalDateString(date);
 
         // Get logs up to this date (rolling window)
         const logsToDate = dutyLogs.filter(l => l.date <= dateStr);

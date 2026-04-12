@@ -14,5 +14,6 @@ root.render(
   </React.StrictMode>
 );
 
+
 // Measure and report Core Web Vitals (CLS, FCP, LCP, TTFB, INP)
 reportWebVitals();

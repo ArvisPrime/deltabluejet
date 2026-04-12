@@ -4,21 +4,11 @@ import { ROUTES } from '../../config/routes';
 import { APP_CONFIG } from '../../config/app';
 import { useBookingStore } from '../../stores/bookingStore';
 import { validatePassportExpiry, validateDocumentFormat, type ExpiryValidation } from '../../services/travelDocService';
+import { isValidEmail, isValidPhone, isValidDOB } from '../../utils/validators';
 
-// ── Common countries list ──────────────────────────────────
-const COUNTRIES = [
-  'Afghanistan', 'Albania', 'Algeria', 'Argentina', 'Australia', 'Austria', 'Bangladesh',
-  'Belgium', 'Brazil', 'Cameroon', 'Canada', 'China', 'Colombia', 'Congo', 'Côte d\'Ivoire',
-  'Denmark', 'Egypt', 'Ethiopia', 'Finland', 'France', 'Gambia', 'Germany', 'Ghana', 'Greece',
-  'Guinea', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Jamaica',
-  'Japan', 'Jordan', 'Kenya', 'Lebanon', 'Liberia', 'Libya', 'Malaysia', 'Mali', 'Mexico',
-  'Morocco', 'Mozambique', 'Netherlands', 'New Zealand', 'Niger', 'Nigeria', 'Norway',
-  'Pakistan', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia', 'Rwanda',
-  'Saudi Arabia', 'Senegal', 'Sierra Leone', 'Singapore', 'Somalia', 'South Africa',
-  'South Korea', 'Spain', 'Sri Lanka', 'Sudan', 'Sweden', 'Switzerland', 'Tanzania',
-  'Thailand', 'Togo', 'Tunisia', 'Turkey', 'Uganda', 'Ukraine', 'United Arab Emirates',
-  'United Kingdom', 'United States', 'Vietnam', 'Zimbabwe',
-];
+import { useConfigStore } from '../../stores/configStore';
+
+
 
 const PassengerDetails: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +20,7 @@ const PassengerDetails: React.FC = () => {
   const [lastName, setLastName] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [nationality, setNationality] = useState('');
+  const [documentType, setDocumentType] = useState('passport');
   const [passportNumber, setPassportNumber] = useState('');
   const [passportExpiry, setPassportExpiry] = useState('');
   const [issuingCountry, setIssuingCountry] = useState('');
@@ -39,9 +30,30 @@ const PassengerDetails: React.FC = () => {
   const [attempted, setAttempted] = useState(false);
 
   const setPassengers = useBookingStore(s => s.setPassengers);
+  const countriesConfig = useConfigStore(s => s.countries);
+
+  const countriesList = useMemo(() => {
+    if (countriesConfig?.countries?.length) {
+      return countriesConfig.countries.map(c => c.name).sort();
+    }
+    return [
+      'Canada', 'Gambia', 'Ghana', 'Guinea', 'Kenya', 'Liberia', 'Morocco', 
+      'Nigeria', 'Senegal', 'Sierra Leone', 'South Africa', 'United Arab Emirates', 
+      'United Kingdom', 'United States'
+    ];
+  }, [countriesConfig]);
+
+  const phoneCodesList = useMemo(() => {
+    if (countriesConfig?.countries?.length) {
+      return countriesConfig.countries.map(c => ({ code: c.dialCode, label: c.code })).sort((a,b) => a.label.localeCompare(b.label));
+    }
+    return APP_CONFIG.phoneCodes || [{ code: '+1', label: 'US' }];
+  }, [countriesConfig]);
 
   // ── Validation ──────────────────────────────────────────
-  const isEmailValid = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), [email]);
+  const isEmailValid = useMemo(() => isValidEmail(email), [email]);
+  const isPhoneValid = useMemo(() => isValidPhone(phone), [phone]);
+  const isDobValid = useMemo(() => isValidDOB(dateOfBirth), [dateOfBirth]);
 
   const passportExpiryCheck: ExpiryValidation | null = useMemo(() => {
     if (!passportExpiry) return null;
@@ -61,17 +73,19 @@ const PassengerDetails: React.FC = () => {
     if (!firstName.trim()) e.firstName = 'First name is required';
     if (!lastName.trim()) e.lastName = 'Last name is required';
     if (!dateOfBirth) e.dateOfBirth = 'Date of birth is required';
+    else if (!isDobValid) e.dateOfBirth = 'Invalid date of birth';
     if (!nationality) e.nationality = 'Nationality is required';
-    if (!passportNumber.trim()) e.passportNumber = 'Passport number is required';
+    if (!passportNumber.trim()) e.passportNumber = `${documentType === 'passport' ? 'Passport' : 'ID'} number is required`;
     else if (passportFormatCheck && !passportFormatCheck.valid) e.passportNumber = passportFormatCheck.message;
-    if (!passportExpiry) e.passportExpiry = 'Passport expiry date is required';
+    if (!passportExpiry) e.passportExpiry = 'Expiry date is required';
     else if (passportExpiryCheck && !passportExpiryCheck.valid) e.passportExpiry = passportExpiryCheck.message;
     if (!issuingCountry) e.issuingCountry = 'Issuing country is required';
     if (!email.trim()) e.email = 'Email is required';
     else if (!isEmailValid) e.email = 'Please enter a valid email address';
     if (!phone.trim()) e.phone = 'Phone number is required';
+    else if (!isPhoneValid) e.phone = 'Please enter a valid phone number';
     return e;
-  }, [firstName, lastName, dateOfBirth, nationality, passportNumber, passportExpiry, issuingCountry, email, phone, isEmailValid, passportExpiryCheck, passportFormatCheck]);
+  }, [firstName, lastName, dateOfBirth, isDobValid, nationality, passportNumber, passportExpiry, issuingCountry, email, phone, isEmailValid, isPhoneValid, passportExpiryCheck, passportFormatCheck, documentType]);
 
   const isValid = Object.keys(errors).length === 0;
 
@@ -88,7 +102,7 @@ const PassengerDetails: React.FC = () => {
         gender,
         dateOfBirth,
         nationality,
-        documentType: 'passport',
+        documentType,
         documentNumber: passportNumber,
         passportExpiry,
         issuingCountry,
@@ -153,12 +167,16 @@ const PassengerDetails: React.FC = () => {
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">First Name {requiredMark}</label>
                   <input value={firstName} onChange={e => setFirstName(e.target.value)} className={fieldClass('firstName')} placeholder="e.g. John" />
-                  {attempted && errors.firstName && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.firstName}</p>}
+                  {attempted && errors.firstName && (
+                    <div className="flex items-center gap-1 mt-1 text-red-500 text-[10px] font-bold"><span className="material-symbols-outlined text-[12px]">error</span> {errors.firstName}</div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Last Name {requiredMark}</label>
                   <input value={lastName} onChange={e => setLastName(e.target.value)} className={fieldClass('lastName')} placeholder="e.g. Doe" />
-                  {attempted && errors.lastName && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.lastName}</p>}
+                  {attempted && errors.lastName && (
+                    <div className="flex items-center gap-1 mt-1 text-red-500 text-[10px] font-bold"><span className="material-symbols-outlined text-[12px]">error</span> {errors.lastName}</div>
+                  )}
                 </div>
               </div>
             </section>
@@ -172,23 +190,36 @@ const PassengerDetails: React.FC = () => {
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Date of Birth {requiredMark}</label>
                   <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} className={fieldClass('dateOfBirth')} />
-                  {attempted && errors.dateOfBirth && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.dateOfBirth}</p>}
+                  {attempted && errors.dateOfBirth && (
+                    <div className="flex items-center gap-1 mt-1 text-red-500 text-[10px] font-bold"><span className="material-symbols-outlined text-[12px]">error</span> {errors.dateOfBirth}</div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Nationality {requiredMark}</label>
                   <select value={nationality} onChange={e => setNationality(e.target.value)} className={fieldClass('nationality')}>
                     <option value="">Select country</option>
-                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    {countriesList.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  {attempted && errors.nationality && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.nationality}</p>}
+                  {attempted && errors.nationality && (
+                    <div className="flex items-center gap-1 mt-1 text-red-500 text-[10px] font-bold"><span className="material-symbols-outlined text-[12px]">error</span> {errors.nationality}</div>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Passport Number {requiredMark}</label>
-                  <input value={passportNumber} onChange={e => setPassportNumber(e.target.value.toUpperCase())} className={fieldClass('passportNumber')} placeholder="Enter passport number" />
-                  {attempted && errors.passportNumber && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.passportNumber}</p>}
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Doc Type {requiredMark}</label>
+                  <select value={documentType} onChange={e => setDocumentType(e.target.value)} className="w-full h-12 rounded-xl border-2 border-transparent bg-navy-50 px-4 font-bold text-navy-900 focus:ring-2 focus:ring-primary/20 appearance-none">
+                    <option value="passport">Passport</option>
+                    <option value="id_card">National ID / Resident Card</option>
+                  </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Passport Expiry Date {requiredMark}</label>
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Document Number {requiredMark}</label>
+                  <input value={passportNumber} onChange={e => setPassportNumber(e.target.value.toUpperCase())} className={fieldClass('passportNumber')} placeholder={documentType === 'passport' ? 'E.g. A1234567' : 'Enter ID number'} />
+                  {attempted && errors.passportNumber && (
+                    <div className="flex items-center gap-1 mt-1 text-red-500 text-[10px] font-bold"><span className="material-symbols-outlined text-[12px]">error</span> {errors.passportNumber}</div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Expiry Date {requiredMark}</label>
                   <input type="date" value={passportExpiry} onChange={e => setPassportExpiry(e.target.value)} className={fieldClass('passportExpiry')} />
                   {passportExpiryCheck && passportExpiryCheck.severity === 'warning' && (
                     <div className="flex items-start gap-2 mt-1 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
@@ -196,15 +227,19 @@ const PassengerDetails: React.FC = () => {
                       <p className="text-[10px] text-amber-700 font-bold">{passportExpiryCheck.message}</p>
                     </div>
                   )}
-                  {attempted && errors.passportExpiry && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.passportExpiry}</p>}
+                  {attempted && errors.passportExpiry && (
+                    <div className="flex items-center gap-1 mt-1 text-red-500 text-[10px] font-bold"><span className="material-symbols-outlined text-[12px]">error</span> {errors.passportExpiry}</div>
+                  )}
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Issuing Country {requiredMark}</label>
                   <select value={issuingCountry} onChange={e => setIssuingCountry(e.target.value)} className={fieldClass('issuingCountry')}>
                     <option value="">Select issuing country</option>
-                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    {countriesList.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  {attempted && errors.issuingCountry && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.issuingCountry}</p>}
+                  {attempted && errors.issuingCountry && (
+                    <div className="flex items-center gap-1 mt-1 text-red-500 text-[10px] font-bold"><span className="material-symbols-outlined text-[12px]">error</span> {errors.issuingCountry}</div>
+                  )}
                 </div>
               </div>
             </section>
@@ -239,19 +274,29 @@ const PassengerDetails: React.FC = () => {
                       <span className="material-symbols-outlined text-red-400 absolute right-4 top-1/2 -translate-y-1/2">error</span>
                     )}
                   </div>
-                  {attempted && errors.email && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.email}</p>}
+                  {attempted && errors.email && (
+                    <div className="flex items-center gap-1 mt-1 text-red-500 text-[10px] font-bold"><span className="material-symbols-outlined text-[12px]">error</span> {errors.email}</div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Phone Number {requiredMark}</label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 relative">
                     <select value={phoneCode} onChange={e => setPhoneCode(e.target.value)} className="w-24 h-12 rounded-xl border-2 border-transparent bg-navy-50 px-3 font-bold text-navy-900 focus:ring-2 focus:ring-primary/20 appearance-none text-xs">
-                      {APP_CONFIG.phoneCodes.map((pc) => (
-                        <option key={pc.code} value={pc.code}>{pc.code} ({pc.label})</option>
+                      {phoneCodesList.map((pc) => (
+                        <option key={`${pc.label}-${pc.code}`} value={pc.code}>{pc.code} ({pc.label})</option>
                       ))}
                     </select>
-                    <input value={phone} onChange={e => setPhone(e.target.value)} className={`flex-1 ${fieldClass('phone')}`} placeholder="123 456 7890" />
+                    <input value={phone} onChange={e => setPhone(e.target.value)} className={`flex-1 pr-10 ${fieldClass('phone')}`} placeholder="123 456 7890" />
+                    {phone && isPhoneValid && (
+                      <span className="material-symbols-outlined text-emerald-500 absolute right-4 top-1/2 -translate-y-1/2">check_circle</span>
+                    )}
+                    {attempted && errors.phone && !isPhoneValid && phone && (
+                      <span className="material-symbols-outlined text-red-400 absolute right-4 top-1/2 -translate-y-1/2">error</span>
+                    )}
                   </div>
-                  {attempted && errors.phone && <p className="text-[10px] text-red-500 font-bold mt-1">{errors.phone}</p>}
+                  {attempted && errors.phone && (
+                    <div className="flex items-center gap-1 mt-1 text-red-500 text-[10px] font-bold"><span className="material-symbols-outlined text-[12px]">error</span> {errors.phone}</div>
+                  )}
                 </div>
               </div>
             </section>
@@ -279,64 +324,7 @@ const PassengerDetails: React.FC = () => {
       {/* ═══ Right Sidebar: Flight Summary ═══ */}
       <div className="lg:col-span-4 space-y-6 relative">
         <div className="sticky top-8 space-y-6">
-          <div className="bg-white rounded-[2rem] border border-navy-100 shadow-sm overflow-hidden">
-            <div className="bg-navy-900 p-8 text-white relative overflow-hidden">
-              {/* Abstract Map Background */}
-              <div className="absolute inset-0 opacity-20 bg-cover bg-center" style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuD_VV2pz1mYBO4J4Cx6Y5IK87LFCnLO0FxgIrxgqgUnmdRRYdmmEly-aMPNToc0EckQfcZjJk-Rs5fA5n8cTGtSPppUe3lw_t1X46BOvA8pLfW2NCxiWqbjZ4dE7ksvFa-nygNUpH9wqXojoNi7g1v9uvPZUVN8YN382ceQZAkna_7RuSjnCL7iTGYCAKqkHqYqQRxkyGYPHH8iXf5jWsVTtXsGWAwDpd3v0vh8E3v56Tqg--q2Vf81S_uvUnLWqw3X4ESBXlwuFKo')" }}></div>
-
-              <div className="relative z-10 space-y-6">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.25em] opacity-50">Your Flight</h3>
-                <div className="flex items-center justify-between">
-                  <div className="text-center">
-                    <div className="text-3xl font-black">New York</div>
-                    <div className="text-[10px] opacity-60 font-black uppercase tracking-widest mt-1">JFK</div>
-                  </div>
-                  <div className="flex-1 flex flex-col items-center px-4">
-                    <span className="text-[10px] opacity-40 uppercase font-black tracking-widest">Direct</span>
-                    <div className="w-full h-px bg-white/20 my-2 relative">
-                      <span className="material-symbols-outlined text-xs absolute right-0 -top-1.5 rotate-90 text-primary">flight</span>
-                    </div>
-                    <span className="text-[10px] opacity-40 font-black uppercase tracking-widest">5h 20m</span>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-black">London</div>
-                    <div className="text-[10px] opacity-60 font-black uppercase tracking-widest mt-1">LHR</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-8 space-y-6">
-              <div className="flex gap-4">
-                <div className="bg-navy-50 p-3 rounded-2xl flex flex-col items-center justify-center min-w-[70px] border border-navy-100">
-                  <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Oct</span>
-                  <span className="text-2xl font-black text-navy-950">24</span>
-                </div>
-                <div className="flex flex-col justify-center">
-                  <div className="text-sm font-black text-navy-950 uppercase tracking-tight">Thu, 10:30 AM</div>
-                  <div className="text-[10px] font-bold text-navy-400 uppercase tracking-widest">Flight DJ-102</div>
-                </div>
-              </div>
-              <hr className="border-dashed border-navy-100" />
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm font-bold text-navy-500 uppercase tracking-widest text-[10px]">
-                  <span>Adult x 1</span>
-                  <span className="text-navy-900">$520.00</span>
-                </div>
-                <div className="flex justify-between text-sm font-bold text-navy-500 uppercase tracking-widest text-[10px]">
-                  <span>Taxes & Fees</span>
-                  <span className="text-navy-900">$85.00</span>
-                </div>
-                <div className="flex justify-between text-sm font-bold text-emerald-500 uppercase tracking-widest text-[10px]">
-                  <span>Early Booking Discount</span>
-                  <span>-$25.00</span>
-                </div>
-                <div className="pt-4 border-t border-navy-100 flex justify-between items-end">
-                  <span className="text-xs font-black text-navy-400 uppercase tracking-widest pb-1">Total Price</span>
-                  <span className="text-4xl font-black text-primary">$580.00</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <FlightSummarySidebar />
 
           <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100 flex items-start gap-4">
             <span className="material-symbols-outlined text-primary p-2 bg-white rounded-xl shadow-sm">verified_user</span>
@@ -351,4 +339,123 @@ const PassengerDetails: React.FC = () => {
   );
 };
 
+// ── Flight Summary Sidebar (reads from store) ─────────────
+const FlightSummarySidebar: React.FC = () => {
+  const selectedFlight = useBookingStore(s => s.selectedFlight);
+  const searchCriteria = useBookingStore(s => s.searchCriteria);
+
+  const originCode = selectedFlight?.origin || '—';
+  const destCode = selectedFlight?.destination || '—';
+  const flightNum = selectedFlight?.flightNumber || '—';
+  const fareClass = selectedFlight?.fareClass || 'economy';
+  const unitPrice = selectedFlight?.price || 0;
+
+  // Passenger count from search criteria
+  const adults = searchCriteria?.passengers?.adults || 1;
+  const children = searchCriteria?.passengers?.children || 0;
+  const infants = searchCriteria?.passengers?.infants || 0;
+  const totalPax = adults + children + infants;
+  const subtotal = unitPrice * totalPax;
+  const taxes = Math.round(subtotal * 0.12 * 100) / 100; // ~12% tax estimate
+  const total = subtotal + taxes;
+
+  // Parse departure time — may be ISO string or formatted time
+  const depDateRaw = selectedFlight?.departureTime ? new Date(selectedFlight.departureTime) : null;
+  const depDate = depDateRaw && !isNaN(depDateRaw.getTime()) ? depDateRaw : null;
+
+  // Fallback: use searchCriteria departure date if flight time isn't parseable
+  const displayDate = depDate
+    ? depDate
+    : searchCriteria?.departureDate ? new Date(searchCriteria.departureDate) : null;
+
+  const monthShort = displayDate && !isNaN(displayDate.getTime()) ? displayDate.toLocaleString('en', { month: 'short' }) : '—';
+  const dayNum = displayDate && !isNaN(displayDate.getTime()) ? displayDate.getDate() : '—';
+  const dayTime = depDate
+    ? depDate.toLocaleString('en', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: true })
+    : selectedFlight?.departureTime || '—';
+
+  // Duration
+  const arrDateRaw = selectedFlight?.arrivalTime ? new Date(selectedFlight.arrivalTime) : null;
+  const arrDate = arrDateRaw && !isNaN(arrDateRaw.getTime()) ? arrDateRaw : null;
+  const duration = depDate && arrDate
+    ? (() => {
+        let diff = (arrDate.getTime() - depDate.getTime()) / 60000;
+        if (diff < 0) diff += 1440;
+        return `${Math.floor(diff / 60)}h ${Math.round(diff % 60)}m`;
+      })()
+    : '—';
+
+  return (
+    <div className="bg-white rounded-[2rem] border border-navy-100 shadow-sm overflow-hidden">
+      <div className="bg-navy-900 p-8 text-white relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10 bg-gradient-to-br from-primary/30 to-transparent" />
+        <div className="relative z-10 space-y-6">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.25em] opacity-50">Your Flight</h3>
+          <div className="flex items-center justify-between">
+            <div className="text-center">
+              <div className="text-3xl font-black">{originCode}</div>
+            </div>
+            <div className="flex-1 flex flex-col items-center px-4">
+              <span className="text-[10px] opacity-40 uppercase font-black tracking-widest">Direct</span>
+              <div className="w-full h-px bg-white/20 my-2 relative">
+                <span className="material-symbols-outlined text-xs absolute right-0 -top-1.5 rotate-90 text-primary">flight</span>
+              </div>
+              <span className="text-[10px] opacity-40 font-black uppercase tracking-widest">{duration}</span>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-black">{destCode}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="p-8 space-y-6">
+        <div className="flex gap-4">
+          <div className="bg-navy-50 p-3 rounded-2xl flex flex-col items-center justify-center min-w-[70px] border border-navy-100">
+            <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">{monthShort}</span>
+            <span className="text-2xl font-black text-navy-950">{dayNum}</span>
+          </div>
+          <div className="flex flex-col justify-center">
+            <div className="text-sm font-black text-navy-950 uppercase tracking-tight">{dayTime}</div>
+            <div className="text-[10px] font-bold text-navy-400 uppercase tracking-widest">Flight {flightNum}</div>
+          </div>
+        </div>
+        <hr className="border-dashed border-navy-100" />
+        <div className="space-y-3">
+          {adults > 0 && (
+            <div className="flex justify-between text-sm font-bold text-navy-500 uppercase tracking-widest text-[10px]">
+              <span>Adult × {adults}</span>
+              <span className="text-navy-900">${(unitPrice * adults).toFixed(2)}</span>
+            </div>
+          )}
+          {children > 0 && (
+            <div className="flex justify-between text-sm font-bold text-navy-500 uppercase tracking-widest text-[10px]">
+              <span>Child × {children}</span>
+              <span className="text-navy-900">${(unitPrice * children).toFixed(2)}</span>
+            </div>
+          )}
+          {infants > 0 && (
+            <div className="flex justify-between text-sm font-bold text-navy-500 uppercase tracking-widest text-[10px]">
+              <span>Infant × {infants}</span>
+              <span className="text-navy-900">${(unitPrice * infants * 0.1).toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm font-bold text-navy-500 uppercase tracking-widest text-[10px]">
+            <span>Taxes & Fees</span>
+            <span className="text-navy-900">${taxes.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-sm font-bold text-navy-500 uppercase tracking-widest text-[10px]">
+            <span>Class</span>
+            <span className="text-navy-900 capitalize">{fareClass}</span>
+          </div>
+          <div className="pt-4 border-t border-navy-100 flex justify-between items-end">
+            <span className="text-xs font-black text-navy-400 uppercase tracking-widest pb-1">Total Price</span>
+            <span className="text-4xl font-black text-primary">${total.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default PassengerDetails;
+

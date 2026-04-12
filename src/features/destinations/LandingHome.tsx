@@ -7,6 +7,7 @@ import { useBookingStore, type SearchCriteria } from '../../stores/bookingStore'
 import { getLandingPageConfig } from '../../services/cms';
 import type { CmsLandingPageDoc } from '../../types/firestore';
 import { useCurrency } from '../../hooks/useCurrency';
+import { toLocalDateString } from '../../utils/localDate';
 
 const LandingHome: React.FC = () => {
    const navigate = useNavigate();
@@ -119,10 +120,10 @@ const LandingHome: React.FC = () => {
    // Default dates: tomorrow for departure, one week later for return
    const tomorrow = new Date();
    tomorrow.setDate(tomorrow.getDate() + 1);
-   const defaultDep = tomorrow.toISOString().slice(0, 10);
+   const defaultDep = toLocalDateString(tomorrow);
    const weekLater = new Date(tomorrow);
    weekLater.setDate(weekLater.getDate() + 7);
-   const defaultRet = weekLater.toISOString().slice(0, 10);
+   const defaultRet = toLocalDateString(weekLater);
 
    const [departureDate, setDepartureDate] = useState(defaultDep);
    const [returnDate, setReturnDate] = useState(defaultRet);

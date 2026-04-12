@@ -11,6 +11,7 @@ import {
     getSeverityColor, FTL_LIMITS,
     type FtlAlert, type AlertSeverity,
 } from '../../utils/ftlEngine';
+import { todayString } from '../../utils/localDate';
 
 // ─── Empty form templates ───────────────────────────────────
 
@@ -20,7 +21,7 @@ const EMPTY_LEG: FlightLegEntry = {
 };
 
 const EMPTY_LOG = {
-    date: new Date().toISOString().slice(0, 10),
+    date: todayString(),
     reportTime: '05:00', releaseTime: '09:00',
     totalDutyMinutes: 240, totalFlightMinutes: 120, totalLegs: 1,
     restBeforeMinutes: 720, status: 'completed' as DutyLogEntry['status'], notes: '',

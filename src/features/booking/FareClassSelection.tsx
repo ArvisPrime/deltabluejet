@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { BRAND } from '../../config/brand';
 import { ROUTES } from '../../config/routes';
+import { useBookingStore } from '../../stores/bookingStore';
+import { useConfigStore } from '../../stores/configStore';
+import { useCurrency } from '../../hooks/useCurrency';
 
-
+/** Format an ISO string or time string for display */
+function displayTime(t: string): string {
+  if (!t) return '--:--';
+  const d = new Date(t);
+  if (!isNaN(d.getTime())) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  return t; // fallback: already formatted
+}
 
 const BookingStepper: React.FC<{ current: number }> = ({ current }) => {
   const steps = ['Search', 'Flights', 'Fare', 'Passengers', 'Seats', 'Secure'];
@@ -27,8 +36,43 @@ const BookingStepper: React.FC<{ current: number }> = ({ current }) => {
 
 const FareClassSelection: React.FC = () => {
   const navigate = useNavigate();
+  const { currency, display } = useCurrency();
+  const searchCriteria = useBookingStore(s => s.searchCriteria);
+  const selectedFlight = useBookingStore(s => s.selectedFlight);
+  const setSelectedFlight = useBookingStore(s => s.setSelectedFlight);
+  const faresConfig = useConfigStore(s => s.fares);
+
   const onBack = () => navigate(ROUTES.FLIGHT_RESULTS);
-  const onNext = () => navigate(ROUTES.PASSENGER_DETAILS);
+  
+  // Calculate specific flight durations and displays
+  const flightDisplay = useMemo(() => {
+    if (!searchCriteria || !selectedFlight) return null;
+    const depDate = new Date(searchCriteria.departureDate);
+    const dateStr = depDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    
+    // Attempt duration calc if format matched (e.g. "08:00")
+    // departureTime is stored as ISO string in bookingStore
+    // so we just display it.
+    return { dateStr };
+  }, [searchCriteria, selectedFlight]);
+
+  if (!searchCriteria || !selectedFlight || !faresConfig) {
+    navigate(ROUTES.FLIGHT_SEARCH);
+    return null;
+  }
+
+  const handleSelectFare = (fareId: string, multiplier: number) => {
+    // Update the flight details according to the multiplier
+    if (selectedFlight) {
+        setSelectedFlight({
+            ...selectedFlight,
+            fareClass: fareId,
+            price: Math.round(selectedFlight.basePrice * multiplier)
+        });
+        navigate(ROUTES.PASSENGER_DETAILS);
+    }
+  };
+
   return (
     <div className="p-4 md:p-10 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-500 font-sans bg-white/20 min-h-screen">
       <BookingStepper current={2} />
@@ -46,7 +90,7 @@ const FareClassSelection: React.FC = () => {
           </div>
           <div className="flex flex-col items-end">
             <span className="text-[9px] font-black text-navy-300 uppercase tracking-widest mb-1">Route</span>
-            <span className="text-xs font-black text-navy-950 uppercase tracking-tight bg-navy-50 px-4 py-1.5 rounded-full border border-navy-100">DJ-102 • ERJ-120</span>
+            <span className="text-xs font-black text-navy-950 uppercase tracking-tight bg-navy-50 px-4 py-1.5 rounded-full border border-navy-100">{selectedFlight.flightNumber} • {selectedFlight.aircraft}</span>
           </div>
         </div>
       </div>
@@ -59,13 +103,13 @@ const FareClassSelection: React.FC = () => {
         <div className="flex-1 space-y-6 relative z-10">
           <div className="flex items-center gap-4">
             <span className="px-4 py-1.5 rounded-xl bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest border border-primary/20 shadow-inner">Outbound Flight</span>
-            <span className="text-xs font-black text-navy-950 uppercase tracking-widest opacity-60">Sat, Oct 12 • Direct Flight</span>
+            <span className="text-xs font-black text-navy-950 uppercase tracking-widest opacity-60">{flightDisplay?.dateStr} • Direct Flight</span>
           </div>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h3 className="text-3xl font-black text-navy-950 uppercase tracking-tighter leading-none">New York (JFK) <span className="text-navy-300 mx-2">→</span> London (LHR)</h3>
+              <h3 className="text-3xl font-black text-navy-950 uppercase tracking-tighter leading-none">{selectedFlight.origin} <span className="text-navy-300 mx-2">→</span> {selectedFlight.destination}</h3>
               <p className="text-[10px] font-bold text-navy-400 uppercase mt-4 tracking-widest flex items-center gap-3">
-                <span className="material-symbols-outlined text-sm">schedule</span> 08:00 AM - 11:30 PM (7h 30m)
+                <span className="material-symbols-outlined text-sm">schedule</span> {displayTime(selectedFlight.departureTime)} - {displayTime(selectedFlight.arrivalTime)}
                 <span className="size-1 rounded-full bg-navy-200"></span>
                 <span className="material-symbols-outlined text-sm">airlines</span> {BRAND.shortName} Core Fleet
               </p>
@@ -78,56 +122,60 @@ const FareClassSelection: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-        {[
-          { name: 'Standard', price: '450', tags: ['Essential'], features: ['1 Carry-on (7kg)', 'Checked: Paid', 'Seat: Auto-Assign', 'Changes: Fee-Based', 'Standard Hydration'], primary: false },
-          { name: 'Executive Class', price: '520', tags: ['Popular', 'Best Value'], features: ['1 Carry-on (7kg)', '1 Checked (23kg)', 'Standard Selection', 'Flexible Window', 'Full Meal Protocol'], primary: true },
-          { name: 'Elite Class', price: '1,200', tags: ['Premium'], features: ['2 Checked (32kg)', 'Airport Lounge Access', 'Extra Legroom Seat', 'Priority Boarding', 'Premium Dining'], primary: false },
-        ].map((fare, idx) => (
-          <div key={idx} className={`relative flex flex-col gap-10 rounded-[3.5rem] p-12 border-4 transition-all group ${fare.primary ? 'border-primary bg-white shadow-2xl shadow-primary/10 -translate-y-4' : 'border-navy-50 bg-white hover:border-navy-100 shadow-sm'
+        {faresConfig.classes.map((fareClass) => {
+          const calculatedPrice = selectedFlight.basePrice * fareClass.multiplier;
+          
+          return (
+          <div key={fareClass.id} className={`relative flex flex-col gap-10 rounded-[3.5rem] p-12 border-4 transition-all group ${fareClass.isPopular ? 'border-primary bg-white shadow-2xl shadow-primary/10 -translate-y-4' : 'border-navy-50 bg-white hover:border-navy-100 shadow-sm'
             }`}>
-            {fare.primary && (
+            {fareClass.isPopular && (
               <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-black px-8 py-2 rounded-full shadow-xl tracking-widest uppercase animate-in zoom-in duration-1000">
                 Recommended Choice
               </div>
             )}
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                {fare.tags.map(t => <span key={t} className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-navy-50 text-navy-400 border border-navy-100">{t}</span>)}
+                <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-navy-50 text-navy-400 border border-navy-100">{fareClass.id}</span>
+                {fareClass.isPopular && <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">Popular</span>}
               </div>
-              <h3 className="text-3xl font-black text-navy-950 uppercase tracking-tighter leading-tight">{fare.name}</h3>
-              <p className="text-[10px] font-bold text-navy-300 uppercase tracking-widest italic opacity-70">Aviation service protocol v4.2</p>
+              <h3 className="text-3xl font-black text-navy-950 uppercase tracking-tighter leading-tight">{fareClass.name}</h3>
+              <p className="text-[10px] font-bold text-navy-300 uppercase tracking-widest italic opacity-70">{fareClass.description}</p>
             </div>
 
             <div className="py-8 border-y border-navy-50">
               <div className="flex items-baseline gap-2">
                 <span className="text-xs font-bold text-navy-400 uppercase tracking-widest">Starting at</span>
-                <span className="text-5xl font-black text-navy-950 tracking-tighter">${fare.price}</span>
+                <div className="flex items-baseline justify-end gap-1">
+                    <span className="text-xs font-black text-navy-400">{currency}</span>
+                    <span className="text-5xl font-black text-navy-950 tracking-tighter">{display(calculatedPrice)}</span>
+                </div>
                 <span className="text-xs font-bold text-navy-400 uppercase">/ Pax</span>
               </div>
             </div>
 
             <ul className="space-y-6 flex-1 pt-4">
-              {fare.features.map((f, i) => (
-                <li key={i} className="flex items-center gap-4 text-xs font-bold text-navy-700 uppercase tracking-wide">
-                  <span className={`material-symbols-outlined text-2xl font-black ${f.includes('None') || f.includes('Paid') ? 'text-navy-100' : 'text-primary'}`}>
-                    {f.includes('None') || f.includes('Paid') ? 'radio_button_unchecked' : 'verified'}
+              {fareClass.features.map((f, i) => (
+                <li key={i} className={`flex items-center gap-4 text-xs font-bold uppercase tracking-wide ${f.included ? 'text-navy-700' : 'text-navy-300'}`}>
+                  <span className={`material-symbols-outlined text-2xl font-black ${f.included ? 'text-primary' : 'text-navy-100'}`}>
+                    {f.included ? 'verified' : 'radio_button_unchecked'}
                   </span>
-                  <span className={f.includes('None') || f.includes('Paid') ? 'text-navy-300' : ''}>{f}</span>
+                  <span>{f.name}</span>
                 </li>
               ))}
             </ul>
 
             <button
-              onClick={onNext}
-              className={`w-full py-6 rounded-3xl font-black uppercase tracking-[0.25em] text-xs transition-all ${fare.primary
+              onClick={() => handleSelectFare(fareClass.id, fareClass.multiplier)}
+              className={`w-full py-6 rounded-3xl font-black uppercase tracking-[0.25em] text-xs transition-all ${fareClass.isPopular
                 ? 'bg-primary text-white shadow-2xl shadow-primary/30 hover:scale-[1.05] active:scale-95'
                 : 'bg-white border-2 border-navy-100 text-navy-700 hover:border-primary hover:text-primary hover:bg-primary/5'
                 }`}
             >
-              Choose {fare.name.split(' ')[0]}
+              Choose {fareClass.name.split(' ')[0]}
             </button>
           </div>
-        ))}
+        )
+      })}
       </div>
 
       <div className="max-w-4xl mx-auto bg-navy-950 rounded-[3rem] p-10 flex flex-col md:flex-row items-center justify-between gap-10 shadow-2xl text-white relative overflow-hidden group">

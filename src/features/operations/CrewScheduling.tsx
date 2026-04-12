@@ -18,6 +18,7 @@ import { calculateFtlCounters, getFtlAlerts, type FtlAlert } from '../../utils/f
 import { getAllScheduledFlights } from '../../services/firestore';
 import type { FlightDoc } from '../../types/firestore';
 import { downloadCSV, printTable } from '../../utils/tableExport';
+import { toLocalDateString } from '../../utils/localDate';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -29,7 +30,7 @@ function getWeekDates(baseDate: Date): string[] {
     return Array.from({ length: 7 }, (_, i) => {
         const dt = new Date(monday);
         dt.setDate(monday.getDate() + i);
-        return dt.toISOString().slice(0, 10);
+        return toLocalDateString(dt);
     });
 }
 
@@ -81,7 +82,7 @@ const CrewScheduling: React.FC = () => {
         const unsubAssign = subscribeToAssignments(data => { setAssignments(data); checkReady(); });
 
         // One-shot flight load
-        getAllScheduledFlights().then(f => setFlights(f)).catch(err => console.error('Flight load error:', err));
+        getAllScheduledFlights().then(result => setFlights(result.flights)).catch(err => console.error('Flight load error:', err));
 
         return () => { unsubCrew(); unsubAssign(); };
     }, []);
@@ -668,7 +669,7 @@ const CrewScheduling: React.FC = () => {
                         <tr>
                             <th className="sticky left-0 z-10 bg-navy-50 px-6 py-4 text-left text-[10px] font-black text-navy-500 uppercase tracking-widest border-b border-navy-100 w-48 min-w-48">Crew Member</th>
                             {weekDates.map((date, i) => {
-                                const isToday = date === new Date().toISOString().slice(0, 10);
+                                const isToday = date === toLocalDateString(new Date());
                                 return (
                                     <th key={date} className={`px-4 py-4 text-center text-[10px] font-black uppercase tracking-widest border-b border-l border-navy-100 min-w-32 ${isToday ? 'bg-primary/5 text-primary' : 'bg-navy-50 text-navy-500'}`}>
                                         {DAYS[i]}<br /><span className="text-[8px] text-navy-400">{date.slice(5)}</span>
@@ -699,7 +700,7 @@ const CrewScheduling: React.FC = () => {
                                     </td>
                                     {weekDates.map(date => {
                                         const dayAssignments = getAssignmentsForCell(member.id, date);
-                                        const isToday = date === new Date().toISOString().slice(0, 10);
+                                        const isToday = date === toLocalDateString(new Date());
                                         return (
                                             <td key={date} className={`px-2 py-2 border-b border-l border-navy-50 align-top ${isToday ? 'bg-primary/[0.02]' : ''}`}>
                                                 {dayAssignments.map(a => {

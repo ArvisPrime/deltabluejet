@@ -28,6 +28,7 @@ import { db, functions } from '../config/firebase.config';
 import type { BookingDoc, PassengerDoc } from '../types/firestore';
 import type { PassengerInfo } from '../stores/bookingStore';
 import { awardPoints } from './loyaltyService';
+import { toLocalDateString } from '../utils/localDate';
 
 // ─── Create Booking ────────────────────────────────────────
 
@@ -76,6 +77,11 @@ const cancelBookingSecureFn = httpsCallable<
     { bookingId: string },
     { success: boolean }
 >(functions, 'cancelBookingSecure');
+
+const modifyBookingSecureFn = httpsCallable<
+    { bookingId: string; newFlightId?: string; newFareClass?: string; newSeats?: Record<string, string> },
+    { success: boolean; newTotalAmount?: number }
+>(functions, 'modifyBookingSecure');
 
 export async function createBooking(input: CreateBookingInput): Promise<{
     bookingId: string;
@@ -162,6 +168,18 @@ export interface ModifyBookingInput {
 }
 
 export async function modifyBooking(input: ModifyBookingInput): Promise<void> {
+    try {
+        await modifyBookingSecureFn({
+            bookingId: input.bookingId,
+            newFlightId: input.newFlightId,
+            newFareClass: input.newFareClass,
+            newSeats: input.newSeats,
+        });
+        return;
+    } catch (err) {
+        console.warn('modifyBookingSecure CF failed, falling back to batch update:', err);
+    }
+
     const bookingSnap = await getDoc(doc(db, 'bookings', input.bookingId));
     if (!bookingSnap.exists()) throw new Error('Booking not found');
 
@@ -210,6 +228,24 @@ export async function getBookingByPNR(pnr: string): Promise<BookingDoc | null> {
     if (snap.empty) return null;
     const d = snap.docs[0];
     return { id: d.id, ...d.data() } as BookingDoc;
+}
+
+export async function validateBookingAccess(pnr: string, lastName: string): Promise<boolean> {
+    const cleanPnr = pnr.trim().toUpperCase();
+    const cleanLastName = lastName.trim().toUpperCase();
+    
+    if (!cleanPnr || !cleanLastName) return false;
+
+    const booking = await getBookingByPNR(cleanPnr);
+    if (!booking) return false;
+
+    // Fetch passengers to validate last name matches
+    const paxSnap = await getDocs(collection(db, 'bookings', booking.id, 'passengers'));
+    // Return true if any passenger has a matching last name
+    return paxSnap.docs.some(d => {
+        const pax = d.data();
+        return pax.lastName?.toUpperCase() === cleanLastName;
+    });
 }
 
 export async function getBookingWithPassengers(bookingId: string): Promise<{
@@ -299,12 +335,33 @@ export async function searchBookings(term: string): Promise<BookingDoc[]> {
     const clean = term.trim();
     if (!clean) return [];
 
+    // Try exact Booking ID match first (typically 20 chars long)
+    if (clean.length > 15) {
+        try {
+            const docRef = doc(db, 'bookings', clean);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return [{ id: docSnap.id, ...docSnap.data() } as BookingDoc];
+            }
+        } catch (e) {
+            // Ignore error and continue to other search methods
+        }
+    }
+
     // Try PNR exact match first
     const pnrSnap = await getDocs(
         query(collection(db, 'bookings'), where('pnr', '==', clean.toUpperCase()), limit(10)),
     );
     if (!pnrSnap.empty) {
         return pnrSnap.docs.map(d => ({ id: d.id, ...d.data() }) as BookingDoc);
+    }
+
+    // Try Flight Number exact match
+    const flightSnap = await getDocs(
+        query(collection(db, 'bookings'), where('flightNumber', '==', clean.toUpperCase()), limit(20)),
+    );
+    if (!flightSnap.empty) {
+        return flightSnap.docs.map(d => ({ id: d.id, ...d.data() }) as BookingDoc);
     }
 
     // Fallback: search by contact email
@@ -324,7 +381,7 @@ export function exportBookingsCSV(bookings: BookingDoc[]): void {
             b.pnr,
             b.flightNumber,
             `${b.origin?.code ?? ''}-${b.destination?.code ?? ''}`,
-            dep.toISOString().slice(0, 10),
+            toLocalDateString(dep),
             String(b.passengerCount),
             b.totalAmount.toFixed(2),
             b.currency,

@@ -11,11 +11,13 @@ import {
     where,
     orderBy,
     limit,
+    startAfter,
     onSnapshot,
     Timestamp,
     serverTimestamp,
     type QueryConstraint,
     type DocumentData,
+    type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase.config';
@@ -106,30 +108,64 @@ export async function searchFlights(
     const snap = await getDocs(query(
         flightsRef,
         where('origin.code', '==', originCode),
-        where('destination.code', '==', destinationCode),
-        where('departureTime', '>=', Timestamp.fromDate(dayStart)),
-        where('departureTime', '<=', Timestamp.fromDate(dayEnd)),
-        orderBy('departureTime', 'asc'),
+        where('destination.code', '==', destinationCode)
     ));
 
-    // Client-side filter: only return bookable flights (avoids composite index)
+    // Client-side filter for both status and departureTime date range
     return snap.docs
         .map((d) => ({ id: d.id, ...d.data() }) as FlightDoc)
-        .filter((f) => f.status === 'scheduled' || f.status === 'boarding');
+        .filter((f) => {
+            if (f.status !== 'scheduled' && f.status !== 'boarding') return false;
+            
+            // Handle Firestore Timestamp to Date conversion
+            const dt = ((f.departureTime as any).toDate 
+                ? (f.departureTime as any).toDate() 
+                : new Date(f.departureTime as any)) as Date;
+                
+            return dt >= dayStart && dt <= dayEnd;
+        })
+        .sort((a, b) => {
+            const dtA = ((a.departureTime as any).toDate ? (a.departureTime as any).toDate() : new Date(a.departureTime as any)) as Date;
+            const dtB = ((b.departureTime as any).toDate ? (b.departureTime as any).toDate() : new Date(b.departureTime as any)) as Date;
+            return dtA.getTime() - dtB.getTime();
+        });
 }
 
 /**
  * Get all scheduled/boarding flights (bookable), ordered by departure.
  * Uses simple orderBy query + client-side status filter to avoid composite index.
  */
-export async function getAllScheduledFlights(): Promise<FlightDoc[]> {
-    const snap = await getDocs(query(
-        flightsRef,
+export async function getAllScheduledFlights(
+    cursor?: QueryDocumentSnapshot<DocumentData> | null,
+    maxLimit = 50
+): Promise<{ flights: FlightDoc[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null; hasMore: boolean }> {
+    const constraints: QueryConstraint[] = [
         orderBy('departureTime', 'asc'),
-    ));
-    return snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }) as FlightDoc)
-        .filter((f) => f.status === 'scheduled' || f.status === 'boarding');
+        limit(maxLimit * 3) // fetch extra since we filter client-side
+    ];
+    if (cursor) {
+        constraints.push(startAfter(cursor));
+    }
+
+    const snap = await getDocs(query(flightsRef, ...constraints));
+    
+    // Filter scheduled/boarding client-side
+    const bookableDocs = snap.docs.filter((d) => {
+        const s = d.data().status;
+        return s === 'scheduled' || s === 'boarding';
+    });
+
+    const isMore = snap.docs.length === maxLimit * 3;
+    const finalDocs = bookableDocs.slice(0, maxLimit);
+    const lastIncludedDoc = finalDocs.length > 0 
+        ? snap.docs.find(d => d.id === finalDocs[finalDocs.length - 1].id) || null
+        : null;
+
+    return {
+        flights: finalDocs.map(d => ({ id: d.id, ...d.data() }) as FlightDoc),
+        lastDoc: lastIncludedDoc,
+        hasMore: isMore || bookableDocs.length > maxLimit
+    };
 }
 
 // ─── Aircraft ──────────────────────────────────────────────
@@ -263,34 +299,8 @@ export async function getRoutesForAircraft(rangeKm: number): Promise<RouteDoc[]>
 }
 
 // ─── Bookings ──────────────────────────────────────────────
+// Note: Booking service functions have been consolidated into `src/services/booking.ts`.
 
-const bookingsRef = collection(db, 'bookings');
-
-export async function getBookingsByUser(userId: string): Promise<BookingDoc[]> {
-    const snap = await getDocs(query(
-        bookingsRef,
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-    ));
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BookingDoc);
-}
-
-export async function getBookingByPNR(pnr: string): Promise<BookingDoc | null> {
-    const snap = await getDocs(query(bookingsRef, where('pnr', '==', pnr), limit(1)));
-    if (snap.empty) return null;
-    const d = snap.docs[0];
-    return { id: d.id, ...d.data() } as BookingDoc;
-}
-
-export async function getBookingById(bookingId: string): Promise<BookingDoc | null> {
-    const snap = await getDoc(doc(db, 'bookings', bookingId));
-    return snap.exists() ? ({ id: snap.id, ...snap.data() } as BookingDoc) : null;
-}
-
-export async function getAllBookings(maxResults = 50): Promise<BookingDoc[]> {
-    const snap = await getDocs(query(bookingsRef, orderBy('createdAt', 'desc'), limit(maxResults)));
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BookingDoc);
-}
 
 // ─── Destinations ──────────────────────────────────────────
 

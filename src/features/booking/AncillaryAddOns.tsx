@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useToastStore } from '../../stores/toastStore';
 import { useCurrency } from '../../hooks/useCurrency';
 import {
-    getAvailableProducts,
     addAncillaryToBooking,
     getCategoryMeta,
     type AncillaryProduct,
     type AncillaryCategory,
 } from '../../services/ancillaryService';
+import { useConfigStore } from '../../stores/configStore';
+import { useBookingStore } from '../../stores/bookingStore';
 
 interface AncillaryAddOnsProps {
     bookingId: string;
@@ -17,15 +18,54 @@ interface AncillaryAddOnsProps {
 const AncillaryAddOns: React.FC<AncillaryAddOnsProps> = ({ bookingId, onComplete }) => {
     const addToast = useToastStore(s => s.addToast);
     const { display } = useCurrency();
-    const [products, setProducts] = useState<AncillaryProduct[]>([]);
-    const [loading, setLoading] = useState(true);
     const [selected, setSelected] = useState<Map<string, number>>(new Map());
     const [adding, setAdding] = useState(false);
     const [filterCat, setFilterCat] = useState<AncillaryCategory | 'all'>('all');
 
-    useEffect(() => {
-        getAvailableProducts().then(setProducts).catch(console.error).finally(() => setLoading(false));
-    }, []);
+    const ancillariesConfig = useConfigStore(s => s.ancillaries);
+    const selectedFlight = useBookingStore(s => s.selectedFlight);
+    const fareClass = selectedFlight?.fareClass || 'economy';
+
+    const products = React.useMemo<AncillaryProduct[]>(() => {
+        if (!ancillariesConfig) return [];
+        
+        const isPremiumDiningFree = fareClass === 'first' || fareClass === 'business';
+        const meals: AncillaryProduct[] = ancillariesConfig.meals.map(m => ({
+            id: m.id,
+            name: m.name,
+            description: m.description,
+            category: 'meal',
+            price: (isPremiumDiningFree && m.premiumOnly) ? 0 : m.priceCents,
+            currency: 'USD',
+            available: true,
+            iconName: 'restaurant'
+        }));
+
+        const isLoungeFree = fareClass === 'first' || fareClass === 'business';
+        const lounges: AncillaryProduct[] = ancillariesConfig.lounges.map(l => ({
+            id: l.id,
+            name: l.name,
+            description: `${l.airportCode} - Terminal ${l.terminal} (${l.openHours})`,
+            category: 'lounge',
+            price: isLoungeFree ? 0 : l.priceCents,
+            currency: 'USD',
+            available: true,
+            iconName: 'weekend'
+        }));
+
+        const insurance: AncillaryProduct[] = ancillariesConfig.insurance.map(i => ({
+            id: i.id,
+            name: i.name,
+            description: i.coverageDetails.join('. '),
+            category: 'insurance',
+            price: i.premiumCents,
+            currency: 'USD',
+            available: true,
+            iconName: 'shield'
+        }));
+
+        return [...meals, ...lounges, ...insurance];
+    }, [ancillariesConfig, fareClass]);
 
     const toggleProduct = (id: string) => {
         const next = new Map(selected);
@@ -62,7 +102,7 @@ const AncillaryAddOns: React.FC<AncillaryAddOnsProps> = ({ bookingId, onComplete
     const filtered = filterCat === 'all' ? products : products.filter(p => p.category === filterCat);
     const categories = [...new Set(products.map(p => p.category))];
 
-    if (loading) return (
+    if (!ancillariesConfig) return (
         <div className="flex items-center justify-center h-96">
             <span className="material-symbols-outlined text-5xl text-primary animate-spin">progress_activity</span>
         </div>

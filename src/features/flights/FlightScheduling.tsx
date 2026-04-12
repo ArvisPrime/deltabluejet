@@ -9,6 +9,7 @@ import FlightPreviewTable from '../../components/scheduling/FlightPreviewTable';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuth } from '../../hooks/useAuth';
 import LiveOpsView from './LiveOpsView';
+import { toLocalDateString } from '../../utils/localDate';
 
 interface ScheduleDoc {
    id: string;
@@ -165,12 +166,12 @@ const FlightScheduling: React.FC = () => {
       if (!effectiveFrom) {
          const tomorrow = new Date();
          tomorrow.setDate(tomorrow.getDate() + 1);
-         setEffectiveFrom(tomorrow.toISOString().slice(0, 10));
+         setEffectiveFrom(toLocalDateString(tomorrow));
       }
       if (!effectiveTo) {
          const threeMonths = new Date();
          threeMonths.setMonth(threeMonths.getMonth() + 3);
-         setEffectiveTo(threeMonths.toISOString().slice(0, 10));
+         setEffectiveTo(toLocalDateString(threeMonths));
       }
    }, [effectiveFrom, effectiveTo]);
 

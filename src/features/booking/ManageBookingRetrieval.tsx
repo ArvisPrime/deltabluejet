@@ -1,15 +1,36 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { BRAND } from '../../config/brand';
 import { ROUTES } from '../../config/routes';
+import { validateBookingAccess } from '../../services/booking';
+import { useToastStore } from '../../stores/toastStore';
 
 const ManageBookingRetrieval: React.FC = () => {
    const navigate = useNavigate();
-   const onNext = () => navigate(`/manage-booking/${pnr}`);
    const onBack = () => navigate(ROUTES.HOME);
    const [pnr, setPnr] = useState('');
    const [lastName, setLastName] = useState('');
+   const [isLoading, setIsLoading] = useState(false);
+
+   const handleRetrieve = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!pnr || !lastName) return;
+
+      setIsLoading(true);
+      try {
+         const isValid = await validateBookingAccess(pnr, lastName);
+         if (isValid) {
+            navigate(`/manage-booking/${pnr.toUpperCase()}`);
+         } else {
+            useToastStore.getState().addToast('Booking not found. Please check your PNR and Last Name.', 'error');
+         }
+      } catch (error) {
+         console.error('Error validating booking:', error);
+         useToastStore.getState().addToast('An error occurred while retrieving your booking. Please try again later.', 'error');
+      } finally {
+         setIsLoading(false);
+      }
+   };
 
    return (
       <div className="min-h-full flex flex-col items-center justify-center p-6 md:p-20 font-display animate-in fade-in duration-700 bg-white/10">
@@ -53,17 +74,18 @@ const ManageBookingRetrieval: React.FC = () => {
                   <span className="material-symbols-outlined text-[140px] font-black">airplane_ticket</span>
                </div>
 
-               <form className="space-y-12 relative z-10" onSubmit={(e) => { e.preventDefault(); onNext(); }}>
+               <form className="space-y-12 relative z-10" onSubmit={handleRetrieve}>
                   <div className="space-y-4">
                      <label className="text-[10px] font-black text-navy-400 uppercase tracking-[0.3em] block px-2">Booking Reference (PNR)</label>
                      <div className="relative group/input">
                         <span className="absolute left-6 top-1/2 -translate-y-1/2 material-symbols-outlined text-navy-200 group-focus-within/input:text-primary transition-colors">qr_code</span>
                         <input
                            required
+                           disabled={isLoading}
                            placeholder="E.G. DJXJ799"
                            value={pnr}
                            onChange={(e) => setPnr(e.target.value.toUpperCase())}
-                           className="w-full h-20 pl-16 pr-8 bg-navy-50 border-none rounded-[2rem] text-2xl font-black text-navy-950 uppercase tracking-[0.2em] focus:ring-8 focus:ring-primary/5 transition-all shadow-inner"
+                           className="w-full h-20 pl-16 pr-8 bg-navy-50 border-none rounded-[2rem] text-2xl font-black text-navy-950 uppercase tracking-[0.2em] focus:ring-8 focus:ring-primary/5 transition-all shadow-inner disabled:opacity-50"
                         />
                      </div>
                   </div>
@@ -74,19 +96,25 @@ const ManageBookingRetrieval: React.FC = () => {
                         <span className="absolute left-6 top-1/2 -translate-y-1/2 material-symbols-outlined text-navy-200 group-focus-within/input:text-primary transition-colors">person</span>
                         <input
                            required
+                           disabled={isLoading}
                            placeholder="E.G. CHEN"
                            value={lastName}
                            onChange={(e) => setLastName(e.target.value.toUpperCase())}
-                           className="w-full h-20 pl-16 pr-8 bg-navy-50 border-none rounded-[2rem] text-xl font-black text-navy-950 uppercase tracking-widest focus:ring-8 focus:ring-primary/5 transition-all shadow-inner"
+                           className="w-full h-20 pl-16 pr-8 bg-navy-50 border-none rounded-[2rem] text-xl font-black text-navy-950 uppercase tracking-widest focus:ring-8 focus:ring-primary/5 transition-all shadow-inner disabled:opacity-50"
                         />
                      </div>
                   </div>
 
                   <div className="pt-8 space-y-6">
-                     <button className="w-full h-20 bg-primary text-white font-black uppercase tracking-[0.3em] text-xs rounded-[2rem] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-6 group/btn">
-                        Retrieve Booking <span className="material-symbols-outlined text-2xl group-hover/btn:translate-x-2 transition-transform">arrow_forward</span>
+                     <button 
+                        type="submit" 
+                        disabled={isLoading || !pnr || !lastName}
+                        className="w-full h-20 bg-primary text-white font-black uppercase tracking-[0.3em] text-xs rounded-[2rem] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-6 group/btn disabled:opacity-70 disabled:hover:scale-100"
+                     >
+                        {isLoading ? 'Verifying...' : 'Retrieve Booking'}
+                        {!isLoading && <span className="material-symbols-outlined text-2xl group-hover/btn:translate-x-2 transition-transform">arrow_forward</span>}
                      </button>
-                     <button type="button" onClick={onBack} className="w-full text-[10px] font-black text-navy-300 uppercase tracking-[0.4em] hover:text-navy-950 transition-colors">Return to Landing Page</button>
+                     <button type="button" onClick={onBack} disabled={isLoading} className="w-full text-[10px] font-black text-navy-300 uppercase tracking-[0.4em] hover:text-navy-950 transition-colors disabled:opacity-50">Return to Landing Page</button>
                   </div>
                </form>
 
