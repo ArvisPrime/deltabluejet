@@ -11,6 +11,7 @@ import {
 } from '../../services/booking';
 import type { BookingDoc } from '../../types/firestore';
 import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import AdminBookingWizard from './AdminBookingWizard';
 
 /* ── Status helpers ──────────────────────────────────────────── */
 const STATUS_STYLE: Record<string, string> = {
@@ -63,6 +64,7 @@ const Bookings: React.FC = () => {
     const [isSearching, setIsSearching] = useState(false);
     const [hasMore, setHasMore] = useState(false);
     const cursorRef = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
+    const [showWizard, setShowWizard] = useState(false);
 
     /* ── Load bookings (initial + tab change) ───────────────── */
     const loadBookings = useCallback(async (status: string) => {
@@ -164,6 +166,13 @@ const Bookings: React.FC = () => {
                     >
                         <span className="material-symbols-outlined text-lg">download</span>
                         Export CSV
+                    </button>
+                    <button
+                        onClick={() => setShowWizard(true)}
+                        className="px-6 py-2.5 bg-primary text-white font-bold rounded-xl shadow-md hover:bg-primary-600 transition-all flex items-center gap-2"
+                    >
+                        <span className="material-symbols-outlined text-lg">flight_takeoff</span>
+                        Book a Flight
                     </button>
                 </div>
             </div>
@@ -329,6 +338,17 @@ const Bookings: React.FC = () => {
                     </>
                 )}
             </div>
+
+            {/* Admin Booking Wizard Modal */}
+            {showWizard && (
+                <AdminBookingWizard
+                    onClose={() => setShowWizard(false)}
+                    onComplete={() => {
+                        setShowWizard(false);
+                        loadBookings(activeTab);
+                    }}
+                />
+            )}
         </div>
     );
 };

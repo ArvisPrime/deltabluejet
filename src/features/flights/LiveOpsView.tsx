@@ -6,7 +6,7 @@ import DelayWarningCard from '../../components/scheduling/DelayWarningCard';
 import FlightTrackingCard from '../../components/scheduling/FlightTrackingCard';
 import { FLIGHT_STATUS_LABELS, FLIGHT_STATUS_CONFIG } from '../../types/firestore';
 import type { FlightDoc, FlightStatus } from '../../types/firestore';
-import { updateFlightStatus } from '../../services/firestore';
+import { updateFlightStatus, deleteFlight, getFlightBookingCount } from '../../services/firestore';
 import { useToastStore } from '../../stores/toastStore';
 
 type Tab = 'today' | 'week' | 'all';
@@ -17,6 +17,9 @@ const OVERRIDE_STATUSES: FlightStatus[] = [
   'departed', 'airborne', 'cruise', 'descent',
   'landed', 'taxi_in', 'arrived', 'delayed', 'cancelled',
 ];
+
+/** Statuses that allow deletion */
+const DELETABLE_STATUSES: FlightStatus[] = ['scheduled', 'cancelled'];
 
 /**
  * Live Ops Control Center — replaces the old table-based schedule list.
@@ -30,6 +33,8 @@ const LiveOpsView: React.FC = () => {
     delayedFlights,
     upcomingFlights,
     todayFlights,
+    weekFlights,
+    allFlights,
     recentEvents,
     landedFlights,
     arrivedFlights,
@@ -39,21 +44,33 @@ const LiveOpsView: React.FC = () => {
 
   const addToast = useToastStore((s) => s.addToast);
   const [scheduleTab, setScheduleTab] = useState<Tab>('today');
-  const [overrideFlight, setOverrideFlight] = useState<FlightDoc | null>(null);
+
+  // Detail panel state
+  const [selectedFlight, setSelectedFlight] = useState<FlightDoc | null>(null);
+
+  // Status override state
   const [overrideStatus, setOverrideStatus] = useState<FlightStatus | ''>('');
   const [overrideLoading, setOverrideLoading] = useState(false);
 
-  // Filter flights based on tab
+  // Delete state
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [bookingCount, setBookingCount] = useState<number | null>(null);
+  const [bookingCheckLoading, setBookingCheckLoading] = useState(false);
+
+  // ─── Filter flights based on tab ───
   const displayFlights = useMemo(() => {
     switch (scheduleTab) {
       case 'today':
         return todayFlights;
       case 'week':
+        return weekFlights;
       case 'all':
+        return allFlights;
       default:
         return todayFlights;
     }
-  }, [scheduleTab, todayFlights]);
+  }, [scheduleTab, todayFlights, weekFlights, allFlights]);
 
   // Next scheduled flight
   const nextFlight = useMemo(() => {
@@ -65,16 +82,30 @@ const LiveOpsView: React.FC = () => {
     ) || null;
   }, [upcomingFlights, activeFlight, boardingFlights, airborneFlights]);
 
+  // ─── Handlers ───
+  const handleSelectFlight = useCallback((f: FlightDoc) => {
+    setSelectedFlight(f);
+    setOverrideStatus('');
+    setDeleteConfirm(false);
+    setBookingCount(null);
+  }, []);
+
+  const handleClosePanel = useCallback(() => {
+    setSelectedFlight(null);
+    setOverrideStatus('');
+    setDeleteConfirm(false);
+    setBookingCount(null);
+  }, []);
+
   const handleOverride = useCallback(async () => {
-    if (!overrideFlight || !overrideStatus) return;
+    if (!selectedFlight || !overrideStatus) return;
     setOverrideLoading(true);
     try {
       await updateFlightStatus({
-        flightId: overrideFlight.id,
+        flightId: selectedFlight.id,
         status: overrideStatus,
       });
-      addToast(`${overrideFlight.flightNumber} → ${FLIGHT_STATUS_LABELS[overrideStatus as FlightStatus]}`, 'success');
-      setOverrideFlight(null);
+      addToast(`${selectedFlight.flightNumber} → ${FLIGHT_STATUS_LABELS[overrideStatus as FlightStatus]}`, 'success');
       setOverrideStatus('');
     } catch (err) {
       console.error('Status override failed:', err);
@@ -82,11 +113,57 @@ const LiveOpsView: React.FC = () => {
     } finally {
       setOverrideLoading(false);
     }
-  }, [overrideFlight, overrideStatus, addToast]);
+  }, [selectedFlight, overrideStatus, addToast]);
+
+  const handleDeleteRequest = useCallback(async () => {
+    if (!selectedFlight) return;
+    setBookingCheckLoading(true);
+    try {
+      const count = await getFlightBookingCount(selectedFlight.id);
+      setBookingCount(count);
+      if (count === 0) {
+        setDeleteConfirm(true);
+      }
+    } catch (err) {
+      console.error('Booking check failed:', err);
+      addToast('Failed to check bookings', 'error');
+    } finally {
+      setBookingCheckLoading(false);
+    }
+  }, [selectedFlight, addToast]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!selectedFlight) return;
+    setDeleteLoading(true);
+    try {
+      await deleteFlight(selectedFlight.id);
+      addToast(`${selectedFlight.flightNumber} deleted`, 'success');
+      handleClosePanel();
+    } catch (err) {
+      console.error('Delete flight failed:', err);
+      addToast('Failed to delete flight', 'error');
+    } finally {
+      setDeleteLoading(false);
+    }
+  }, [selectedFlight, addToast, handleClosePanel]);
 
   const formatTime = (ts: any) => {
     if (!ts?.toDate) return '--:--';
     return ts.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  const formatFullDate = (ts: any) => {
+    if (!ts?.toDate) return '—';
+    return ts.toDate().toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const formatDuration = (dep: any, arr: any) => {
+    if (!dep?.toMillis || !arr?.toMillis) return '—';
+    const diff = arr.toMillis() - dep.toMillis();
+    if (diff <= 0) return '—';
+    const hrs = Math.floor(diff / 3_600_000);
+    const mins = Math.floor((diff % 3_600_000) / 60_000);
+    return `${hrs}h ${mins}m`;
   };
 
   const formatEventTime = (ts: any) => {
@@ -103,6 +180,10 @@ const LiveOpsView: React.FC = () => {
       </div>
     );
   }
+
+  // ─── Determine if the detail panel should be open ───
+  const isPanelOpen = selectedFlight !== null;
+  const canDelete = selectedFlight && DELETABLE_STATUSES.includes(selectedFlight.status);
 
   return (
     <div className="space-y-6">
@@ -214,7 +295,7 @@ const LiveOpsView: React.FC = () => {
         </div>
       )}
 
-      {/* ─── Schedule Cards Grid ─── */}
+      {/* ─── Schedule Cards Grid + Detail Panel ─── */}
       <div>
         {/* Tabs */}
         <div className="flex items-center justify-between mb-4">
@@ -234,29 +315,313 @@ const LiveOpsView: React.FC = () => {
             ))}
           </div>
 
-          {/* Live indicator */}
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-navy-400">Live</span>
+          {/* Flight count + Live indicator */}
+          <div className="flex items-center gap-4">
+            <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">
+              {displayFlights.length} {displayFlights.length === 1 ? 'flight' : 'flights'}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-navy-400">Live</span>
+            </div>
           </div>
         </div>
 
-        {/* Cards */}
-        {displayFlights.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-navy-100 p-16 text-center">
-            <span className="material-symbols-outlined text-5xl text-navy-200 block mb-3">event_busy</span>
-            <p className="font-bold text-navy-400">No flights found</p>
-            <p className="text-xs text-navy-300 mt-1">No flights scheduled for this time period.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {displayFlights.map((f) => (
-              <div key={f.id} onClick={() => { setOverrideFlight(f); setOverrideStatus(''); }}>
-                <FlightTrackingCard flight={f} tick={tick} />
+        {/* Master-Detail Layout */}
+        <div className={`flex gap-4 ${isPanelOpen ? '' : ''}`}>
+          {/* ─── LEFT: Cards Grid ─── */}
+          <div className={`transition-all duration-300 ${isPanelOpen ? 'w-2/3' : 'w-full'}`}>
+            {displayFlights.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-navy-100 p-16 text-center">
+                <span className="material-symbols-outlined text-5xl text-navy-200 block mb-3">event_busy</span>
+                <p className="font-bold text-navy-400">No flights found</p>
+                <p className="text-xs text-navy-300 mt-1">No flights scheduled for this time period.</p>
               </div>
-            ))}
+            ) : (
+              <div className={`grid gap-4 ${isPanelOpen ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+                {displayFlights.map((f) => (
+                  <div
+                    key={f.id}
+                    onClick={() => handleSelectFlight(f)}
+                    className={`cursor-pointer transition-all duration-200 rounded-2xl ${
+                      selectedFlight?.id === f.id
+                        ? 'ring-2 ring-primary ring-offset-2 scale-[1.02]'
+                        : 'hover:scale-[1.01]'
+                    }`}
+                  >
+                    <FlightTrackingCard flight={f} tick={tick} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          {/* ─── RIGHT: Detail Sidebar Panel ─── */}
+          {isPanelOpen && selectedFlight && (
+            <div className="w-1/3 min-w-[320px] transition-all duration-300">
+              <div className="bg-white rounded-3xl border border-navy-100 shadow-xl sticky top-4 overflow-hidden">
+                {/* Panel Header */}
+                <div className="bg-gradient-to-r from-navy-950 to-navy-800 px-6 py-5 text-white">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-black tracking-tight">{selectedFlight.flightNumber}</h3>
+                    <button
+                      onClick={handleClosePanel}
+                      className="size-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl font-black">{selectedFlight.origin?.code}</span>
+                    <div className="flex-1 flex items-center">
+                      <span className="h-px flex-1 bg-white/30" />
+                      <span className="material-symbols-outlined mx-2" style={{ fontSize: 18 }}>flight</span>
+                      <span className="h-px flex-1 bg-white/30" />
+                    </div>
+                    <span className="text-xl font-black">{selectedFlight.destination?.code}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-white/60 font-bold">
+                      {selectedFlight.origin?.city}
+                    </span>
+                    <span className="text-[10px] text-white/60 font-bold">
+                      {selectedFlight.destination?.city}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Badge */}
+                <div className="px-6 pt-4 pb-2">
+                  {(() => {
+                    const sc = FLIGHT_STATUS_CONFIG[selectedFlight.status] || FLIGHT_STATUS_CONFIG.scheduled;
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${sc.bg} ${sc.text}`}>
+                        <span className={`w-2 h-2 rounded-full ${sc.dot} ${sc.pulse ? 'animate-pulse' : ''}`} />
+                        {FLIGHT_STATUS_LABELS[selectedFlight.status]}
+                      </span>
+                    );
+                  })()}
+                </div>
+
+                {/* Flight Info Sections */}
+                <div className="px-6 py-4 space-y-4 max-h-[calc(100vh-380px)] overflow-y-auto">
+
+                  {/* Times */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-navy-50/50 rounded-xl p-3 text-center">
+                      <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest mb-1">Departure</p>
+                      <p className="text-sm font-black text-navy-950">{formatTime(selectedFlight.departureTime)}</p>
+                    </div>
+                    <div className="bg-navy-50/50 rounded-xl p-3 text-center">
+                      <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest mb-1">Duration</p>
+                      <p className="text-sm font-black text-navy-950">{formatDuration(selectedFlight.departureTime, selectedFlight.arrivalTime)}</p>
+                    </div>
+                    <div className="bg-navy-50/50 rounded-xl p-3 text-center">
+                      <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest mb-1">Arrival</p>
+                      <p className="text-sm font-black text-navy-950">{formatTime(selectedFlight.arrivalTime)}</p>
+                    </div>
+                  </div>
+
+                  {/* Date */}
+                  <div className="flex items-center gap-3 p-3 bg-navy-50/30 rounded-xl">
+                    <span className="material-symbols-outlined text-navy-400" style={{ fontSize: 18 }}>calendar_today</span>
+                    <div>
+                      <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest">Date</p>
+                      <p className="text-xs font-bold text-navy-800">{formatFullDate(selectedFlight.departureTime)}</p>
+                    </div>
+                  </div>
+
+                  {/* Aircraft */}
+                  <div className="flex items-center gap-3 p-3 bg-navy-50/30 rounded-xl">
+                    <span className="material-symbols-outlined text-navy-400" style={{ fontSize: 18 }}>flight</span>
+                    <div className="flex-1">
+                      <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest">Aircraft</p>
+                      <p className="text-xs font-bold text-navy-800">{selectedFlight.aircraft?.registration || '—'}</p>
+                    </div>
+                    <span className="text-[10px] font-bold text-navy-400">{selectedFlight.aircraft?.type}</span>
+                  </div>
+
+                  {/* Gate & Terminal */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 p-3 bg-navy-50/30 rounded-xl">
+                      <span className="material-symbols-outlined text-navy-400" style={{ fontSize: 16 }}>door_front</span>
+                      <div>
+                        <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest">Gate</p>
+                        <p className="text-xs font-bold text-navy-800">{selectedFlight.gate || '—'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-navy-50/30 rounded-xl">
+                      <span className="material-symbols-outlined text-navy-400" style={{ fontSize: 16 }}>apartment</span>
+                      <div>
+                        <p className="text-[8px] font-black text-navy-300 uppercase tracking-widest">Terminal</p>
+                        <p className="text-xs font-bold text-navy-800">{selectedFlight.terminal || '—'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seat Availability */}
+                  {selectedFlight.seatsAvailable && (
+                    <div>
+                      <p className="text-[9px] font-black text-navy-400 uppercase tracking-widest mb-2">Seat Availability</p>
+                      <div className="space-y-1.5">
+                        {Object.entries(selectedFlight.seatsAvailable).map(([cls, total]) => {
+                          const taken = selectedFlight.seatsTaken?.[cls] || 0;
+                          const available = (total as number) - taken;
+                          const pct = (total as number) > 0 ? Math.round((taken / (total as number)) * 100) : 0;
+                          return (
+                            <div key={cls} className="flex items-center gap-3">
+                              <span className="text-[10px] font-bold text-navy-600 capitalize w-16">{cls}</span>
+                              <div className="flex-1 h-2 bg-navy-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${pct > 85 ? 'bg-red-400' : pct > 60 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] font-bold text-navy-500 w-14 text-right">{available}/{total as number}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Base Fares */}
+                  {selectedFlight.baseFare && (
+                    <div>
+                      <p className="text-[9px] font-black text-navy-400 uppercase tracking-widest mb-2">Base Fares</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {Object.entries(selectedFlight.baseFare).map(([cls, price]) => (
+                          <div key={cls} className="bg-navy-50/50 rounded-lg p-2 text-center">
+                            <p className="text-[8px] font-black text-navy-300 uppercase">{cls}</p>
+                            <p className="text-xs font-black text-emerald-700">${(price as number).toLocaleString()}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Delay Info */}
+                  {selectedFlight.status === 'delayed' && selectedFlight.delayMinutes > 0 && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 rounded-xl border border-red-100">
+                      <span className="material-symbols-outlined text-red-500" style={{ fontSize: 16 }}>warning</span>
+                      <div>
+                        <p className="text-[10px] font-bold text-red-700">
+                          Delayed {selectedFlight.delayMinutes} minutes
+                        </p>
+                        {selectedFlight.delayReason && (
+                          <p className="text-[9px] text-red-500 mt-0.5">{selectedFlight.delayReason}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ─── Status Override ─── */}
+                  <div className="border-t border-navy-100 pt-4">
+                    <p className="text-[9px] font-black text-navy-400 uppercase tracking-widest mb-2">
+                      Status Override
+                    </p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {OVERRIDE_STATUSES.map((s) => {
+                        const sConfig = FLIGHT_STATUS_CONFIG[s];
+                        const sLabel = FLIGHT_STATUS_LABELS[s];
+                        const isSelected = overrideStatus === s;
+                        const isCurrent = selectedFlight.status === s;
+                        return (
+                          <button
+                            key={s}
+                            disabled={isCurrent}
+                            onClick={() => setOverrideStatus(s)}
+                            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-bold transition-all border ${
+                              isSelected
+                                ? `${sConfig.bg} ${sConfig.text} border-current shadow-md`
+                                : isCurrent
+                                  ? 'bg-navy-50 text-navy-300 border-navy-100 opacity-50 cursor-not-allowed'
+                                  : 'bg-white text-navy-600 border-navy-100 hover:border-navy-200'
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${sConfig.dot}`} />
+                            {sLabel}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {overrideStatus && (
+                      <button
+                        onClick={handleOverride}
+                        disabled={overrideLoading}
+                        className="w-full mt-3 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+                      >
+                        {overrideLoading ? 'Updating...' : `Apply: ${FLIGHT_STATUS_LABELS[overrideStatus as FlightStatus]}`}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ─── Delete Flight ─── */}
+                  {canDelete && (
+                    <div className="border-t border-navy-100 pt-4">
+                      {!deleteConfirm && bookingCount === null && (
+                        <button
+                          onClick={handleDeleteRequest}
+                          disabled={bookingCheckLoading}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-50 text-red-600 border border-red-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
+                        >
+                          {bookingCheckLoading ? (
+                            <>
+                              <div className="animate-spin size-3 border-2 border-red-300 border-t-red-600 rounded-full" />
+                              Checking bookings...
+                            </>
+                          ) : (
+                            <>
+                              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
+                              Delete Flight
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {/* Booking exists warning */}
+                      {bookingCount !== null && bookingCount > 0 && (
+                        <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl border border-amber-200">
+                          <span className="material-symbols-outlined text-amber-500" style={{ fontSize: 16 }}>warning</span>
+                          <p className="text-[10px] font-bold text-amber-700">
+                            Cannot delete — {bookingCount} booking(s) exist for this flight. Cancel bookings first.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Delete confirmation */}
+                      {deleteConfirm && (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 p-3 bg-red-50 rounded-xl border border-red-200">
+                            <span className="material-symbols-outlined text-red-500" style={{ fontSize: 16 }}>error</span>
+                            <p className="text-[10px] font-bold text-red-700">
+                              Are you sure? This will permanently delete {selectedFlight.flightNumber}.
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => { setDeleteConfirm(false); setBookingCount(null); }}
+                              className="flex-1 py-2.5 border border-navy-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-navy-500 hover:bg-navy-50 transition-all"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={handleConfirmDelete}
+                              disabled={deleteLoading}
+                              className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-200 disabled:opacity-50"
+                            >
+                              {deleteLoading ? 'Deleting...' : 'Confirm Delete'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ─── Summary Stats (Enhanced) ─── */}
@@ -286,81 +651,6 @@ const LiveOpsView: React.FC = () => {
           <p className="text-[9px] font-black uppercase tracking-widest text-navy-400 mt-1">Delayed</p>
         </div>
       </div>
-
-      {/* ─── Manual Status Override Modal ─── */}
-      {overrideFlight && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setOverrideFlight(null)}>
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-navy-100" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-sm font-black text-navy-950">Manual Status Override</h3>
-              <button onClick={() => setOverrideFlight(null)} className="text-navy-400 hover:text-navy-600">
-                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
-              </button>
-            </div>
-
-            {/* Flight info */}
-            <div className="p-4 bg-navy-50/50 rounded-2xl mb-5">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-black text-navy-950">{overrideFlight.flightNumber}</span>
-                <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-bold ${FLIGHT_STATUS_CONFIG[overrideFlight.status]?.bg} ${FLIGHT_STATUS_CONFIG[overrideFlight.status]?.text}`}>
-                  <span className={`w-2 h-2 rounded-full ${FLIGHT_STATUS_CONFIG[overrideFlight.status]?.dot}`} />
-                  {FLIGHT_STATUS_LABELS[overrideFlight.status]}
-                </span>
-              </div>
-              <p className="text-xs text-navy-500 mt-1">
-                {overrideFlight.origin?.code} → {overrideFlight.destination?.code}
-              </p>
-            </div>
-
-            {/* Status selector */}
-            <label className="block text-[9px] font-black text-navy-400 uppercase tracking-widest mb-2">
-              Set New Status
-            </label>
-            <div className="grid grid-cols-3 gap-2 mb-5">
-              {OVERRIDE_STATUSES.map((s) => {
-                const sConfig = FLIGHT_STATUS_CONFIG[s];
-                const sLabel = FLIGHT_STATUS_LABELS[s];
-                const isSelected = overrideStatus === s;
-                const isCurrent = overrideFlight.status === s;
-                return (
-                  <button
-                    key={s}
-                    disabled={isCurrent}
-                    onClick={() => setOverrideStatus(s)}
-                    className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[10px] font-bold transition-all border ${
-                      isSelected
-                        ? `${sConfig.bg} ${sConfig.text} border-current shadow-md`
-                        : isCurrent
-                          ? 'bg-navy-50 text-navy-300 border-navy-100 opacity-50 cursor-not-allowed'
-                          : 'bg-white text-navy-600 border-navy-100 hover:border-navy-200'
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${sConfig.dot}`} />
-                    {sLabel}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setOverrideFlight(null)}
-                className="flex-1 py-3 border border-navy-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-navy-500 hover:bg-navy-50 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleOverride}
-                disabled={!overrideStatus || overrideLoading}
-                className="flex-1 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
-              >
-                {overrideLoading ? 'Updating...' : 'Apply Override'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

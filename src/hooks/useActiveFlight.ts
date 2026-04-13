@@ -17,6 +17,10 @@ export interface LiveFlightData {
   upcomingFlights: FlightDoc[];
   /** All today's flights, unfiltered */
   todayFlights: FlightDoc[];
+  /** Flights this week (Mon–Sun of current week) */
+  weekFlights: FlightDoc[];
+  /** All future scheduled flights (today → 3 months) */
+  allFlights: FlightDoc[];
   /** Recent flight events for the event feed */
   recentEvents: FlightEventDoc[];
   /** Flights that have landed / taxi_in (for turnaround tracking) */
@@ -37,6 +41,7 @@ const PRE_FLIGHT_ACTIVE = ['boarding', 'doors_closed'];
 /* ─────────────── Hook ─────────────── */
 export function useActiveFlight(): LiveFlightData {
   const [flights, setFlights] = useState<FlightDoc[]>([]);
+  const [extendedFlights, setExtendedFlights] = useState<FlightDoc[]>([]);
   const [recentEvents, setRecentEvents] = useState<FlightEventDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(Date.now());
@@ -66,6 +71,34 @@ export function useActiveFlight(): LiveFlightData {
       (err) => {
         console.error('[useActiveFlight] Snapshot error:', err);
         setLoading(false);
+      },
+    );
+
+    return unsub;
+  }, []);
+
+  // Subscribe to extended flights (today → 3 months) for 'This Week' and 'All' tabs
+  useEffect(() => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const threeMonthsOut = new Date(startOfDay);
+    threeMonthsOut.setMonth(threeMonthsOut.getMonth() + 3);
+
+    const q = query(
+      collection(db, 'flights'),
+      where('departureTime', '>=', Timestamp.fromDate(startOfDay)),
+      where('departureTime', '<=', Timestamp.fromDate(threeMonthsOut)),
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as FlightDoc);
+        data.sort((a, b) => a.departureTime.toMillis() - b.departureTime.toMillis());
+        setExtendedFlights(data);
+      },
+      (err) => {
+        console.error('[useActiveFlight] Extended flights snapshot error:', err);
       },
     );
 
@@ -137,6 +170,20 @@ export function useActiveFlight(): LiveFlightData {
     return depMs >= todayStart.getTime() && depMs < todayEnd.getTime();
   });
 
+  // This week: Monday through Sunday of the current week
+  const weekFlights = extendedFlights.filter((f) => {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
+    const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const depMs = f.departureTime?.toMillis?.() || 0;
+    return depMs >= weekStart.getTime() && depMs < weekEnd.getTime();
+  });
+
+  // All future flights (the full extended dataset)
+  const allFlights = extendedFlights;
+
   const landedFlights = flights.filter(
     (f) => f.status === 'landed' || f.status === 'taxi_in',
   );
@@ -174,6 +221,8 @@ export function useActiveFlight(): LiveFlightData {
     delayedFlights,
     upcomingFlights,
     todayFlights,
+    weekFlights,
+    allFlights,
     recentEvents,
     landedFlights,
     arrivedFlights,

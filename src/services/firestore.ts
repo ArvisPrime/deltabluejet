@@ -492,3 +492,27 @@ export const updateFlightStatus = httpsCallable(functions, 'updateFlightStatus')
 export const assignGate = httpsCallable(functions, 'assignGate');
 export const swapAircraft = httpsCallable(functions, 'swapAircraft');
 export const getDashboardStats = httpsCallable(functions, 'getDashboardStats');
+
+// ─── Flight Management ─────────────────────────────────────
+
+/**
+ * Check how many bookings reference a given flight.
+ * Returns the count so the UI can warn/block before deletion.
+ */
+export async function getFlightBookingCount(flightId: string): Promise<number> {
+    const q = query(
+        collection(db, 'bookings'),
+        where('flightId', '==', flightId),
+        limit(1),
+    );
+    const snap = await getDocs(q);
+    return snap.size;
+}
+
+/**
+ * Delete a flight document from Firestore.
+ * Caller should check for existing bookings first via getFlightBookingCount.
+ */
+export async function deleteFlight(flightId: string): Promise<void> {
+    await deleteDoc(doc(db, 'flights', flightId));
+}
