@@ -27,13 +27,18 @@ const ChangeMealModal: React.FC<ChangeMealModalProps> = ({ open, onClose, bookin
    const { addToast } = useToastStore();
 
    useEffect(() => {
+      if (!open) return;
       // Find existing meal from special requests if any
       if (passenger) {
          const mealRequest = passenger.specialRequests?.find(req => req.includes('ML')) || 'standard';
          const matchingMeal = MEAL_OPTIONS.find(m => m.name.includes(mealRequest) || m.id === 'standard');
          if (matchingMeal) setSelectedMeal(matchingMeal.id);
+         else setSelectedMeal('standard');
+      } else {
+         setSelectedMeal('standard');
       }
-   }, [passenger]);
+      setIsSaving(false);
+   }, [open, passenger]);
 
    if (!passenger || !booking) return null;
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ModalShell from './ModalShell';
 import type { BookingDoc } from '../../../types/firestore';
 import { useBooking } from '../../../hooks/useBooking';
@@ -13,6 +13,14 @@ interface CancelBookingModalProps {
 const CancelBookingModal: React.FC<CancelBookingModalProps> = ({ open, onClose, booking }) => {
    const [confirmed, setConfirmed] = useState(false);
    const [isCancelling, setIsCancelling] = useState(false);
+
+   // Reset state when modal opens
+   useEffect(() => {
+      if (open) {
+         setConfirmed(false);
+         setIsCancelling(false);
+      }
+   }, [open]);
    const { cancel } = useBooking();
    const { addToast } = useToastStore();
 

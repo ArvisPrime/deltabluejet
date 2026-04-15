@@ -352,7 +352,7 @@ const LandingHome: React.FC = () => {
                      <p className="text-primary font-black uppercase tracking-[0.4em] text-xs">{promoData.sectionLabel}</p>
                      <h2 className="text-4xl md:text-6xl font-black text-navy-950 tracking-tighter uppercase leading-[0.9]">{promoData.sectionTitle} <br /><span className="text-navy-300">{promoData.sectionTitleHighlight}</span></h2>
                   </div>
-                  <button className="px-12 py-5 bg-navy-950 text-white font-black uppercase tracking-[0.3em] text-[10px] rounded-[1.5rem] shadow-2xl hover:bg-black transition-all">{promoData.ctaLabel}</button>
+                   <button onClick={onDestinationsStart} className="px-12 py-5 bg-navy-950 text-white font-black uppercase tracking-[0.3em] text-[10px] rounded-[1.5rem] shadow-2xl hover:bg-black transition-all">{promoData.ctaLabel}</button>
                </div>
 
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -366,7 +366,7 @@ const LandingHome: React.FC = () => {
                            <h3 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter uppercase leading-none">{promoData.featuredPromo.title}</h3>
                            <p className="text-sm sm:text-base md:text-xl font-medium italic opacity-80 max-w-lg leading-relaxed uppercase tracking-wider">{promoData.featuredPromo.description}</p>
                         </div>
-                        <button className="px-10 py-5 bg-white text-navy-950 font-black uppercase tracking-[0.3em] text-[10px] rounded-2xl shadow-2xl transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">{promoData.featuredPromo.ctaLabel}</button>
+                         <button onClick={(e) => { e.stopPropagation(); onBookingStart(); }} className="px-10 py-5 bg-white text-navy-950 font-black uppercase tracking-[0.3em] text-[10px] rounded-2xl shadow-2xl transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all">{promoData.featuredPromo.ctaLabel}</button>
                      </div>
                   </div>
 
@@ -419,7 +419,7 @@ const LandingHome: React.FC = () => {
                                  {dest.description}
                               </p>
                            </div>
-                           <button className="w-full py-4 border-2 border-navy-50 text-navy-950 text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-primary hover:text-white hover:border-primary transition-all">Explore Station</button>
+                            <button onClick={(e) => { e.stopPropagation(); onDestinationsStart(); }} className="w-full py-4 border-2 border-navy-50 text-navy-950 text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-primary hover:text-white hover:border-primary transition-all">Explore Station</button>
                         </div>
                      </div>
                   ))}
@@ -453,8 +453,8 @@ const LandingHome: React.FC = () => {
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-6 pt-6">
-                     <button className="px-16 py-6 bg-primary text-white font-black uppercase tracking-[0.3em] text-xs rounded-2xl shadow-2xl shadow-primary/40 hover:scale-105 active:scale-95 transition-all">{clubData.primaryCtaLabel}</button>
-                     <button className="px-12 py-6 bg-white/10 border border-white/20 text-white font-black uppercase tracking-[0.3em] text-xs rounded-2xl hover:bg-white/20 transition-all">{clubData.secondaryCtaLabel}</button>
+                      <button onClick={() => navigate(ROUTES.LOYALTY)} className="px-16 py-6 bg-primary text-white font-black uppercase tracking-[0.3em] text-xs rounded-2xl shadow-2xl shadow-primary/40 hover:scale-105 active:scale-95 transition-all">{clubData.primaryCtaLabel}</button>
+                      <button onClick={() => navigate(ROUTES.TIER_BENEFITS)} className="px-12 py-6 bg-white/10 border border-white/20 text-white font-black uppercase tracking-[0.3em] text-xs rounded-2xl hover:bg-white/20 transition-all">{clubData.secondaryCtaLabel}</button>
                   </div>
                </div>
 

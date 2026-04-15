@@ -30,6 +30,7 @@ const SpecialAssistanceModal: React.FC<SpecialAssistanceModalProps> = ({ open, o
    const toggle = (id: string) => setSelected(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
 
    useEffect(() => {
+      if (!open) return;
       // Find existing assistance from special requests
       if (passenger) {
          const existingServices = passenger.specialRequests?.filter(req => SERVICES.some(s => s.id === req)) || [];
@@ -41,8 +42,12 @@ const SpecialAssistanceModal: React.FC<SpecialAssistanceModalProps> = ({ open, o
          } else {
              setNotes('');
          }
+      } else {
+         setSelected([]);
+         setNotes('');
       }
-   }, [passenger]);
+      setIsSaving(false);
+   }, [open, passenger]);
 
    if (!passenger || !booking) return null;
 

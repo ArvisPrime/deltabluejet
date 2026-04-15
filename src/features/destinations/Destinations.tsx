@@ -339,6 +339,7 @@ const Destinations: React.FC = () => {
                         </div>
 
                         <button
+                           onClick={(e) => { e.stopPropagation(); onSelectDestination(hub); }}
                            className="w-full py-5 bg-white text-navy-950 font-black uppercase text-[10px] tracking-[0.3em] rounded-2xl shadow-xl hover:bg-primary hover:text-white transition-all transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
                         >
                            View Destination

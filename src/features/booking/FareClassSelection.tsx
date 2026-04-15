@@ -189,7 +189,7 @@ const FareClassSelection: React.FC = () => {
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 leading-relaxed mt-1">Our travel consultants are standing by for group and corporate bookings.</p>
           </div>
         </div>
-        <button className="px-12 py-4 bg-white text-navy-950 font-black uppercase text-[10px] tracking-[0.25em] rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all relative z-10">Live Support Chat</button>
+        <button onClick={() => navigate(ROUTES.HELP_CENTER)} className="px-12 py-4 bg-white text-navy-950 font-black uppercase text-[10px] tracking-[0.25em] rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all relative z-10">Live Support Chat</button>
       </div>
     </div>
   );

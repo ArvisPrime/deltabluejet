@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ModalShell from './ModalShell';
 import type { BookingDoc } from '../../../types/firestore';
 import { useBooking } from '../../../hooks/useBooking';
@@ -12,6 +12,11 @@ interface UpgradeClassModalProps {
 
 const UpgradeClassModal: React.FC<UpgradeClassModalProps> = ({ open, onClose, booking }) => {
    const [selectedClass, setSelectedClass] = useState<string | null>(null);
+
+   // Reset state when modal opens
+   useEffect(() => {
+      if (open) setSelectedClass(null);
+   }, [open]);
    const [isUpgrading, setIsUpgrading] = useState(false);
    const { modify } = useBooking();
    const { addToast } = useToastStore();
@@ -19,8 +24,8 @@ const UpgradeClassModal: React.FC<UpgradeClassModalProps> = ({ open, onClose, bo
    if (!booking) return null;
 
    const classes = [
-      { id: 'premium', name: 'Premium Economy', price: '+$280', seat: '38" pitch • 19" wide', perks: ['Priority Boarding', 'Extra Legroom', 'Premium Meal'], icon: 'airline_seat_recline_extra', color: 'border-indigo-200 bg-indigo-50/30', badge: 'bg-indigo-100 text-indigo-700', recommended: false },
-      { id: 'executive', name: 'Executive Class', price: '+$860', seat: '78" lie-flat • 22" wide', perks: ['Lounge Access', 'Lie-Flat Seat', 'Premium Dining', 'Priority Baggage'], icon: 'airline_seat_flat', color: 'border-amber-200 bg-amber-50/30', badge: 'bg-amber-100 text-amber-700', recommended: true },
+      { id: 'business', name: 'Business Class', price: '+$680', seat: '42" pitch • 21" wide', perks: ['Priority Boarding', 'Extra Legroom', 'Premium Meal', 'Lounge Access'], icon: 'airline_seat_recline_extra', color: 'border-indigo-200 bg-indigo-50/30', badge: 'bg-indigo-100 text-indigo-700', recommended: false },
+      { id: 'first', name: 'First Class', price: '+$1,860', seat: '78" lie-flat • 22" wide', perks: ['Lounge Access', 'Lie-Flat Seat', 'Premium Dining', 'Priority Baggage'], icon: 'airline_seat_flat', color: 'border-amber-200 bg-amber-50/30', badge: 'bg-amber-100 text-amber-700', recommended: true },
    ].filter(c => c.id !== booking.fareClass);
 
    const handleUpgrade = async () => {
@@ -44,7 +49,7 @@ const UpgradeClassModal: React.FC<UpgradeClassModalProps> = ({ open, onClose, bo
                <p className="text-[9px] font-bold text-navy-300 uppercase tracking-widest italic">{selectedClass ? 'Upgrade price shown per passenger' : 'Select a class to continue'}</p>
                <div className="flex gap-3">
                   <button onClick={onClose} className="px-8 py-3 border-2 border-navy-100 text-navy-700 font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl hover:bg-navy-50 transition-all">Cancel</button>
-                  <button disabled={!selectedClass || isUpgrading} onClick={handleUpgrade} className={`px-10 py-3 font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl shadow-lg transition-all ${selectedClass ? 'bg-primary text-white shadow-primary/20 hover:scale-[1.02] active:scale-95' : 'bg-navy-100 text-navy-300 cursor-not-allowed'} disabled:opacity-50 disabled:active:scale-100`}>
+                  <button disabled={!selectedClass || isUpgrading} onClick={handleUpgrade} className={`px-10 py-3 font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl shadow-lg transition-all ${selectedClass ? 'bg-primary text-white shadow-primary/20 hover:scale-[1.02] active:scale-95' : 'bg-navy-100 text-navy-300 cursor-not-allowed'} disabled:opacity-50 disabled:hover:scale-100 disabled:active:scale-100`}>
                      {isUpgrading ? 'Upgrading...' : 'Confirm Upgrade'}
                   </button>
                </div>

@@ -28,10 +28,14 @@ const SelectSeatModal: React.FC<SelectSeatModalProps> = ({ open, onClose, bookin
    ];
 
    useEffect(() => {
+      if (!open) return;
       if (passenger && passenger.seatNumber) {
          setSelectedSeat(passenger.seatNumber);
+      } else {
+         setSelectedSeat(null);
       }
-   }, [passenger]);
+      setIsSaving(false);
+   }, [open, passenger]);
 
    if (!passenger || !booking) return null;
 

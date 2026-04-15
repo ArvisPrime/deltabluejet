@@ -253,7 +253,7 @@ const FlightResults: React.FC = () => {
                      <div className="relative z-10 space-y-4">
                         <p className="text-[9px] font-black text-primary uppercase tracking-[0.2em]">{BRAND.shortName} Club</p>
                         <h4 className="text-lg font-black uppercase tracking-tight leading-tight">Unlock personnel discounts</h4>
-                        <button className="bg-white/10 border border-white/10 hover:bg-white/20 px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all">Join Loyalty Program</button>
+                        <button onClick={() => navigate(ROUTES.LOYALTY)} className="bg-white/10 border border-white/10 hover:bg-white/20 px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all">Join Loyalty Program</button>
                      </div>
                   </div>
                </aside>
@@ -407,7 +407,7 @@ const FlightResults: React.FC = () => {
                                                    <span className="text-4xl font-black text-navy-950 tracking-tighter">{display(economyPrice)}</span>
                                                 </div>
                                              </div>
-                                             <button className="px-12 py-5 bg-navy-950 text-white font-black uppercase text-[11px] tracking-[0.25em] rounded-[1.5rem] shadow-2xl shadow-navy-950/20 group-hover:bg-primary group-hover:shadow-primary/30 transition-all hover:scale-105 active:scale-95">Select Flight</button>
+                                             <button onClick={(e) => { e.stopPropagation(); selectFlight(f); }} className="px-12 py-5 bg-navy-950 text-white font-black uppercase text-[11px] tracking-[0.25em] rounded-[1.5rem] shadow-2xl shadow-navy-950/20 group-hover:bg-primary group-hover:shadow-primary/30 transition-all hover:scale-105 active:scale-95">Select Flight</button>
                                           </div>
                                        </div>
                                     );
@@ -528,7 +528,7 @@ const FlightResults: React.FC = () => {
                                           <span className="text-4xl font-black text-navy-950 tracking-tighter">{display(economyPrice)}</span>
                                        </div>
                                     </div>
-                                    <button className="px-12 py-5 bg-navy-950 text-white font-black uppercase text-[11px] tracking-[0.25em] rounded-[1.5rem] shadow-2xl shadow-navy-950/20 group-hover:bg-primary group-hover:shadow-primary/30 transition-all hover:scale-105 active:scale-95">Select Flight</button>
+                                    <button onClick={(e) => { e.stopPropagation(); selectFlight(f); }} className="px-12 py-5 bg-navy-950 text-white font-black uppercase text-[11px] tracking-[0.25em] rounded-[1.5rem] shadow-2xl shadow-navy-950/20 group-hover:bg-primary group-hover:shadow-primary/30 transition-all hover:scale-105 active:scale-95">Select Flight</button>
                                  </div>
                               </div>
                            );

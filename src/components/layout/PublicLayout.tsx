@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
 import { useCmsHeaderStore } from '../../stores/cmsHeaderStore';
@@ -15,6 +15,7 @@ import CurrencySelector from '../common/CurrencySelector';
  */
 const PublicLayout: React.FC = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const { logoUrl, brandName, tagSuffix, navItems, ctaLabel, ctaLink, ctaVisible, showSearch, showLanguageSwitcher, showLoginButton, loaded } = useCmsHeaderStore();
     const addToast = useToastStore(s => s.addToast);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -157,7 +158,7 @@ const PublicLayout: React.FC = () => {
                             <CurrencySelector />
                         </div>
                         {showSearch !== false && (
-                            <button className="text-navy-500 hover:text-navy-800 transition-colors hidden md:block">
+                            <button onClick={() => navigate(ROUTES.FLIGHT_SEARCH)} className="text-navy-500 hover:text-navy-800 transition-colors hidden md:block" aria-label="Search flights">
                                 <span className="material-symbols-outlined text-xl">search</span>
                             </button>
                         )}
@@ -228,7 +229,7 @@ const PublicLayout: React.FC = () => {
                             {
                                 title: 'Support',
                                 links: [
-                                    { label: 'Help Center', path: ROUTES.ABOUT },
+                                    { label: 'Help Center', path: ROUTES.HELP_CENTER },
                                     { label: 'Dangerous Goods', path: ROUTES.DANGEROUS_GOODS },
                                     { label: 'Visa Requirements', path: ROUTES.VISA_CHECKER },
                                 ],

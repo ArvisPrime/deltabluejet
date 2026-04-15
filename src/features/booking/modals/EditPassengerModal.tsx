@@ -19,8 +19,9 @@ const EditPassengerModal: React.FC<EditPassengerModalProps> = ({ open, onClose, 
    const [isSaving, setIsSaving] = useState(false);
    const { addToast } = useToastStore();
 
+   // Reset form from passenger data when modal opens
    useEffect(() => {
-      if (passenger) {
+      if (open && passenger) {
          setFormData({
             firstName: passenger.firstName || '',
             lastName: passenger.lastName || '',
@@ -28,8 +29,11 @@ const EditPassengerModal: React.FC<EditPassengerModalProps> = ({ open, onClose, 
             documentNumber: passenger.documentNumber || '',
             nationality: passenger.nationality || ''
          });
+         setIsSaving(false);
       }
-   }, [passenger]);
+   }, [open, passenger]);
+
+   const isFormValid = formData.firstName.trim() && formData.lastName.trim() && formData.documentNumber.trim() && formData.nationality.trim();
 
    if (!passenger || !booking) return null;
 
@@ -68,7 +72,7 @@ const EditPassengerModal: React.FC<EditPassengerModalProps> = ({ open, onClose, 
                <p className="text-[9px] font-bold text-navy-300 uppercase tracking-widest italic">Changes apply to this booking only</p>
                <div className="flex gap-3">
                   <button onClick={onClose} className="px-8 py-3 border-2 border-navy-100 text-navy-700 font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl hover:bg-navy-50 transition-all">Cancel</button>
-                  <button disabled={isSaving} onClick={handleSave} className="px-10 py-3 bg-primary text-white font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100">
+                  <button disabled={isSaving || !isFormValid} onClick={handleSave} className="px-10 py-3 bg-primary text-white font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 disabled:active:scale-100 disabled:cursor-not-allowed">
                      {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                </div>

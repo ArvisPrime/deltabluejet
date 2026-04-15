@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ModalShell from './ModalShell';
 import type { BookingDoc } from '../../../types/firestore';
 import { useBooking } from '../../../hooks/useBooking';
@@ -13,9 +13,20 @@ interface ChangeFlightModalProps {
 const ChangeFlightModal: React.FC<ChangeFlightModalProps> = ({ open, onClose, booking }) => {
    const [selectedDate, setSelectedDate] = useState('');
    const [isSearching, setIsSearching] = useState(false);
+   const [isChanging, setIsChanging] = useState<string | null>(null);
    const [flights, setFlights] = useState<any[]>([]);
    const { search, modify } = useBooking();
    const { addToast } = useToastStore();
+
+   // Reset state when modal opens
+   useEffect(() => {
+      if (open) {
+         setSelectedDate('');
+         setIsSearching(false);
+         setIsChanging(null);
+         setFlights([]);
+      }
+   }, [open]);
 
    if (!booking) return null;
 
@@ -39,12 +50,15 @@ const ChangeFlightModal: React.FC<ChangeFlightModalProps> = ({ open, onClose, bo
    };
 
    const handleChangeFlight = async (newFlightId: string) => {
+      setIsChanging(newFlightId);
       try {
          await modify({ bookingId: booking.id, newFlightId });
          addToast('Flight changed successfully.', 'success');
          onClose();
       } catch (err) {
          addToast('Failed to change flight.', 'error');
+      } finally {
+         setIsChanging(null);
       }
    };
 
@@ -58,7 +72,7 @@ const ChangeFlightModal: React.FC<ChangeFlightModalProps> = ({ open, onClose, bo
                <p className="text-[9px] font-bold text-navy-300 uppercase tracking-widest italic">Fare difference may apply</p>
                <div className="flex gap-3">
                   <button onClick={onClose} className="px-8 py-3 border-2 border-navy-100 text-navy-700 font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl hover:bg-navy-50 transition-all">Cancel</button>
-                  <button disabled={isSearching} onClick={handleSearch} className="px-10 py-3 bg-primary text-white font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100">{isSearching ? 'Searching...' : 'Search Available Flights'}</button>
+                  <button disabled={isSearching || !selectedDate} onClick={handleSearch} className="px-10 py-3 bg-primary text-white font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed">{isSearching ? 'Searching...' : 'Search Available Flights'}</button>
                </div>
             </div>
          }
@@ -124,7 +138,7 @@ const ChangeFlightModal: React.FC<ChangeFlightModalProps> = ({ open, onClose, bo
                                  <p className="font-bold text-navy-950">{f.flightNumber} • {dep} - {arr}</p>
                                  <p className="text-xs text-navy-500">${f.price} base fare</p>
                               </div>
-                              <button onClick={() => handleChangeFlight(f.id)} className="px-6 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/90">Select</button>
+                              <button disabled={isChanging !== null} onClick={() => handleChangeFlight(f.id)} className="px-6 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">{isChanging === f.id ? 'Changing...' : 'Select'}</button>
                            </div>
                         );
                      })}

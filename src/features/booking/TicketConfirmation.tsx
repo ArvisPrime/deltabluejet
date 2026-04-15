@@ -185,6 +185,7 @@ const TicketConfirmation: React.FC = () => {
                   Return to Home
                </button>
                <button
+                   onClick={() => window.print()}
                   className="flex-1 py-4 bg-white border-2 border-navy-100 text-navy-700 font-black uppercase tracking-[0.15em] rounded-2xl hover:border-navy-200 transition-all flex items-center justify-center gap-2"
                >
                   <span className="material-symbols-outlined text-sm">download</span>
