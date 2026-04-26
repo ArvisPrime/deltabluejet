@@ -21,7 +21,11 @@ exports.updateFlightStatus = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('permission-denied', 'Insufficient permissions for flight operations.');
     }
     const { flightId, status, delayMinutes, cancellationReason } = request.data;
-    const validStatuses = ['scheduled', 'boarding', 'departed', 'in_air', 'landed', 'arrived', 'delayed', 'cancelled'];
+    const validStatuses = [
+        'scheduled', 'boarding', 'doors_closed', 'taxi_out',
+        'departed', 'airborne', 'in_air', 'cruise', 'descent',
+        'landed', 'taxi_in', 'arrived', 'delayed', 'cancelled', 'diverted',
+    ];
     if (!validStatuses.includes(status)) {
         throw new https_1.HttpsError('invalid-argument', `Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     }

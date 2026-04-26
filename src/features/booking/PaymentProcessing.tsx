@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
+import { useBookingStore } from '../../stores/bookingStore';
 import { useConfigStore } from '../../stores/configStore';
 import { useAuth } from '../../hooks/useAuth';
 import { useBooking } from '../../hooks/useBooking';
@@ -24,8 +25,12 @@ const PaymentProcessing: React.FC = () => {
     const pnr = useBookingStore((s) => s.pnr);
     const { completeBooking } = useBooking();
     
-    // Configs
-    const paymentProviders = useConfigStore(s => s.paymentProviders?.providers.filter(p => p.active) || []);
+    // Configs — read the raw config object (stable reference) and derive filtered list via useMemo
+    const paymentProvidersConfig = useConfigStore(s => s.paymentProviders);
+    const paymentProviders = useMemo(
+        () => paymentProvidersConfig?.providers?.filter(p => p.active) || [],
+        [paymentProvidersConfig]
+    );
 
     // Compute real amounts from booking store
     const pricePerPax = selectedFlight?.price || 0;
@@ -52,7 +57,8 @@ const PaymentProcessing: React.FC = () => {
         if (paymentProviders.length > 0 && !selectedProvider) {
             setSelectedProvider(paymentProviders[0].id);
         }
-    }, [paymentProviders, selectedProvider]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [paymentProviders.length]);
 
     // Card form state
     const [cardNumber, setCardNumber] = useState('');

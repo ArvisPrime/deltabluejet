@@ -7,11 +7,13 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase.config';
 import { useConfigStore } from '../../stores/configStore';
 import { AircraftLayoutConfig, SeatZone } from '../../types/configTypes';
+import { useCurrency } from '../../hooks/useCurrency';
 
 const SeatSelection: React.FC = () => {
    const navigate = useNavigate();
    const { selectedFlight, passengers, selectedSeats, setSelectedSeats } = useBookingStore();
    const { fetchAircraftLayout } = useConfigStore();
+   const { display, format } = useCurrency();
    const [activePassengerIndex, setActivePassengerIndex] = useState(0);
    const [occupiedSeats, setOccupiedSeats] = useState<string[]>([]);
    const [isLoading, setIsLoading] = useState(true);
@@ -37,8 +39,13 @@ const SeatSelection: React.FC = () => {
                setOccupiedSeats(seats);
             }
 
-            // Fetch layout config
-            const configLayout = await fetchAircraftLayout(selectedFlight.aircraft || 'DBJ-120');
+            // Fetch layout config — try exact aircraft ID first, then default
+            const aircraftId = selectedFlight.aircraft || 'DBJ-120';
+            let configLayout = await fetchAircraftLayout(aircraftId);
+            // Fallback: if the aircraft type name doesn't match a layout doc ID, use default
+            if (!configLayout && aircraftId !== 'DBJ-120') {
+               configLayout = await fetchAircraftLayout('DBJ-120');
+            }
             setLayout(configLayout);
          } catch (error) {
             console.error("Error fetching seat data:", error);
@@ -331,13 +338,13 @@ const SeatSelection: React.FC = () => {
                      <div className="space-y-6 pt-6 border-t border-navy-50">
                         <div className="flex justify-between items-center text-[10px] font-black text-navy-400 uppercase tracking-widest">
                            <span>Base Fare</span>
-                           <span className="text-navy-950">${selectedFlight.price.toFixed(2)}</span>
+                           <span className="text-navy-950">{display(selectedFlight.price)}</span>
                         </div>
                         <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
                            <span className="text-primary">Seat Selection {activeSeatZone?.name ? `(${activeSeatZone.name})` : 'Fee'}</span>
                            <span className={activeSeatZone && activeSeatZone.priceCents > 0 ? "text-emerald-600" : "text-navy-500"}>
                               {activeSeatZone && activeSeatZone.priceCents > 0 
-                                 ? `+$${(activeSeatZone.priceCents / 100).toFixed(2)}` 
+                                 ? `+${format(activeSeatZone.priceCents / 100)}` 
                                  : 'Free'}
                            </span>
                         </div>

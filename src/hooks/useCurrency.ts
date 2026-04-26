@@ -37,8 +37,8 @@ interface CurrencyState {
 }
 
 const storedCurrency = typeof window !== 'undefined'
-    ? localStorage.getItem('deltablue_currency') || 'USD'
-    : 'USD';
+    ? localStorage.getItem('deltablue_currency') || 'GMD'
+    : 'GMD';
 
 export const useCurrencyStore = create<CurrencyState>((set) => ({
     currency: storedCurrency,

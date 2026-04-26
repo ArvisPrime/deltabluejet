@@ -279,8 +279,12 @@ const AdminBookingWizard: React.FC<Props> = ({ onClose, onComplete }) => {
         const data = flightSnap.data();
         setOccupiedSeats(data.occupiedSeats || []);
       }
-      const aircraftType = selectedFlight.aircraft || 'B737-800';
-      const layoutData = await fetchAircraftLayout(aircraftType);
+      const aircraftType = selectedFlight.aircraft || 'DBJ-120';
+      let layoutData = await fetchAircraftLayout(aircraftType);
+      // Fallback: if the aircraft type name doesn't match a layout doc ID, use default
+      if (!layoutData && aircraftType !== 'DBJ-120') {
+        layoutData = await fetchAircraftLayout('DBJ-120');
+      }
       setLayout(layoutData);
     } catch (err) {
       console.error('Seat load failed:', err);

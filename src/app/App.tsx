@@ -7,8 +7,12 @@ import ToastContainer from '../components/ui/ToastContainer';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
 import { useConfigStore } from '../stores/configStore';
+import { useGeoLocale } from '../hooks/useGeoLocale';
 
 const App: React.FC = () => {
+  // Silently detect visitor locale from IP (currency + language)
+  useGeoLocale();
+
   // Subscribe to Firebase auth state changes and initial system configs
   useEffect(() => {
     const unsubAuth = onAuthChange();

@@ -1,0 +1,52 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ─── Helper Functions ─────────────────────────────────────────────────
+
+    // Is the request from a signed-in (authenticated) user?
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Is the signed-in user the platform admin?
+    // The admin UID is stored as a custom claim set via Firebase Admin SDK.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    // Is the file an allowed image type?
+    function isAllowedImage() {
+      return request.resource.contentType.matches('image/.*')
+          && request.resource.size < 5 * 1024 * 1024; // 5 MB max
+    }
+
+    // ─── CMS Brand Assets (logo, favicon) ────────────────────────────────
+    // Only admins can upload. Anyone can read (for public branding display).
+    match /cms/brand/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isAllowedImage();
+    }
+
+    // ─── CMS Destination Images ───────────────────────────────────────────
+    // Only admins can upload. Anyone can read (for landing pages).
+    match /cms/destinations/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isAllowedImage();
+    }
+
+    // ─── CMS Page Featured Images ─────────────────────────────────────────
+    // Only admins can upload. Anyone can read.
+    match /cms/pages/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isAllowedImage();
+    }
+
+    // ─── Catch-all: Deny Everything Else ─────────────────────────────────
+    // Any path not explicitly matched above is denied.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

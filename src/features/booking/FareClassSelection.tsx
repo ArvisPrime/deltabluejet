@@ -36,7 +36,7 @@ const BookingStepper: React.FC<{ current: number }> = ({ current }) => {
 
 const FareClassSelection: React.FC = () => {
   const navigate = useNavigate();
-  const { currency, display } = useCurrency();
+  const { display } = useCurrency();
   const searchCriteria = useBookingStore(s => s.searchCriteria);
   const selectedFlight = useBookingStore(s => s.selectedFlight);
   const setSelectedFlight = useBookingStore(s => s.setSelectedFlight);
@@ -97,8 +97,9 @@ const FareClassSelection: React.FC = () => {
 
       <div className="bg-white rounded-[3.5rem] border border-navy-100 shadow-sm p-10 flex flex-col md:flex-row items-center gap-10 group overflow-hidden relative">
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-        <div className="w-full md:w-64 h-44 rounded-3xl bg-cover bg-center shrink-0 shadow-2xl relative overflow-hidden group-hover:scale-105 transition-transform duration-700" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1542296332-2e4473faf563?auto=format&fit=crop&q=80')" }}>
-          <div className="absolute inset-0 bg-navy-950/20 group-hover:bg-transparent transition-colors"></div>
+        <div className="w-full md:w-64 h-44 rounded-3xl bg-gradient-to-br from-primary/20 via-navy-100 to-navy-50 shrink-0 shadow-2xl relative overflow-hidden group-hover:scale-105 transition-transform duration-700 flex items-center justify-center">
+          <span className="material-symbols-outlined text-7xl text-primary/30">flight_takeoff</span>
+          <div className="absolute inset-0 bg-navy-950/5 group-hover:bg-transparent transition-colors"></div>
         </div>
         <div className="flex-1 space-y-6 relative z-10">
           <div className="flex items-center gap-4">
@@ -143,13 +144,10 @@ const FareClassSelection: React.FC = () => {
             </div>
 
             <div className="py-8 border-y border-navy-50">
-              <div className="flex items-baseline gap-2">
-                <span className="text-xs font-bold text-navy-400 uppercase tracking-widest">Starting at</span>
-                <div className="flex items-baseline justify-end gap-1">
-                    <span className="text-xs font-black text-navy-400">{currency}</span>
-                    <span className="text-5xl font-black text-navy-950 tracking-tighter">{display(calculatedPrice)}</span>
-                </div>
-                <span className="text-xs font-bold text-navy-400 uppercase">/ Pax</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-navy-400 uppercase tracking-widest">Starting at</span>
+                <span className="text-3xl sm:text-4xl font-black text-navy-950 tracking-tighter leading-none break-words">{display(calculatedPrice)}</span>
+                <span className="text-[10px] font-bold text-navy-400 uppercase tracking-widest">per passenger</span>
               </div>
             </div>
 

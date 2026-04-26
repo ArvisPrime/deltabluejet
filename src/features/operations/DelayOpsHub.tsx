@@ -4,9 +4,6 @@ import { useSearchParams } from 'react-router';
 // ─── Lazy-loaded Tab Panels ─────────────────────────────
 
 const DisruptionResolution = lazy(() => import('./DisruptionResolution'));
-const AircraftSwap = lazy(() => import('./AircraftSwap'));
-const SeatMapCMS = lazy(() => import('./SeatMapCMS'));
-const AirportManagement = lazy(() => import('./AirportManagement'));
 const ManageDelay = lazy(() => import('./ManageDelay'));
 
 // ─── Tab Configuration ──────────────────────────────────
@@ -20,11 +17,8 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-    { id: 'delays',       label: 'Delay Manager',       icon: 'timer_off',                  component: ManageDelay,          color: 'text-red-600 bg-red-50' },
-    { id: 'disruptions',  label: 'Disruption Center',    icon: 'warning',                    component: DisruptionResolution,  color: 'text-amber-600 bg-amber-50' },
-    { id: 'swap',         label: 'Aircraft Swap',        icon: 'swap_horiz',                 component: AircraftSwap,          color: 'text-blue-600 bg-blue-50' },
-    { id: 'seatmap',      label: 'Seat Map CMS',         icon: 'airline_seat_recline_normal', component: SeatMapCMS,            color: 'text-violet-600 bg-violet-50' },
-    { id: 'airports',     label: 'Airports',             icon: 'flight_takeoff',             component: AirportManagement,     color: 'text-emerald-600 bg-emerald-50' },
+    { id: 'delays',       label: 'Delay Manager',       icon: 'timer_off',   component: ManageDelay,          color: 'text-red-600 bg-red-50' },
+    { id: 'disruptions',  label: 'Disruption Center',    icon: 'warning',     component: DisruptionResolution,  color: 'text-amber-600 bg-amber-50' },
 ];
 
 // ─── Loading Fallback ───────────────────────────────────
@@ -64,7 +58,7 @@ const DelayOpsHub: React.FC = () => {
                         <div>
                             <h1 className="text-2xl font-black text-navy-950 tracking-tighter uppercase">Delay Management</h1>
                             <p className="text-[9px] font-black text-navy-400 uppercase tracking-widest mt-0.5">
-                                Delays • Disruptions • Aircraft Swap • Seat Maps • Airports
+                                Delays • Disruptions
                             </p>
                         </div>
                     </div>

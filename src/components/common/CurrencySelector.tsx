@@ -1,9 +1,16 @@
 import React from 'react';
 import { useCurrencyStore, SUPPORTED_CURRENCIES } from '../../hooks/useCurrency';
+import { setManualPreference } from '../../hooks/useGeoLocale';
+import { clearGeoCache } from '../../services/geoService';
 
 const CurrencySelector: React.FC = () => {
     const { currency, setCurrency } = useCurrencyStore();
 
+    const handleSelect = (code: string) => {
+        setCurrency(code);
+        setManualPreference();
+        clearGeoCache();
+    };
     return (
         <div className="relative group">
             <button
@@ -18,7 +25,7 @@ const CurrencySelector: React.FC = () => {
                 {SUPPORTED_CURRENCIES.map(cur => (
                     <button
                         key={cur.code}
-                        onClick={() => setCurrency(cur.code)}
+                        onClick={() => handleSelect(cur.code)}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold transition-colors hover:bg-navy-50 ${
                             currency === cur.code ? 'text-primary bg-primary/5' : 'text-navy-600'
                         }`}

@@ -26,3 +26,4 @@ export { calculateDynamicPriceSecure, forecastRevenueSecure } from './pricing';
 export { createVoucherSecure, redeemVoucherSecure } from './vouchers';
 export { totpGenerateSecret, totpVerifySetup, totpVerifyCode, totpRemove, totpGetStatus, clearTotpVerified } from './totp';
 export { checkFlightStatus } from './flightStatus';
+export { geolocate } from './geolocate';

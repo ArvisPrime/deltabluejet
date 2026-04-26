@@ -1,5 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { setManualPreference } from '../../hooks/useGeoLocale';
+import { clearGeoCache } from '../../services/geoService';
 
 const LANGUAGES = [
     { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -10,6 +12,11 @@ const LANGUAGES = [
 const LanguageSwitcher: React.FC = () => {
     const { i18n } = useTranslation();
 
+    const handleSelect = (code: string) => {
+        i18n.changeLanguage(code);
+        setManualPreference();
+        clearGeoCache();
+    };
     return (
         <div className="relative group">
             <button
@@ -24,7 +31,7 @@ const LanguageSwitcher: React.FC = () => {
                 {LANGUAGES.map(lang => (
                     <button
                         key={lang.code}
-                        onClick={() => i18n.changeLanguage(lang.code)}
+                        onClick={() => handleSelect(lang.code)}
                         className={`w-full flex items-center gap-3 px-4 py-3 text-xs font-bold transition-colors hover:bg-navy-50 ${
                             i18n.language === lang.code ? 'text-primary bg-primary/5' : 'text-navy-600'
                         }`}

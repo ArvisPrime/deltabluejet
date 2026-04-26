@@ -7,7 +7,7 @@
 
 export const APP_CONFIG = {
     /** Default currency for bookings and payments */
-    defaultCurrency: 'USD',
+    defaultCurrency: 'GMD',
 
     /** Supported currencies */
     supportedCurrencies: ['USD', 'EUR', 'GBP', 'GMD'],
