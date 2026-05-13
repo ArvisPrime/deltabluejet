@@ -210,7 +210,7 @@ const PaymentProcessing: React.FC = () => {
             amount: bookingAmountCents,
             currency: 'GMD',
             paymentMethod: 'mobilemoney',
-            mobileMoneyProvider: selectedProvider,
+            mobileMoneyProvider: selectedProvider as 'wave' | 'orange_money' | 'afrimoney' | 'qmoney',
             customerEmail,
             customerName: passengerName || 'PASSENGER',
             customerPhone,
