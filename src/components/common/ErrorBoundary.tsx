@@ -5,6 +5,10 @@ interface ErrorBoundaryProps {
     children: ReactNode;
     /** Optional fallback UI. If not provided, a default branded page is shown. */
     fallback?: ReactNode;
+    /** Section label for context-aware error messages (e.g. "Admin", "Operations", "Finance"). */
+    section?: string;
+    /** Optional callback invoked when an error is caught — useful for analytics/logging. */
+    onError?: (error: Error, componentStack: string) => void;
 }
 
 interface ErrorBoundaryState {
@@ -44,7 +48,13 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     }
 
     componentDidCatch(error: Error, info: React.ErrorInfo) {
-        console.error('[ErrorBoundary] Uncaught error:', error, info.componentStack);
+        const section = this.props.section ? ` [${this.props.section}]` : '';
+        console.error(`[ErrorBoundary]${section} Uncaught error:`, error, info.componentStack);
+
+        // Notify external error handler (analytics, logging, etc.)
+        if (this.props.onError) {
+            this.props.onError(error, info.componentStack ?? '');
+        }
 
         // Auto-retry once for chunk load errors (stale deploy)
         if (isChunkLoadError(error) && !this.retried) {
@@ -162,7 +172,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                         >
                             {isChunk
                                 ? `${BRAND.name} has been updated since your last visit. Please refresh to load the latest version.`
-                                : `We apologise for the inconvenience. ${BRAND.name} encountered a temporary issue. Please try again or return to the home page.`
+                                : `We apologise for the inconvenience. ${BRAND.name}${this.props.section ? ` ${this.props.section}` : ''} encountered a temporary issue. Please try again or return to the home page.`
                             }
                         </p>
 

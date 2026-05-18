@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Outlet, Link, useLocation } from 'react-router';
+import ErrorBoundary from '../common/ErrorBoundary';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
 import { useUIStore } from '../../stores/uiStore';
@@ -423,7 +424,9 @@ const AdminLayout: React.FC = () => {
 
                 {/* Page Content */}
                 <main className="flex-1 overflow-y-auto custom-scrollbar">
-                    <Outlet />
+                    <ErrorBoundary section="Admin">
+                        <Outlet />
+                    </ErrorBoundary>
                 </main>
             </div>
         </div>
