@@ -397,44 +397,7 @@ const Dashboard: React.FC = () => {
 
         {/* Side panels */}
         <div className="flex flex-col gap-6 md:gap-8">
-          <div className="bg-primary text-white p-6 rounded-2xl md:rounded-[2rem] shadow-lg shadow-primary/25 relative overflow-hidden">
-            <div className="relative z-10">
-              <h3 className="text-lg font-bold">Quick Actions</h3>
-              <p className="text-blue-100 text-sm mt-1 mb-6 uppercase tracking-widest font-black text-[10px]">Manage your station efficiently.</p>
-              <div className="flex flex-col gap-3">
-                {hasModule('BOOKINGS') ? (
-                  <button onClick={() => navigate(ROUTES.BOOKINGS)} className="bg-white text-primary w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-                    <span className="material-symbols-outlined text-[18px]">confirmation_number</span>
-                    View Bookings
-                  </button>
-                ) : (
-                  <button onClick={() => navigate(ROUTES.FLIGHT_SEARCH)} className="bg-white text-primary w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-                    <span className="material-symbols-outlined text-[18px]">add</span>
-                    Create Booking
-                  </button>
-                )}
-                {hasModule('USER_MANAGEMENT') && (
-                  <button onClick={() => navigate(ROUTES.USER_MANAGEMENT)} className="bg-blue-600 text-white w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 border border-blue-500 shadow-sm">
-                    <span className="material-symbols-outlined text-[18px]">person_add</span>
-                    Manage Users
-                  </button>
-                )}
-                {hasModule('CREW_SCHEDULING') && (
-                  <button onClick={() => navigate(ROUTES.CREW_SCHEDULING)} className="bg-blue-600 text-white w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 border border-blue-500 shadow-sm">
-                    <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-                    Crew Schedule
-                  </button>
-                )}
-                {hasModule('FLIGHT_SCHEDULING') && (
-                  <button onClick={() => navigate(ROUTES.FLIGHT_SCHEDULING)} className="bg-blue-600 text-white w-full py-3 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-2 border border-blue-500 shadow-sm">
-                    <span className="material-symbols-outlined text-[18px]">schedule</span>
-                    Flight Schedule
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="absolute -right-10 -top-10 size-40 bg-white/10 rounded-full blur-2xl"></div>
-          </div>
+
 
           <div className="bg-white rounded-2xl md:rounded-[3rem] border border-navy-100 p-6 md:p-10 shadow-sm relative group overflow-hidden">
             <div className="flex items-center justify-between mb-6 relative z-10">
