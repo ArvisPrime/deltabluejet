@@ -32,7 +32,7 @@ interface AuditEntry {
 const DEFAULT_CONFIG: SeoConfig = {
   metaTitleTemplate: `{{page_title}} | ${BRAND.name}`,
   metaDescription: `Book flights with ${BRAND.name}. Affordable fares, real-time tracking, and premium passenger services.`,
-  robotsTxt: `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /api/\n\nSitemap: https://${BRAND.domain}/sitemap.xml`,
+  robotsTxt: `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /api/\n\nSitemap: https://deltabluejetair.com/sitemap.xml`,
   faviconUrl: null,
   faviconName: 'Deltablue_Icon_v4',
   ogTitle: `${BRAND.name} | Your Flight Partner`,

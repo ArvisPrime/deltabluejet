@@ -4,9 +4,11 @@ import { Link } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
+import { useCmsHeaderStore } from '../../stores/cmsHeaderStore';
 
 const ForgotPassword: React.FC = () => {
   const { sendReset } = useAuth();
+  const { logoUrl } = useCmsHeaderStore();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,10 +43,16 @@ const ForgotPassword: React.FC = () => {
       <header className="w-full bg-white border-b border-navy-100 px-10 py-6">
         <div className="max-w-[1200px] mx-auto flex items-center justify-between">
           <Link to={ROUTES.HOME} className="flex items-center gap-4 select-none cursor-pointer">
-            <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20">
-              <span className="material-symbols-outlined text-white text-2xl font-black">airlines</span>
-            </div>
-            <h2 className="text-navy-950 text-xl font-black tracking-tighter uppercase">{BRAND.name}</h2>
+            {logoUrl ? (
+              <img src={logoUrl} alt={BRAND.name} className="h-10 w-auto object-contain" />
+            ) : (
+              <>
+                <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20">
+                  <span className="material-symbols-outlined text-white text-2xl font-black">airlines</span>
+                </div>
+                <h2 className="text-navy-950 text-xl font-black tracking-tighter uppercase">{BRAND.name}</h2>
+              </>
+            )}
           </Link>
           <Link
             to={ROUTES.LOGIN}

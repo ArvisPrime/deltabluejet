@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
 import { useToastStore } from '../../stores/toastStore';
+import { useCmsHeaderStore } from '../../stores/cmsHeaderStore';
 
 // ────────────────────────────────────────────────────────────
 // Types
@@ -89,6 +90,7 @@ const Register: React.FC = () => {
   const navigate = useNavigate();
   const { register, googleLogin } = useAuth();
   const addToast = useToastStore(s => s.addToast);
+  const { logoUrl } = useCmsHeaderStore();
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(INITIAL);
@@ -510,10 +512,16 @@ const Register: React.FC = () => {
 
         <div className="relative z-10 flex flex-col h-full justify-between p-16 text-white">
           <Link to={ROUTES.HOME} className="flex items-center gap-4 group cursor-pointer no-underline">
-            <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20 transition-transform group-hover:scale-110">
-              <span className="material-symbols-outlined text-white text-2xl font-black">airlines</span>
-            </div>
-            <span className="text-2xl font-black tracking-tighter uppercase text-white">{BRAND.name}</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt={BRAND.name} className="h-10 w-auto object-contain" />
+            ) : (
+              <>
+                <div className="size-10 rounded-xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20 transition-transform group-hover:scale-110">
+                  <span className="material-symbols-outlined text-white text-2xl font-black">airlines</span>
+                </div>
+                <span className="text-2xl font-black tracking-tighter uppercase text-white">{BRAND.name}</span>
+              </>
+            )}
           </Link>
 
           <div className="max-w-xl space-y-10">
@@ -540,10 +548,16 @@ const Register: React.FC = () => {
         <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-12 relative">
           {/* Mobile Header Logo */}
           <Link to={ROUTES.HOME} className="lg:hidden absolute top-8 left-8 flex items-center gap-3 no-underline">
-            <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white">
-              <span className="material-symbols-outlined text-xl font-black">airlines</span>
-            </div>
-            <span className="font-black text-xl tracking-tighter text-navy-950 uppercase">{BRAND.shortName}</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt={BRAND.shortName} className="h-8 w-auto object-contain" />
+            ) : (
+              <>
+                <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white">
+                  <span className="material-symbols-outlined text-xl font-black">airlines</span>
+                </div>
+                <span className="font-black text-xl tracking-tighter text-navy-950 uppercase">{BRAND.shortName}</span>
+              </>
+            )}
           </Link>
 
           <div className="w-full max-w-[580px] flex flex-col gap-6 mt-16 lg:mt-0">

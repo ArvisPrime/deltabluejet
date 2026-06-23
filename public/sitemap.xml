@@ -1,36 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- Core Pages -->
-  <url><loc>https://deltablue-jet-air.web.app/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/destinations</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/careers</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <!-- ═══ Core Pages ═══ -->
+  <url><loc>https://deltabluejetair.com/</loc><lastmod>2026-06-23</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://deltabluejetair.com/destinations</loc><lastmod>2026-06-23</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://deltabluejetair.com/about</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://deltabluejetair.com/careers</loc><lastmod>2026-06-23</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
 
-  <!-- Booking Flow -->
-  <url><loc>https://deltablue-jet-air.web.app/flights/search</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/manage-booking</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/online-check-in</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/flight-tracker</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/group-booking</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/baggage-tracking</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/multi-city</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/codeshare-flights</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <!-- ═══ Booking Flow ═══ -->
+  <url><loc>https://deltabluejetair.com/book</loc><lastmod>2026-06-23</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://deltabluejetair.com/book/multi-city</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://deltabluejetair.com/manage-booking</loc><lastmod>2026-06-23</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://deltabluejetair.com/manage-booking/baggage</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://deltabluejetair.com/group-booking</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
 
-  <!-- Support -->
-  <url><loc>https://deltablue-jet-air.web.app/help-center</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/callback-request</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/special-assistance</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/health-requirements</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <!-- ═══ Check-in Flow ═══ -->
+  <url><loc>https://deltabluejetair.com/checkin</loc><lastmod>2026-06-23</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
 
-  <!-- Legal -->
-  <url><loc>https://deltablue-jet-air.web.app/terms</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/privacy-policy</loc><changefreq>monthly</changefreq><priority>0.4</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/dangerous-goods</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/tarmac-delay-plan</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/visa-checker</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/accessibility</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <!-- ═══ Flight Tracker ═══ -->
+  <url><loc>https://deltabluejetair.com/flight-status</loc><lastmod>2026-06-23</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
 
-  <!-- Auth -->
-  <url><loc>https://deltablue-jet-air.web.app/login</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://deltablue-jet-air.web.app/register</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <!-- ═══ Codeshare ═══ -->
+  <url><loc>https://deltabluejetair.com/codeshare</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+
+  <!-- ═══ Support ═══ -->
+  <url><loc>https://deltabluejetair.com/help</loc><lastmod>2026-06-23</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://deltabluejetair.com/support/callback</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://deltabluejetair.com/special-assistance</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://deltabluejetair.com/health-requirements</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+
+  <!-- ═══ Legal ═══ -->
+  <url><loc>https://deltabluejetair.com/terms</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://deltabluejetair.com/privacy</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://deltabluejetair.com/dangerous-goods</loc><lastmod>2026-06-23</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://deltabluejetair.com/tarmac-delay-plan</loc><lastmod>2026-06-23</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://deltabluejetair.com/visa-requirements</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://deltabluejetair.com/accessibility</loc><lastmod>2026-06-23</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+
+  <!-- ═══ Auth (public entry points) ═══ -->
+  <url><loc>https://deltabluejetair.com/login</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://deltabluejetair.com/register</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
 </urlset>

@@ -8,5 +8,7 @@ Disallow: /yubikey-verify
 Disallow: /totp-verify
 Disallow: /account-settings
 Disallow: /notification-preferences
+Disallow: /api/
 
-Sitemap: https://deltablue-jet-air.web.app/sitemap.xml
+# Sitemaps
+Sitemap: https://deltabluejetair.com/sitemap.xml

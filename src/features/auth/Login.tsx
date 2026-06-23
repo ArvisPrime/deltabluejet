@@ -4,11 +4,13 @@ import { useNavigate, Link, useLocation } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
+import { useCmsHeaderStore } from '../../stores/cmsHeaderStore';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, googleLogin } = useAuth();
+  const { logoUrl } = useCmsHeaderStore();
 
   const [showPass, setShowPass] = useState(false);
   const [email, setEmail] = useState('');
@@ -81,10 +83,16 @@ const Login: React.FC = () => {
 
         <div className="relative z-10 flex flex-col justify-between p-16 lg:p-20 w-full h-full text-white">
           <Link to={ROUTES.HOME} className="flex items-center gap-4 group cursor-pointer no-underline">
-            <div className="size-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform ring-4 ring-white/10">
-              <span className="material-symbols-outlined text-white text-3xl font-black">airlines</span>
-            </div>
-            <span className="text-3xl font-black tracking-tighter uppercase text-white">{BRAND.name}</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt={BRAND.name} className="h-12 w-auto object-contain" />
+            ) : (
+              <>
+                <div className="size-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform ring-4 ring-white/10">
+                  <span className="material-symbols-outlined text-white text-3xl font-black">airlines</span>
+                </div>
+                <span className="text-3xl font-black tracking-tighter uppercase text-white">{BRAND.name}</span>
+              </>
+            )}
           </Link>
 
           <div className="space-y-8">
@@ -119,10 +127,16 @@ const Login: React.FC = () => {
         {/* Top Nav */}
         <div className="flex justify-between items-center p-6 sm:p-8 shrink-0">
           <Link to={ROUTES.HOME} className="flex items-center gap-3 lg:hidden no-underline">
-            <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white">
-              <span className="material-symbols-outlined text-xl font-black">airlines</span>
-            </div>
-            <span className="font-black text-xl tracking-tighter uppercase text-navy-950">{BRAND.shortName}</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt={BRAND.shortName} className="h-8 w-auto object-contain" />
+            ) : (
+              <>
+                <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white">
+                  <span className="material-symbols-outlined text-xl font-black">airlines</span>
+                </div>
+                <span className="font-black text-xl tracking-tighter uppercase text-navy-950">{BRAND.shortName}</span>
+              </>
+            )}
           </Link>
           <div className="flex items-center gap-4 ml-auto">
             <p className="text-[10px] font-black uppercase tracking-widest text-navy-400">

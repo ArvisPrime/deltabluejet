@@ -37,6 +37,37 @@
                     {
                         "key": "Strict-Transport-Security",
                         "value": "max-age=63072000; includeSubDomains; preload"
+                    },
+                    {
+                        "key": "X-Robots-Tag",
+                        "value": "index, follow, max-image-preview:large, max-snippet:-1"
+                    }
+                ]
+            },
+            {
+                "source": "@(favicon.*|logo*.png|og-image.png)",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=86400"
+                    }
+                ]
+            },
+            {
+                "source": "robots.txt",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=3600"
+                    }
+                ]
+            },
+            {
+                "source": "sitemap.xml",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=3600"
                     }
                 ]
             },
@@ -50,6 +81,7 @@
                 ]
             }
         ],
+
         "rewrites": [
             {
                 "source": "/api/geolocate",

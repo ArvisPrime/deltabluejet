@@ -1,28 +1,32 @@
 {
-    "name": "Deltablue Jet Air",
-    "short_name": "Deltablue",
-    "description": "Book flights, check in, manage bookings, and explore destinations with Deltablue Jet Air.",
+    "name": "DeltaBlue Jet Air",
+    "short_name": "DeltaBlue",
+    "description": "Book flights, check in, manage bookings, and explore destinations with DeltaBlue Jet Air — Intercontinental Aviation.",
     "start_url": "/",
+    "id": "/",
     "display": "standalone",
     "background_color": "#0A0F26",
-    "theme_color": "#266EF1",
+    "theme_color": "#137fec",
     "orientation": "any",
     "categories": ["travel", "transportation"],
     "icons": [
         {
-            "src": "/favicon.ico",
-            "sizes": "64x64",
-            "type": "image/x-icon"
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
         },
         {
             "src": "/logo192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any maskable"
         },
         {
             "src": "/logo512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any maskable"
         }
     ],
     "screenshots": [],

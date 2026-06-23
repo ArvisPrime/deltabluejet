@@ -16,13 +16,13 @@ export const BRAND = {
     tagSuffix: 'Air',
 
     /** Primary domain */
-    domain: 'deltabluejet.com',
+    domain: 'deltabluejetair.com',
 
     /** Booking confirmation sender */
-    email: 'bookings@deltabluejet.com',
+    email: 'bookings@deltabluejetair.com',
 
     /** Support contact */
-    supportEmail: 'support@deltabluejet.com',
+    supportEmail: 'support@deltabluejetair.com',
 
     /** Loyalty program name */
     loyaltyProgram: 'Deltablue Club',
@@ -31,8 +31,9 @@ export const BRAND = {
     copyright: `© ${new Date().getFullYear()} Deltablue Jet Air`,
 
     /** Placeholder email for form inputs */
-    placeholderEmail: 'USER@DELTABLUE.COM',
+    placeholderEmail: 'USER@DELTABLUEJETAIR.COM',
 
     /** AI assistant system context */
     aiContext: 'You are an operations analyst at Deltablue Jet Air.',
 };
+

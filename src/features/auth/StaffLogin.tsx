@@ -5,12 +5,14 @@ import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../config/routes';
 import { BRAND } from '../../config/brand';
 import { useToastStore } from '../../stores/toastStore';
+import { useCmsHeaderStore } from '../../stores/cmsHeaderStore';
 
 const StaffLogin: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, googleLogin } = useAuth();
   const addToast = useToastStore(s => s.addToast);
+  const { logoUrl } = useCmsHeaderStore();
 
   const [step, setStep] = useState<'CREDENTIALS' | 'MFA'>('CREDENTIALS');
   const [showPass, setShowPass] = useState(false);
@@ -85,10 +87,16 @@ const StaffLogin: React.FC = () => {
 
         <div className="relative z-10 flex flex-col justify-between p-20 w-full h-full text-white">
           <Link to={ROUTES.HOME} className="flex items-center gap-4 group cursor-pointer no-underline">
-            <div className="size-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/40 group-hover:scale-110 transition-transform ring-4 ring-white/10">
-              <span className="material-symbols-outlined text-white text-3xl font-black">airlines</span>
-            </div>
-            <span className="text-3xl font-black tracking-tighter uppercase text-white">{BRAND.name}</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt={BRAND.name} className="h-12 w-auto object-contain" />
+            ) : (
+              <>
+                <div className="size-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/40 group-hover:scale-110 transition-transform ring-4 ring-white/10">
+                  <span className="material-symbols-outlined text-white text-3xl font-black">airlines</span>
+                </div>
+                <span className="text-3xl font-black tracking-tighter uppercase text-white">{BRAND.name}</span>
+              </>
+            )}
           </Link>
 
           <div className="space-y-8">
@@ -143,8 +151,14 @@ const StaffLogin: React.FC = () => {
               <div className="space-y-12 animate-in fade-in slide-in-from-right duration-700">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 mb-2 lg:hidden">
-                    <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white"><span className="material-symbols-outlined text-xl font-black">airlines</span></div>
-                    <span className="font-black text-xl tracking-tighter uppercase text-navy-950">{BRAND.shortName}</span>
+                    {logoUrl ? (
+                      <img src={logoUrl} alt={BRAND.shortName} className="h-8 w-auto object-contain" />
+                    ) : (
+                      <>
+                        <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white"><span className="material-symbols-outlined text-xl font-black">airlines</span></div>
+                        <span className="font-black text-xl tracking-tighter uppercase text-navy-950">{BRAND.shortName}</span>
+                      </>
+                    )}
                   </div>
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full mb-2">
                     <span className="material-symbols-outlined text-amber-600 text-sm">badge</span>
