@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { DestinationHub } from '../../types';
 import { BRAND } from '../../config/brand';
 import { ROUTES } from '../../config/routes';
+import LazyImage from '../../components/common/LazyImage';
 
 type RegionFilter = 'all' | 'africa';
 const FILTERS: { label: string; value: RegionFilter }[] = [
@@ -11,7 +12,7 @@ const FILTERS: { label: string; value: RegionFilter }[] = [
    { label: 'Africa', value: 'africa' },
 ];
 
-const HERO_BG_DEFAULT = 'https://images.unsplash.com/photo-1569154941061-e231b4725ef1?auto=format&fit=crop&q=80';
+const HERO_BG_DEFAULT = 'https://images.unsplash.com/photo-1569154941061-e231b4725ef1?auto=format&fit=crop&w=1920&q=80';
 
 interface PageCms {
    heroImage: string;
@@ -306,9 +307,10 @@ const Destinations: React.FC = () => {
                      {/* Destination Image */}
                      <div className="aspect-[4/5] relative overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-t from-navy-950/95 via-navy-950/20 to-transparent z-10"></div>
-                        <div
+                        <LazyImage
+                           src={hub.img}
+                           unsplashWidth={600}
                            className="w-full h-full bg-cover bg-center transition-transform duration-[8s] group-hover:scale-110"
-                           style={{ backgroundImage: `url('${hub.img}')` }}
                         />
                         <div className="absolute top-8 right-8 z-20">
                            <div className="px-5 py-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 text-white text-[10px] font-black uppercase tracking-widest shadow-2xl">

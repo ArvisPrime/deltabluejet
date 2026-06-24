@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router';
 import { DestinationHub } from '../../types';
 import { BRAND } from '../../config/brand';
 import { ROUTES } from '../../config/routes';
+import LazyImage from '../../components/common/LazyImage';
 
 /* Per-destination weather sourced from allmetsat.com METAR reports (fallback) */
 const AIRPORT_WEATHER_FALLBACK: Record<string, { temp: string; visibility: string }> = {
@@ -104,9 +105,11 @@ const DestinationDetail: React.FC = () => {
          <section className="relative h-[65vh] min-h-[500px] flex items-end p-8 md:p-16 overflow-hidden">
             <div className="absolute inset-0 z-0">
                <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-900/20 to-transparent z-10"></div>
-               <div
+               <LazyImage
+                  src={destination.img}
+                  unsplashWidth={1920}
+                  eager
                   className="w-full h-full bg-cover bg-center transition-transform duration-[15s] scale-110 animate-slow-zoom"
-                  style={{ backgroundImage: `url('${destination.img}')` }}
                />
             </div>
 

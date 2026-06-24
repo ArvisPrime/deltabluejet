@@ -59,7 +59,7 @@ const ModifyBookingSearch: React.FC = () => {
                         </div>
                      </div>
                   </div>
-                  <div className="hidden md:block w-56 h-40 rounded-[2rem] bg-cover bg-center relative overflow-hidden shadow-inner border border-navy-50" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&q=80')" }}>
+                  <div className="hidden md:block w-56 h-40 rounded-[2rem] bg-cover bg-center relative overflow-hidden shadow-inner border border-navy-50" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=400&q=80')" }}>
                      <div className="absolute inset-0 bg-navy-950/20"></div>
                      <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-navy-100">
                         <p className="text-[8px] font-black text-navy-400 uppercase tracking-widest text-center">Destination: London</p>

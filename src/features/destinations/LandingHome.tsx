@@ -8,6 +8,7 @@ import { getLandingPageConfig } from '../../services/cms';
 import type { CmsLandingPageDoc } from '../../types/firestore';
 import { useCurrency } from '../../hooks/useCurrency';
 import { toLocalDateString } from '../../utils/localDate';
+import LazyImage from '../../components/common/LazyImage';
 
 const LandingHome: React.FC = () => {
    const navigate = useNavigate();
@@ -78,7 +79,7 @@ const LandingHome: React.FC = () => {
    }, []);
 
    // ── CMS-driven content (fallback to hardcoded defaults) ──
-   const heroData = cms?.hero ?? { badge: 'Redefining Global Transit', headingLine1: 'Flying', headingLine2: 'Angels..', backgroundImageUrl: 'https://images.unsplash.com/photo-1506012787146-f92b2d7d6d96?auto=format&fit=crop&q=80', backgroundType: 'image' as const };
+   const heroData = cms?.hero ?? { badge: 'Redefining Global Transit', headingLine1: 'Flying', headingLine2: 'Angels..', backgroundImageUrl: 'https://images.unsplash.com/photo-1506012787146-f92b2d7d6d96?auto=format&fit=crop&w=1920&q=75', backgroundType: 'image' as const };
    const tickerData = cms?.ticker ?? [
       { icon: '', iconColor: 'bg-emerald-500', text: 'FLEET STATUS: NORMAL', showPulse: true },
       { icon: 'hub', iconColor: 'text-primary', text: 'GLOBAL DESTINATIONS: 42 ACTIVE' },
@@ -87,21 +88,21 @@ const LandingHome: React.FC = () => {
    ];
    const promoData = cms?.promotions ?? {
       sectionLabel: 'Curated Collections', sectionTitle: 'Experience', sectionTitleHighlight: 'Absolute Luxury.', ctaLabel: 'View All Offers',
-      featuredPromo: { title: 'Winter in The Maldives', tag: 'Seasonal Feature', description: 'Escape the cold with our non-stop premium routes.', imageUrl: 'https://images.unsplash.com/photo-1544321689-d499ec24467c?auto=format&fit=crop&q=80', ctaLabel: 'Book Now' },
+      featuredPromo: { title: 'Winter in The Maldives', tag: 'Seasonal Feature', description: 'Escape the cold with our non-stop premium routes.', imageUrl: 'https://images.unsplash.com/photo-1544321689-d499ec24467c?auto=format&fit=crop&w=800&q=75', ctaLabel: 'Book Now' },
       gridPromos: [
-         { title: 'The London Connection', imageUrl: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&q=80', tag: 'City Break', price: 450 },
-         { title: 'Tokyo Neons', imageUrl: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&q=80', tag: 'Asia Corridor', price: 820 },
-         { title: 'Dubai Luxury', imageUrl: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80', tag: 'Executive Station', price: 610 },
-         { title: 'Parisian Spring', imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80', tag: 'Europe', price: 490 },
+         { title: 'The London Connection', imageUrl: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=800&q=75', tag: 'City Break', price: 450 },
+         { title: 'Tokyo Neons', imageUrl: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=800&q=75', tag: 'Asia Corridor', price: 820 },
+         { title: 'Dubai Luxury', imageUrl: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=800&q=75', tag: 'Executive Station', price: 610 },
+         { title: 'Parisian Spring', imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=75', tag: 'Europe', price: 490 },
       ],
    };
    const destData = cms?.destinations ?? {
       sectionLabel: 'Global Network', sectionTitle: 'New Stations', sectionTitleHighlight: 'Added Daily.',
       destinations: [
-         { city: 'Accra', country: 'Ghana', airport: 'ACC', imageUrl: 'https://images.unsplash.com/photo-1591129841117-3adfd313e34f?auto=format&fit=crop&q=80', description: 'Commercial nexus of West Africa.' },
-         { city: 'Banjul', country: 'The Gambia', airport: 'BJL', imageUrl: 'https://images.unsplash.com/photo-1544321689-d499ec24467c?auto=format&fit=crop&q=80', description: 'Serene coastal eco-tourism hub.' },
-         { city: 'Dakar', country: 'Senegal', airport: 'DSS', imageUrl: 'https://images.unsplash.com/photo-1560969184-10fe8719e047?auto=format&fit=crop&q=80', description: 'Premier hub for the Francophone corridor.' },
-         { city: 'Lagos', country: 'Nigeria', airport: 'LOS', imageUrl: 'https://images.unsplash.com/photo-1618833162734-722649666014?auto=format&fit=crop&q=80', description: 'The pulse of African industry.' },
+         { city: 'Accra', country: 'Ghana', airport: 'ACC', imageUrl: 'https://images.unsplash.com/photo-1591129841117-3adfd313e34f?auto=format&fit=crop&w=600&q=75', description: 'Commercial nexus of West Africa.' },
+         { city: 'Banjul', country: 'The Gambia', airport: 'BJL', imageUrl: 'https://images.unsplash.com/photo-1544321689-d499ec24467c?auto=format&fit=crop&w=600&q=75', description: 'Serene coastal eco-tourism hub.' },
+         { city: 'Dakar', country: 'Senegal', airport: 'DSS', imageUrl: 'https://images.unsplash.com/photo-1560969184-10fe8719e047?auto=format&fit=crop&w=600&q=75', description: 'Premier hub for the Francophone corridor.' },
+         { city: 'Lagos', country: 'Nigeria', airport: 'LOS', imageUrl: 'https://images.unsplash.com/photo-1618833162734-722649666014?auto=format&fit=crop&w=600&q=75', description: 'The pulse of African industry.' },
       ],
    };
    const clubData = cms?.club ?? {
@@ -359,7 +360,7 @@ const LandingHome: React.FC = () => {
                   {/* Large Promo */}
                   <div role="button" tabIndex={0} aria-label={`Book now: ${promoData.featuredPromo.title}`} className="group relative h-[600px] rounded-[4rem] overflow-hidden shadow-2xl transition-all duration-700 cursor-pointer" onClick={onBookingStart} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onBookingStart(); } }}>
                      <div className="absolute inset-0 bg-navy-950/20 group-hover:bg-navy-950/10 transition-colors z-10" />
-                     <div role="img" aria-label={promoData.featuredPromo.title} className="w-full h-full bg-cover bg-center transition-transform duration-[10s] group-hover:scale-110" style={{ backgroundImage: `url('${promoData.featuredPromo.imageUrl}')` }} />
+                     <LazyImage src={promoData.featuredPromo.imageUrl} unsplashWidth={800} role="img" aria-label={promoData.featuredPromo.title} className="w-full h-full bg-cover bg-center transition-transform duration-[10s] group-hover:scale-110" />
                      <div className="absolute bottom-0 left-0 w-full p-6 sm:p-10 md:p-12 z-20 text-white space-y-4 sm:space-y-6">
                         <span className="px-5 py-2 rounded-full bg-white/20 backdrop-blur-xl border border-white/20 text-[10px] font-black uppercase tracking-widest">{promoData.featuredPromo.tag}</span>
                         <div className="space-y-2">
@@ -375,7 +376,7 @@ const LandingHome: React.FC = () => {
                      {promoData.gridPromos.map((p, i) => (
                         <div key={i} role="button" tabIndex={0} aria-label={`Book flights to ${p.title}`} onClick={onBookingStart} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onBookingStart(); } }} className="group relative h-full min-h-[280px] rounded-[3rem] overflow-hidden shadow-xl hover:shadow-2xl transition-all cursor-pointer">
                            <div className="absolute inset-0 bg-navy-950/40 group-hover:bg-navy-950/20 transition-colors z-10" />
-                           <div role="img" aria-label={p.title} className="w-full h-full bg-cover bg-center transition-transform duration-[6s] group-hover:scale-110" style={{ backgroundImage: `url('${p.imageUrl}')` }} />
+                           <LazyImage src={p.imageUrl} unsplashWidth={600} role="img" aria-label={p.title} className="w-full h-full bg-cover bg-center transition-transform duration-[6s] group-hover:scale-110" />
                            <div className="absolute bottom-0 left-0 w-full p-8 z-20 text-white">
                               <p className="text-[8px] font-black text-primary uppercase tracking-[0.4em] mb-2">{p.tag}</p>
                               <h4 className="text-xl font-black uppercase tracking-tight mb-4">{p.title}</h4>
@@ -404,7 +405,7 @@ const LandingHome: React.FC = () => {
                      <div key={i} role="button" tabIndex={0} aria-label={`Explore ${dest.city}, ${dest.country}`} onClick={onDestinationsStart} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDestinationsStart(); } }} className="bg-white rounded-[4rem] border border-navy-100 shadow-sm overflow-hidden group hover:shadow-2xl hover:border-primary/40 transition-all duration-700 cursor-pointer flex flex-col">
                         <div className="aspect-[4/5] relative overflow-hidden">
                            <div className="absolute inset-0 bg-navy-950/10 group-hover:bg-transparent transition-colors z-10" />
-                           <div role="img" aria-label={`${dest.city} destination`} className="w-full h-full bg-cover bg-center transition-transform duration-[8s] group-hover:scale-110" style={{ backgroundImage: `url('${dest.imageUrl}')` }} />
+                           <LazyImage src={dest.imageUrl} unsplashWidth={600} role="img" aria-label={`${dest.city} destination`} className="w-full h-full bg-cover bg-center transition-transform duration-[8s] group-hover:scale-110" />
                            <div className="absolute top-8 right-8 z-20">
                               <span className="px-4 py-1.5 rounded-xl bg-white/10 backdrop-blur-xl border border-white/20 text-white text-[9px] font-black uppercase tracking-widest shadow-2xl">
                                  {dest.airport}

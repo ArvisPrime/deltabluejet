@@ -77,7 +77,7 @@ const Login: React.FC = () => {
       <div className="hidden lg:flex w-1/2 relative bg-primary overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-[10s] scale-110 animate-slow-zoom opacity-30"
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1569154941061-e231b4725ef1?auto=format&fit=crop&q=80')" }}
+          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1569154941061-e231b4725ef1?auto=format&fit=crop&w=1280&q=80')" }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/50 to-transparent"></div>
 

@@ -4,9 +4,15 @@
  * Deltablue Jet Air — Service Worker
  *
  * Provides offline caching for static assets and boarding passes.
+ * Cache is versioned by build timestamp to ensure fresh content after deploys.
  */
 
-const CACHE_NAME = 'deltablue-v1';
+// ── Cache Versioning ──────────────────────────────────────────
+// BUILD_TIMESTAMP is replaced at build time by the Vite define plugin.
+// Falls back to a runtime timestamp if not replaced (dev mode).
+const BUILD_VERSION = '__BUILD_TIMESTAMP__';
+const CACHE_NAME = `deltablue-${BUILD_VERSION}`;
+
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -20,10 +26,11 @@ self.addEventListener('install', (event) => {
             return cache.addAll(STATIC_ASSETS);
         })
     );
+    // Activate immediately — don't wait for old tabs to close
     self.skipWaiting();
 });
 
-// Activate: clean old caches
+// Activate: clean ALL old caches (any name that isn't the current version)
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((names) => {
@@ -34,6 +41,7 @@ self.addEventListener('activate', (event) => {
             );
         })
     );
+    // Claim all open clients so the new SW takes over immediately
     self.clients.claim();
 });
 
@@ -48,10 +56,50 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // For navigation requests (HTML pages), ALWAYS go network-first
+    // This ensures users get the latest index.html after a deploy
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then((response) => {
+                    // Cache the fresh HTML
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, clone);
+                    });
+                    return response;
+                })
+                .catch(() => {
+                    // Offline fallback: serve cached index.html
+                    return caches.match('/index.html');
+                })
+        );
+        return;
+    }
+
+    // For static assets (JS, CSS, images): cache-first (they have hashed filenames)
+    if (url.pathname.startsWith('/assets/')) {
+        event.respondWith(
+            caches.match(event.request).then((cached) => {
+                if (cached) return cached;
+                return fetch(event.request).then((response) => {
+                    if (response.status === 200) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(event.request, clone);
+                        });
+                    }
+                    return response;
+                });
+            })
+        );
+        return;
+    }
+
+    // Everything else: network-first with cache fallback
     event.respondWith(
         fetch(event.request)
             .then((response) => {
-                // Cache successful responses
                 if (response.status === 200) {
                     const clone = response.clone();
                     caches.open(CACHE_NAME).then((cache) => {
@@ -61,13 +109,8 @@ self.addEventListener('fetch', (event) => {
                 return response;
             })
             .catch(() => {
-                // Fallback to cache
                 return caches.match(event.request).then((cached) => {
                     if (cached) return cached;
-                    // For navigation requests, return the cached index.html (SPA)
-                    if (event.request.mode === 'navigate') {
-                        return caches.match('/index.html');
-                    }
                     return new Response('Offline', { status: 503 });
                 });
             })

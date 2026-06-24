@@ -50,29 +50,43 @@ export function useGeoLocale(): void {
 
         let cancelled = false;
 
-        (async () => {
-            const geo = await detectGeoLocale();
-            if (cancelled) return;
+        // Defer geo lookup so it doesn't compete with critical
+        // JS/CSS/font downloads during initial page load.
+        const deferMs = 3000;
+        const scheduleGeo = () => {
+            setTimeout(async () => {
+                if (cancelled) return;
 
-            // ── Currency ────────────────────────────────────
-            const currentCurrency = useCurrencyStore.getState().currency;
-            const isSupported = SUPPORTED_CURRENCIES.some(c => c.code === geo.currency);
+                const geo = await detectGeoLocale();
+                if (cancelled) return;
 
-            // Only change if detected currency differs AND is in our list
-            if (isSupported && geo.currency !== currentCurrency) {
-                useCurrencyStore.getState().setCurrency(geo.currency);
-            }
+                // ── Currency ────────────────────────────────────
+                const currentCurrency = useCurrencyStore.getState().currency;
+                const isSupported = SUPPORTED_CURRENCIES.some(c => c.code === geo.currency);
 
-            // ── Language ────────────────────────────────────
-            const supportedLngs = i18n.options.supportedLngs as string[] | undefined;
-            const isLangSupported = supportedLngs
-                ? supportedLngs.includes(geo.language)
-                : true;
+                // Only change if detected currency differs AND is in our list
+                if (isSupported && geo.currency !== currentCurrency) {
+                    useCurrencyStore.getState().setCurrency(geo.currency);
+                }
 
-            if (isLangSupported && geo.language !== i18n.language) {
-                await i18n.changeLanguage(geo.language);
-            }
-        })();
+                // ── Language ────────────────────────────────────
+                const supportedLngs = i18n.options.supportedLngs as string[] | undefined;
+                const isLangSupported = supportedLngs
+                    ? supportedLngs.includes(geo.language)
+                    : true;
+
+                if (isLangSupported && geo.language !== i18n.language) {
+                    await i18n.changeLanguage(geo.language);
+                }
+            }, deferMs);
+        };
+
+        // Use requestIdleCallback if available, else just setTimeout
+        if ('requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(scheduleGeo);
+        } else {
+            scheduleGeo();
+        }
 
         return () => { cancelled = true; };
     }, []);

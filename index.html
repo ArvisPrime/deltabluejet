@@ -13,7 +13,7 @@
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <meta name="theme-color" content="#137fec">
     <meta name="application-name" content="DeltaBlue Jet Air">
-    <link rel="canonical" href="https://deltabluejetair.com/">
+    <!-- canonical URL is set dynamically per route by React Helmet / page components -->
 
     <!-- Geo Tags — Business presence -->
     <meta name="geo.region" content="GM">
@@ -52,11 +52,15 @@
     <link rel="preconnect" href="https://firestore.googleapis.com">
     <link rel="preconnect" href="https://images.unsplash.com">
 
-    <!-- Fonts -->
+    <!-- Fonts (non-render-blocking: load asynchronously via media swap) -->
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet" />
+        rel="stylesheet" media="print" onload="this.media='all'">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,400,0..1&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript>
+        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,400,0..1&display=swap" rel="stylesheet" />
+    </noscript>
 
     <!-- JSON-LD Structured Data: Organization -->
     <script type="application/ld+json">
@@ -131,7 +135,7 @@
             "@type": "SearchAction",
             "target": {
                 "@type": "EntryPoint",
-                "urlTemplate": "https://deltabluejetair.com/flights/search?q={search_term_string}"
+                "urlTemplate": "https://deltabluejetair.com/book?q={search_term_string}"
             },
             "query-input": "required name=search_term_string"
         }
@@ -160,7 +164,7 @@
                 "@type": "ListItem",
                 "position": 3,
                 "name": "Book a Flight",
-                "item": "https://deltabluejetair.com/flights/search"
+                "item": "https://deltabluejetair.com/book"
             },
             {
                 "@type": "ListItem",

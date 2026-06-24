@@ -107,7 +107,7 @@ const AboutUs: React.FC = () => {
                     <div className="absolute inset-0 bg-gradient-to-b from-navy-950/80 via-navy-900/40 to-white z-10" />
                     <div
                         className="w-full h-full bg-cover bg-center scale-110"
-                        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1436491865332-7a61a109db05?auto=format&fit=crop&q=80')" }}
+                        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1436491865332-7a61a109db05?auto=format&fit=crop&w=1920&q=80')" }}
                     />
                 </div>
                 <div className="relative z-20 text-center px-6 space-y-6 max-w-4xl">
