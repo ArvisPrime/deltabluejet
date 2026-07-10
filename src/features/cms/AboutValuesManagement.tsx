@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { BRAND } from '../../config/brand';
-import { getAboutPageConfig, updateAboutPageConfig } from '../../services/cms';
-import type { CmsAboutValueItem, CmsAboutStatItem, CmsAboutMilestoneItem, CmsAboutLeaderItem } from '../../types/firestore';
+import { useCmsAboutStore } from '../../stores/cmsAboutStore';
+import type { CmsAboutValueItem } from '../../types/firestore';
 import { useToastStore } from '../../stores/toastStore';
 
 /* ── Icon Options ─────────────────────────────────────────── */
@@ -15,148 +15,61 @@ const ICON_OPTIONS = [
 
 const STAT_ICON_OPTIONS = ['public', 'flight', 'groups', 'schedule', 'trending_up', 'speed', 'star', 'verified'];
 
-/* ── Defaults (from current frontend) ─────────────────────── */
-const DEFAULT_VALUES: CmsAboutValueItem[] = [
-    { icon: 'shield', title: 'Safety Without Compromise', body: 'Our foundation is built on rigorous international safety standards. We believe that peace of mind is the ultimate luxury in air travel.' },
-    { icon: 'eco', title: 'Authentic Hospitality', body: "We don't just transport passengers; we host them. We bring the spirit of The Gambia to the skies, ensuring every guest feels the warmth of our culture from takeoff to landing." },
-    { icon: 'diversity_3', title: 'Operational Agility', body: 'In a fast-moving world, we stay ahead through efficiency and innovation, ensuring our schedules are dependable and our services are accessible to all.' },
-    { icon: 'lightbulb', title: 'Innovation', body: 'We leverage AI-driven scheduling, real-time disruption management, and a fully digital booking experience to keep you moving seamlessly.' },
-];
-
-const DEFAULT_STATS: CmsAboutStatItem[] = [
-    { value: '120+', label: 'Destinations', icon: 'public' },
-    { value: '85', label: 'Aircraft', icon: 'flight' },
-    { value: '14M', label: 'Passengers/Year', icon: 'groups' },
-    { value: '99.2%', label: 'On-time Rate', icon: 'schedule' },
-];
-
-const DEFAULT_MILESTONES: CmsAboutMilestoneItem[] = [
-    { year: '2012', event: 'Founded in New York with 3 leased aircraft serving 8 domestic routes.' },
-    { year: '2015', event: 'Expanded to transatlantic service — London, Paris, and Frankfurt added.' },
-    { year: '2018', event: 'Fleet grows to 50 aircraft. Deltablue Club loyalty program launched.' },
-    { year: '2021', event: 'Full digital transformation — app-based booking, AI disruption engine, and biometric check-in.' },
-    { year: '2024', event: '120+ destinations across 6 continents. Named "Best Mid-Size Carrier" by Skyline Awards.' },
-];
-
-const DEFAULT_LEADERS: CmsAboutLeaderItem[] = [
-    { name: 'Amara Okafor', role: 'Chief Executive Officer', icon: 'person' },
-    { name: 'James Whitfield', role: 'Chief Operations Officer', icon: 'person' },
-    { name: 'Lina Chen', role: 'Chief Technology Officer', icon: 'person' },
-    { name: 'Marcus Rivera', role: 'VP of Customer Experience', icon: 'person' },
-];
-
 /* ═══════════════════════════════════════════════════════════════
    About Page Editor
    ═══════════════════════════════════════════════════════════════ */
 const AboutValuesManagement: React.FC = () => {
-    const [loading, setLoading] = useState(true);
+    const store = useCmsAboutStore();
+    const patch = useCmsAboutStore(s => s.patch);
+    const subscribeStore = useCmsAboutStore(s => s.subscribe);
+    const saveStore = useCmsAboutStore(s => s.save);
+    const loaded = useCmsAboutStore(s => s.loaded);
+    const dirty = useCmsAboutStore(s => s.dirty);
+
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [activeSection, setActiveSection] = useState<'hero' | 'stats' | 'mission' | 'values' | 'milestones' | 'leadership' | 'cta'>('hero');
-
-    /* ── Hero ──────────────────────────────────────────────────── */
-    const [heroBadge, setHeroBadge] = useState('Our Story');
-    const [heroHeading, setHeroHeading] = useState(`About ${BRAND.shortName}`);
-    const [heroSubtitle, setHeroSubtitle] = useState('Redefining aviation with precision, sustainability, and an unwavering commitment to every passenger who trusts us with their journey.');
-
-    /* ── Stats ─────────────────────────────────────────────────── */
-    const [stats, setStats] = useState<CmsAboutStatItem[]>(DEFAULT_STATS);
-
-    /* ── Mission ───────────────────────────────────────────────── */
-    const [missionBadge, setMissionBadge] = useState('Our Mission');
-    const [missionHeading, setMissionHeading] = useState('Connecting People, Bridging Worlds');
-    const [missionParagraph1, setMissionParagraph1] = useState(`${BRAND.name} to provide safe, affordable, and exceptional air travel that showcases the warmth of The Gambia. We are dedicated to bridging the gap between West Africa and the global community by investing in a modern fleet, empowering our local workforce, and delivering a travel experience rooted in reliability and 'Smiling Coast' hospitality.`);
-    const [missionParagraph2, setMissionParagraph2] = useState("We don't just move passengers — we connect communities with precision, safety, and care at every step.");
-
-    /* ── Values ─────────────────────────────────────────────────── */
-    const [sectionLabel, setSectionLabel] = useState('What Drives Us');
-    const [sectionTitle, setSectionTitle] = useState('Our Values');
-    const [values, setValues] = useState<CmsAboutValueItem[]>(DEFAULT_VALUES);
     const [editIdx, setEditIdx] = useState<number | null>(null);
 
-    /* ── Milestones ─────────────────────────────────────────────── */
-    const [milestones, setMilestones] = useState<CmsAboutMilestoneItem[]>(DEFAULT_MILESTONES);
-
-    /* ── Leadership ─────────────────────────────────────────────── */
-    const [leadersBadge, setLeadersBadge] = useState('The Team');
-    const [leadersTitle, setLeadersTitle] = useState('Leadership');
-    const [leaders, setLeaders] = useState<CmsAboutLeaderItem[]>(DEFAULT_LEADERS);
-
-    /* ── CTA ────────────────────────────────────────────────────── */
-    const [ctaHeading, setCtaHeading] = useState('Ready to Fly With Us?');
-    const [ctaDescription, setCtaDescription] = useState(`Join millions of travellers who trust ${BRAND.name} for seamless, sustainable, and inspired journeys across the globe.`);
-    const [ctaButtonText, setCtaButtonText] = useState('Book Your Journey');
-    const [ctaButtonLink, setCtaButtonLink] = useState('/book');
-
-    /* ── Load from Firestore ───────────────────────────────────── */
+    /* ── Subscribe to real-time Firestore updates ──────────────── */
     useEffect(() => {
-        (async () => {
-            try {
-                const config = await getAboutPageConfig();
-                if (config) {
-                    if (config.heroBadge) setHeroBadge(config.heroBadge);
-                    if (config.heroHeading) setHeroHeading(config.heroHeading);
-                    if (config.heroSubtitle) setHeroSubtitle(config.heroSubtitle);
-                    if (config.stats?.length) setStats(config.stats);
-                    if (config.missionBadge) setMissionBadge(config.missionBadge);
-                    if (config.missionHeading) setMissionHeading(config.missionHeading);
-                    if (config.missionParagraph1) setMissionParagraph1(config.missionParagraph1);
-                    if (config.missionParagraph2) setMissionParagraph2(config.missionParagraph2);
-                    if (config.sectionLabel) setSectionLabel(config.sectionLabel);
-                    if (config.sectionTitle) setSectionTitle(config.sectionTitle);
-                    if (config.values?.length) setValues(config.values);
-                    if (config.milestones?.length) setMilestones(config.milestones);
-                    if (config.leadersBadge) setLeadersBadge(config.leadersBadge);
-                    if (config.leadersTitle) setLeadersTitle(config.leadersTitle);
-                    if (config.leaders?.length) setLeaders(config.leaders);
-                    if (config.ctaHeading) setCtaHeading(config.ctaHeading);
-                    if (config.ctaDescription) setCtaDescription(config.ctaDescription);
-                    if (config.ctaButtonText) setCtaButtonText(config.ctaButtonText);
-                    if (config.ctaButtonLink) setCtaButtonLink(config.ctaButtonLink);
-                }
-            } catch (err) {
-                console.error('Failed to load about page config:', err);
-                useToastStore.getState().addToast("Failed to load about page config", "error");
-            } finally {
-                setLoading(false);
-            }
-        })();
-    }, []);
+        const unsubscribe = subscribeStore();
+        return unsubscribe;
+    }, [subscribeStore]);
 
-    /* ── Save all sections ─────────────────────────────────────── */
+    /* ── Save all sections (persists store → Firestore) ────────── */
     const handleSave = async () => {
         setSaving(true);
         setSaved(false);
-        try {
-            await updateAboutPageConfig({
-                heroBadge, heroHeading, heroSubtitle,
-                stats,
-                missionBadge, missionHeading, missionParagraph1, missionParagraph2,
-                sectionLabel, sectionTitle, values,
-                milestones,
-                leadersBadge, leadersTitle, leaders,
-                ctaHeading, ctaDescription, ctaButtonText, ctaButtonLink,
-            });
+        const ok = await saveStore();
+        if (ok) {
             setSaved(true);
+            useToastStore.getState().addToast("About page saved successfully", "success");
             setTimeout(() => setSaved(false), 3000);
-        } catch (err) {
-            console.error('Failed to save about page:', err);
+        } else {
             useToastStore.getState().addToast("Failed to save about page", "error");
-        } finally {
-            setSaving(false);
         }
+        setSaving(false);
     };
 
-    /* ── Helpers ────────────────────────────────────────────────── */
+    /* ── Helpers (all write to the shared store) ───────────────── */
     const updateValue = (idx: number, field: keyof CmsAboutValueItem, val: string) => {
-        setValues(prev => prev.map((v, i) => i === idx ? { ...v, [field]: val } : v));
+        patch({ values: store.values.map((v, i) => i === idx ? { ...v, [field]: val } : v) });
     };
-    const addValue = () => { setValues(prev => [...prev, { icon: 'star', title: '', body: '' }]); setEditIdx(values.length); };
-    const removeValue = (idx: number) => { setValues(prev => prev.filter((_, i) => i !== idx)); setEditIdx(null); };
+    const addValue = () => {
+        patch({ values: [...store.values, { icon: 'star', title: '', body: '' }] });
+        setEditIdx(store.values.length);
+    };
+    const removeValue = (idx: number) => {
+        patch({ values: store.values.filter((_, i) => i !== idx) });
+        setEditIdx(null);
+    };
     const moveValue = (idx: number, dir: -1 | 1) => {
         const target = idx + dir;
-        if (target < 0 || target >= values.length) return;
-        setValues(prev => { const next = [...prev];[next[idx], next[target]] = [next[target], next[idx]]; return next; });
+        if (target < 0 || target >= store.values.length) return;
+        const next = [...store.values];
+        [next[idx], next[target]] = [next[target], next[idx]];
+        patch({ values: next });
         setEditIdx(target);
     };
 
@@ -170,7 +83,7 @@ const AboutValuesManagement: React.FC = () => {
         { key: 'cta' as const, label: 'CTA', icon: 'ads_click' },
     ];
 
-    if (loading) {
+    if (!loaded) {
         return (
             <div className="min-h-[60vh] flex items-center justify-center">
                 <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
@@ -186,14 +99,22 @@ const AboutValuesManagement: React.FC = () => {
                     <h1 className="text-2xl font-black uppercase tracking-tight text-navy-950">About Page Editor</h1>
                     <p className="text-sm text-navy-500 mt-1">Edit all sections of the public About page.</p>
                 </div>
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="inline-flex items-center gap-2 bg-primary text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-all shadow-lg shadow-primary/20"
-                >
-                    <span className="material-symbols-outlined text-sm">{saving ? 'hourglass_top' : saved ? 'check_circle' : 'save'}</span>
-                    {saving ? 'Saving…' : saved ? 'Saved!' : 'Save All Sections'}
-                </button>
+                <div className="flex items-center gap-3">
+                    {dirty && (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 animate-in fade-in duration-200">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                            Unsaved Changes
+                        </span>
+                    )}
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="inline-flex items-center gap-2 bg-primary text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-all shadow-lg shadow-primary/20"
+                    >
+                        <span className="material-symbols-outlined text-sm">{saving ? 'hourglass_top' : saved ? 'check_circle' : 'save'}</span>
+                        {saving ? 'Saving…' : saved ? 'Saved!' : 'Save All Sections'}
+                    </button>
+                </div>
             </div>
 
             {/* Section Tabs */}
@@ -217,15 +138,15 @@ const AboutValuesManagement: React.FC = () => {
                     <div className="space-y-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Badge Text</label>
-                            <input value={heroBadge} onChange={e => setHeroBadge(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Our Story" />
+                            <input value={store.heroBadge} onChange={e => patch({ heroBadge: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Our Story" />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Page Heading</label>
-                            <input value={heroHeading} onChange={e => setHeroHeading(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="About Deltablue" />
+                            <input value={store.heroHeading} onChange={e => patch({ heroHeading: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="About Deltablue" />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Subtitle</label>
-                            <textarea value={heroSubtitle} onChange={e => setHeroSubtitle(e.target.value)} rows={3} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm text-navy-700 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all resize-none" placeholder="Describe what makes you special…" />
+                            <textarea value={store.heroSubtitle} onChange={e => patch({ heroSubtitle: e.target.value })} rows={3} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm text-navy-700 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all resize-none" placeholder="Describe what makes you special…" />
                         </div>
                     </div>
                 </div>
@@ -235,33 +156,33 @@ const AboutValuesManagement: React.FC = () => {
             {activeSection === 'stats' && (
                 <div className="bg-white rounded-2xl border border-navy-100 p-6 space-y-5 shadow-sm animate-in fade-in duration-300">
                     <div className="flex items-center justify-between border-b border-navy-100 pb-3">
-                        <h2 className="text-xs font-black uppercase tracking-[0.3em] text-navy-400">Stats Band ({stats.length} items)</h2>
-                        <button onClick={() => setStats(prev => [...prev, { value: '', label: '', icon: 'star' }])} className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors">
+                        <h2 className="text-xs font-black uppercase tracking-[0.3em] text-navy-400">Stats Band ({store.stats.length} items)</h2>
+                        <button onClick={() => patch({ stats: [...store.stats, { value: '', label: '', icon: 'star' }] })} className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors">
                             <span className="material-symbols-outlined text-sm">add_circle</span> Add Stat
                         </button>
                     </div>
                     <div className="grid md:grid-cols-2 gap-4">
-                        {stats.map((s, i) => (
+                        {store.stats.map((s, i) => (
                             <div key={i} className="bg-navy-50/50 rounded-xl p-4 space-y-3 border border-navy-100">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Stat #{i + 1}</span>
-                                    <button onClick={() => setStats(prev => prev.filter((_, j) => j !== i))} className="p-1 rounded hover:bg-red-50 transition-colors"><span className="material-symbols-outlined text-sm text-red-400">delete</span></button>
+                                    <button onClick={() => patch({ stats: store.stats.filter((_, j) => j !== i) })} className="p-1 rounded hover:bg-red-50 transition-colors"><span className="material-symbols-outlined text-sm text-red-400">delete</span></button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <label className="text-[9px] font-black uppercase tracking-widest text-navy-400">Value</label>
-                                        <input value={s.value} onChange={e => setStats(prev => prev.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 outline-none" placeholder="120+" />
+                                        <input value={s.value} onChange={e => patch({ stats: store.stats.map((x, j) => j === i ? { ...x, value: e.target.value } : x) })} className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 outline-none" placeholder="120+" />
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[9px] font-black uppercase tracking-widest text-navy-400">Label</label>
-                                        <input value={s.label} onChange={e => setStats(prev => prev.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 outline-none" placeholder="Destinations" />
+                                        <input value={s.label} onChange={e => patch({ stats: store.stats.map((x, j) => j === i ? { ...x, label: e.target.value } : x) })} className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 outline-none" placeholder="Destinations" />
                                     </div>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[9px] font-black uppercase tracking-widest text-navy-400">Icon</label>
                                     <div className="flex flex-wrap gap-1.5">
                                         {STAT_ICON_OPTIONS.map(icon => (
-                                            <button key={icon} onClick={() => setStats(prev => prev.map((x, j) => j === i ? { ...x, icon } : x))} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${s.icon === icon ? 'bg-primary text-white shadow-md' : 'bg-white text-navy-400 hover:bg-navy-100 border border-navy-100'}`}>
+                                            <button key={icon} onClick={() => patch({ stats: store.stats.map((x, j) => j === i ? { ...x, icon } : x) })} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${s.icon === icon ? 'bg-primary text-white shadow-md' : 'bg-white text-navy-400 hover:bg-navy-100 border border-navy-100'}`}>
                                                 <span className="material-symbols-outlined text-base">{icon}</span>
                                             </button>
                                         ))}
@@ -281,20 +202,20 @@ const AboutValuesManagement: React.FC = () => {
                         <div className="grid md:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Badge Text</label>
-                                <input value={missionBadge} onChange={e => setMissionBadge(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Our Mission" />
+                                <input value={store.missionBadge} onChange={e => patch({ missionBadge: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Our Mission" />
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Section Heading</label>
-                                <input value={missionHeading} onChange={e => setMissionHeading(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Connecting People, Bridging Worlds" />
+                                <input value={store.missionHeading} onChange={e => patch({ missionHeading: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Connecting People, Bridging Worlds" />
                             </div>
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Paragraph 1</label>
-                            <textarea value={missionParagraph1} onChange={e => setMissionParagraph1(e.target.value)} rows={4} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm text-navy-700 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all resize-none" placeholder="Describe your mission…" />
+                            <textarea value={store.missionParagraph1} onChange={e => patch({ missionParagraph1: e.target.value })} rows={4} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm text-navy-700 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all resize-none" placeholder="Describe your mission…" />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Paragraph 2</label>
-                            <textarea value={missionParagraph2} onChange={e => setMissionParagraph2(e.target.value)} rows={3} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm text-navy-700 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all resize-none" placeholder="Additional mission details…" />
+                            <textarea value={store.missionParagraph2} onChange={e => patch({ missionParagraph2: e.target.value })} rows={3} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm text-navy-700 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all resize-none" placeholder="Additional mission details…" />
                         </div>
                     </div>
                 </div>
@@ -308,24 +229,24 @@ const AboutValuesManagement: React.FC = () => {
                         <div className="grid md:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Section Label</label>
-                                <input value={sectionLabel} onChange={e => setSectionLabel(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="What Drives Us" />
+                                <input value={store.sectionLabel} onChange={e => patch({ sectionLabel: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="What Drives Us" />
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Section Title</label>
-                                <input value={sectionTitle} onChange={e => setSectionTitle(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Our Values" />
+                                <input value={store.sectionTitle} onChange={e => patch({ sectionTitle: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Our Values" />
                             </div>
                         </div>
                     </div>
 
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-navy-400">Value Cards ({values.length})</h2>
+                            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-navy-400">Value Cards ({store.values.length})</h2>
                             <button onClick={addValue} className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors">
                                 <span className="material-symbols-outlined text-sm">add_circle</span> Add Value
                             </button>
                         </div>
                         <div className="grid md:grid-cols-2 gap-4">
-                            {values.map((v, i) => (
+                            {store.values.map((v, i) => (
                                 <div key={i} className={`bg-white rounded-2xl border p-5 space-y-4 shadow-sm transition-all cursor-pointer ${editIdx === i ? 'border-primary ring-2 ring-primary/20' : 'border-navy-100 hover:border-navy-200'}`} onClick={() => setEditIdx(editIdx === i ? null : i)}>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
@@ -339,7 +260,7 @@ const AboutValuesManagement: React.FC = () => {
                                         </div>
                                         <div className="flex items-center gap-1">
                                             <button onClick={e => { e.stopPropagation(); moveValue(i, -1); }} disabled={i === 0} className="p-1 rounded hover:bg-navy-50 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm text-navy-400">arrow_upward</span></button>
-                                            <button onClick={e => { e.stopPropagation(); moveValue(i, 1); }} disabled={i === values.length - 1} className="p-1 rounded hover:bg-navy-50 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm text-navy-400">arrow_downward</span></button>
+                                            <button onClick={e => { e.stopPropagation(); moveValue(i, 1); }} disabled={i === store.values.length - 1} className="p-1 rounded hover:bg-navy-50 disabled:opacity-20 transition-colors"><span className="material-symbols-outlined text-sm text-navy-400">arrow_downward</span></button>
                                             <button onClick={e => { e.stopPropagation(); removeValue(i); }} className="p-1 rounded hover:bg-red-50 transition-colors"><span className="material-symbols-outlined text-sm text-red-400">delete</span></button>
                                         </div>
                                     </div>
@@ -376,23 +297,23 @@ const AboutValuesManagement: React.FC = () => {
             {activeSection === 'milestones' && (
                 <div className="bg-white rounded-2xl border border-navy-100 p-6 space-y-5 shadow-sm animate-in fade-in duration-300">
                     <div className="flex items-center justify-between border-b border-navy-100 pb-3">
-                        <h2 className="text-xs font-black uppercase tracking-[0.3em] text-navy-400">Timeline ({milestones.length} entries)</h2>
-                        <button onClick={() => setMilestones(prev => [...prev, { year: '', event: '' }])} className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors">
+                        <h2 className="text-xs font-black uppercase tracking-[0.3em] text-navy-400">Timeline ({store.milestones.length} entries)</h2>
+                        <button onClick={() => patch({ milestones: [...store.milestones, { year: '', event: '' }] })} className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors">
                             <span className="material-symbols-outlined text-sm">add_circle</span> Add Entry
                         </button>
                     </div>
                     <div className="space-y-3">
-                        {milestones.map((m, i) => (
+                        {store.milestones.map((m, i) => (
                             <div key={i} className="bg-navy-50/50 rounded-xl p-4 border border-navy-100 flex gap-4 items-start">
                                 <div className="shrink-0 space-y-1">
                                     <label className="text-[9px] font-black uppercase tracking-widest text-navy-400">Year</label>
-                                    <input value={m.year} onChange={e => setMilestones(prev => prev.map((x, j) => j === i ? { ...x, year: e.target.value } : x))} className="w-20 px-3 py-2 rounded-lg border border-navy-200 text-sm font-bold text-navy-950 text-center focus:ring-2 focus:ring-primary/30 outline-none" placeholder="2024" />
+                                    <input value={m.year} onChange={e => patch({ milestones: store.milestones.map((x, j) => j === i ? { ...x, year: e.target.value } : x) })} className="w-20 px-3 py-2 rounded-lg border border-navy-200 text-sm font-bold text-navy-950 text-center focus:ring-2 focus:ring-primary/30 outline-none" placeholder="2024" />
                                 </div>
                                 <div className="flex-1 space-y-1">
                                     <label className="text-[9px] font-black uppercase tracking-widest text-navy-400">Event Description</label>
-                                    <textarea value={m.event} onChange={e => setMilestones(prev => prev.map((x, j) => j === i ? { ...x, event: e.target.value } : x))} rows={2} className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm text-navy-700 focus:ring-2 focus:ring-primary/30 outline-none resize-none" placeholder="Describe what happened…" />
+                                    <textarea value={m.event} onChange={e => patch({ milestones: store.milestones.map((x, j) => j === i ? { ...x, event: e.target.value } : x) })} rows={2} className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm text-navy-700 focus:ring-2 focus:ring-primary/30 outline-none resize-none" placeholder="Describe what happened…" />
                                 </div>
-                                <button onClick={() => setMilestones(prev => prev.filter((_, j) => j !== i))} className="shrink-0 p-1.5 rounded hover:bg-red-50 transition-colors mt-5"><span className="material-symbols-outlined text-sm text-red-400">delete</span></button>
+                                <button onClick={() => patch({ milestones: store.milestones.filter((_, j) => j !== i) })} className="shrink-0 p-1.5 rounded hover:bg-red-50 transition-colors mt-5"><span className="material-symbols-outlined text-sm text-red-400">delete</span></button>
                             </div>
                         ))}
                     </div>
@@ -406,34 +327,34 @@ const AboutValuesManagement: React.FC = () => {
                     <div className="grid md:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Badge Text</label>
-                            <input value={leadersBadge} onChange={e => setLeadersBadge(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="The Team" />
+                            <input value={store.leadersBadge} onChange={e => patch({ leadersBadge: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="The Team" />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Section Title</label>
-                            <input value={leadersTitle} onChange={e => setLeadersTitle(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Leadership" />
+                            <input value={store.leadersTitle} onChange={e => patch({ leadersTitle: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Leadership" />
                         </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-2">
-                        <h3 className="text-xs font-black uppercase tracking-[0.3em] text-navy-400">Team Members ({leaders.length})</h3>
-                        <button onClick={() => setLeaders(prev => [...prev, { name: '', role: '', icon: 'person' }])} className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors">
+                        <h3 className="text-xs font-black uppercase tracking-[0.3em] text-navy-400">Team Members ({store.leaders.length})</h3>
+                        <button onClick={() => patch({ leaders: [...store.leaders, { name: '', role: '', icon: 'person' }] })} className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-widest text-primary hover:text-primary/70 transition-colors">
                             <span className="material-symbols-outlined text-sm">add_circle</span> Add Member
                         </button>
                     </div>
                     <div className="grid md:grid-cols-2 gap-4">
-                        {leaders.map((l, i) => (
+                        {store.leaders.map((l, i) => (
                             <div key={i} className="bg-navy-50/50 rounded-xl p-4 space-y-3 border border-navy-100">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Member #{i + 1}</span>
-                                    <button onClick={() => setLeaders(prev => prev.filter((_, j) => j !== i))} className="p-1 rounded hover:bg-red-50 transition-colors"><span className="material-symbols-outlined text-sm text-red-400">delete</span></button>
+                                    <button onClick={() => patch({ leaders: store.leaders.filter((_, j) => j !== i) })} className="p-1 rounded hover:bg-red-50 transition-colors"><span className="material-symbols-outlined text-sm text-red-400">delete</span></button>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[9px] font-black uppercase tracking-widest text-navy-400">Name</label>
-                                    <input value={l.name} onChange={e => setLeaders(prev => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 outline-none" placeholder="Full name" />
+                                    <input value={l.name} onChange={e => patch({ leaders: store.leaders.map((x, j) => j === i ? { ...x, name: e.target.value } : x) })} className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 outline-none" placeholder="Full name" />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[9px] font-black uppercase tracking-widest text-navy-400">Role / Title</label>
-                                    <input value={l.role} onChange={e => setLeaders(prev => prev.map((x, j) => j === i ? { ...x, role: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 outline-none" placeholder="Chief Executive Officer" />
+                                    <input value={l.role} onChange={e => patch({ leaders: store.leaders.map((x, j) => j === i ? { ...x, role: e.target.value } : x) })} className="w-full px-3 py-2 rounded-lg border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 outline-none" placeholder="Chief Executive Officer" />
                                 </div>
                             </div>
                         ))}
@@ -448,20 +369,20 @@ const AboutValuesManagement: React.FC = () => {
                     <div className="space-y-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Heading</label>
-                            <input value={ctaHeading} onChange={e => setCtaHeading(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Ready to Fly With Us?" />
+                            <input value={store.ctaHeading} onChange={e => patch({ ctaHeading: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Ready to Fly With Us?" />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Description</label>
-                            <textarea value={ctaDescription} onChange={e => setCtaDescription(e.target.value)} rows={3} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm text-navy-700 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all resize-none" placeholder="Encourage visitors to book…" />
+                            <textarea value={store.ctaDescription} onChange={e => patch({ ctaDescription: e.target.value })} rows={3} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm text-navy-700 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all resize-none" placeholder="Encourage visitors to book…" />
                         </div>
                         <div className="grid md:grid-cols-2 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Button Text</label>
-                                <input value={ctaButtonText} onChange={e => setCtaButtonText(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Book Your Journey" />
+                                <input value={store.ctaButtonText} onChange={e => patch({ ctaButtonText: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Book Your Journey" />
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-navy-500">Button Link</label>
-                                <input value={ctaButtonLink} onChange={e => setCtaButtonLink(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="/book" />
+                                <input value={store.ctaButtonLink} onChange={e => patch({ ctaButtonLink: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-navy-200 text-sm font-bold text-navy-950 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="/book" />
                             </div>
                         </div>
                     </div>
@@ -472,7 +393,7 @@ const AboutValuesManagement: React.FC = () => {
             <div className="bg-navy-50 rounded-2xl border border-navy-100 p-6">
                 <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest text-center">
                     <span className="material-symbols-outlined text-sm align-middle mr-1">visibility</span>
-                    Preview changes on the public <a href="/about" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">About page</a> after saving.
+                    Changes are reflected <span className="text-primary">instantly</span> on the public <a href="/about" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">About page</a>. Click <strong>Save</strong> to persist to the database.
                 </p>
             </div>
         </div>
