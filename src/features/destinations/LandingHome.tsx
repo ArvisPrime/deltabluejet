@@ -145,8 +145,8 @@ const LandingHome: React.FC = () => {
    return (
       <div className="flex flex-col bg-white font-sans text-navy-950 overflow-x-hidden">
          {/* Cinematic Hero Section */}
-         <section className="relative min-h-[95vh] flex flex-col items-center justify-center p-4 md:p-10 overflow-hidden">
-            <div className="absolute inset-0 z-0">
+         <section className="relative min-h-[95vh] flex flex-col items-center justify-center p-4 md:p-10">
+            <div className="absolute inset-0 z-0 overflow-hidden">
                <div className="absolute inset-0 bg-gradient-to-b from-navy-950/70 via-navy-900/20 to-white z-10"></div>
                 {(() => {
                    const bgType = heroData.backgroundType || 'image';
@@ -190,7 +190,7 @@ const LandingHome: React.FC = () => {
                </div>
 
                {/* Elevated Booking Card */}
-               <div className="bg-white/95 backdrop-blur-3xl rounded-2xl md:rounded-[3.5rem] shadow-[0_60px_100px_-20px_rgba(0,0,0,0.5)] p-6 sm:p-8 md:p-10 border border-white relative group animate-in zoom-in duration-700 delay-300">
+               <div className="bg-white/95 backdrop-blur-3xl rounded-2xl md:rounded-[3.5rem] shadow-[0_60px_100px_-20px_rgba(0,0,0,0.5)] p-6 sm:p-8 md:p-10 border border-white relative group animate-in zoom-in duration-700 delay-300 overflow-visible">
                   <div className="absolute top-0 left-0 w-full h-1.5 bg-primary shadow-[0_0_20px_rgba(19,127,236,0.8)]"></div>
 
                   {/* Trip Type Selector */}
