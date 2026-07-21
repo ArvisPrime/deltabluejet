@@ -1,102 +1,10 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ROUTES } from '../../config/routes';
 import { useBookingStore, type SearchCriteria } from '../../stores/bookingStore';
-import { getRoutes } from '../../services/firestore';
-import type { RouteDoc } from '../../types/firestore';
 import { toLocalDateString } from '../../utils/localDate';
-
-interface AirportOption {
-  code: string;
-  name: string;
-  city: string;
-  country: string;
-}
-
-function useAirports() {
-  const [airports, setAirports] = useState<AirportOption[]>([]);
-  useEffect(() => {
-    getRoutes().then((routes: RouteDoc[]) => {
-      const map = new Map<string, AirportOption>();
-      for (const r of routes) {
-        if (!map.has(r.origin.code)) map.set(r.origin.code, { code: r.origin.code, name: r.origin.name, city: r.origin.city, country: r.origin.country });
-        if (!map.has(r.destination.code)) map.set(r.destination.code, { code: r.destination.code, name: r.destination.name, city: r.destination.city, country: r.destination.country });
-      }
-      setAirports(Array.from(map.values()).sort((a, b) => a.city.localeCompare(b.city)));
-    });
-  }, []);
-  return airports;
-}
-
-/** Searchable airport dropdown */
-const AirportPicker: React.FC<{
-  label: string;
-  icon: string;
-  value: string;
-  airports: AirportOption[];
-  onChange: (code: string) => void;
-}> = ({ label, icon, value, airports, onChange }) => {
-  const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState('');
-  const ref = useRef<HTMLDivElement>(null);
-
-  const selected = airports.find(a => a.code === value);
-  const displayText = selected ? `${selected.city} (${selected.code})` : '';
-
-  const filtered = airports.filter(a => {
-    const q = filter.toLowerCase();
-    return a.city.toLowerCase().includes(q) || a.code.toLowerCase().includes(q) || a.name.toLowerCase().includes(q) || a.country.toLowerCase().includes(q);
-  });
-
-  // Close on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  return (
-    <div className="relative w-full group" ref={ref}>
-      <label className="block text-xs font-black text-navy-400 mb-1.5 uppercase tracking-wider">{label}</label>
-      <div className="relative">
-        <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-navy-300">{icon}</span>
-        <input
-          className="w-full h-14 pl-12 pr-4 bg-navy-50 border border-navy-100 rounded-xl text-navy-900 font-bold focus:ring-2 focus:ring-primary/20 cursor-pointer"
-          value={open ? filter : displayText}
-          placeholder={`Select ${label.toLowerCase()}`}
-          onFocus={() => { setOpen(true); setFilter(''); }}
-          onChange={(e) => setFilter(e.target.value)}
-          readOnly={false}
-        />
-        {open && (
-          <div className="absolute z-50 top-full left-0 w-full mt-1 bg-white rounded-xl border border-navy-100 shadow-2xl max-h-60 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <p className="p-4 text-sm text-navy-400 text-center">No airports found</p>
-            ) : (
-              filtered.map(a => (
-                <button
-                  key={a.code}
-                  type="button"
-                  className={`w-full text-left px-4 py-3 hover:bg-primary/5 transition-colors flex items-center gap-3 ${value === a.code ? 'bg-primary/10 text-primary' : 'text-navy-700'}`}
-                  onClick={() => { onChange(a.code); setOpen(false); setFilter(''); }}
-                >
-                  <span className="text-xs font-black bg-navy-50 px-2 py-1 rounded-lg border border-navy-100 uppercase">{a.code}</span>
-                  <div>
-                    <p className="text-sm font-bold">{a.city}</p>
-                    <p className="text-[10px] text-navy-400">{a.name}, {a.country}</p>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+import AirportPicker, { useAirports } from '../../components/common/AirportPicker';
 
 const FlightSearch: React.FC = () => {
   const navigate = useNavigate();
@@ -119,6 +27,21 @@ const FlightSearch: React.FC = () => {
   const [departureDate, setDepartureDate] = useState(defaultDep);
   const [returnDate, setReturnDate] = useState(defaultRet);
   const [adults, setAdults] = useState(1);
+  const [children, setChildren] = useState(0);
+  const [infants, setInfants] = useState(0);
+  const [showPaxDropdown, setShowPaxDropdown] = useState(false);
+  const paxRef = useRef<HTMLDivElement>(null);
+
+  // Close passenger dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (paxRef.current && !paxRef.current.contains(e.target as Node)) setShowPaxDropdown(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const totalPax = adults + children + infants;
 
   const canSearch = origin && destination && departureDate && origin !== destination;
 
@@ -130,7 +53,7 @@ const FlightSearch: React.FC = () => {
       departureDate,
       returnDate: tripType === 'round-trip' ? returnDate : undefined,
       tripType,
-      passengers: { adults, children: 0, infants: 0 },
+      passengers: { adults, children, infants },
       fareClass: 'economy',
     };
     setSearchCriteria(criteria);
@@ -220,15 +143,60 @@ const FlightSearch: React.FC = () => {
               </div>
 
               {/* Travelers */}
-              <div className="md:col-span-6 lg:col-span-2">
+              <div className="md:col-span-6 lg:col-span-2 relative" ref={paxRef}>
                 <label className="block text-xs font-black text-navy-400 mb-1.5 uppercase tracking-wider">Travelers</label>
-                <div className="w-full h-14 px-4 bg-navy-50 border border-navy-100 rounded-xl flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setAdults(Math.max(1, adults - 1))} className="size-7 rounded-lg bg-white border border-navy-100 flex items-center justify-center text-navy-500 hover:text-primary transition-colors font-black text-sm">−</button>
-                    <span className="text-sm font-black text-navy-900 min-w-[60px] text-center">{adults} Adult{adults > 1 ? 's' : ''}</span>
-                    <button type="button" onClick={() => setAdults(Math.min(9, adults + 1))} className="size-7 rounded-lg bg-white border border-navy-100 flex items-center justify-center text-navy-500 hover:text-primary transition-colors font-black text-sm">+</button>
+                <button
+                  type="button"
+                  onClick={() => setShowPaxDropdown(!showPaxDropdown)}
+                  className="w-full h-14 px-4 bg-navy-50 border border-navy-100 rounded-xl flex items-center justify-between hover:shadow-md transition-all"
+                >
+                  <span className="text-sm font-black text-navy-900">{totalPax} {totalPax === 1 ? 'Traveler' : 'Travelers'}</span>
+                  <span className={`material-symbols-outlined text-navy-300 transition-transform ${showPaxDropdown ? 'rotate-180' : ''}`}>expand_more</span>
+                </button>
+
+                {showPaxDropdown && (
+                  <div className="absolute bottom-full mb-2 left-0 w-full min-w-[280px] bg-white rounded-2xl shadow-2xl border border-navy-100 p-6 z-50 animate-in slide-in-from-bottom-4 duration-300">
+                    <div className="space-y-5">
+                      {/* Adults */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-black text-navy-950 uppercase tracking-tight">Adults</p>
+                          <p className="text-[10px] font-bold text-navy-300 uppercase tracking-widest">Age 12+</p>
+                        </div>
+                        <div className="flex items-center gap-3 bg-navy-50 p-1.5 rounded-xl border border-navy-100">
+                          <button type="button" onClick={() => setAdults(Math.max(1, adults - 1))} className="size-7 flex items-center justify-center rounded-lg bg-white shadow-sm text-navy-400 hover:text-primary transition-all"><span className="material-symbols-outlined text-sm">remove</span></button>
+                          <span className="w-5 text-center text-xs font-black text-navy-950">{adults}</span>
+                          <button type="button" onClick={() => setAdults(Math.min(9, adults + 1))} className="size-7 flex items-center justify-center rounded-lg bg-white shadow-sm text-navy-400 hover:text-primary transition-all"><span className="material-symbols-outlined text-sm">add</span></button>
+                        </div>
+                      </div>
+                      {/* Children */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-black text-navy-950 uppercase tracking-tight">Children</p>
+                          <p className="text-[10px] font-bold text-navy-300 uppercase tracking-widest">Age 2-11</p>
+                        </div>
+                        <div className="flex items-center gap-3 bg-navy-50 p-1.5 rounded-xl border border-navy-100">
+                          <button type="button" onClick={() => setChildren(Math.max(0, children - 1))} className="size-7 flex items-center justify-center rounded-lg bg-white shadow-sm text-navy-400 hover:text-primary transition-all"><span className="material-symbols-outlined text-sm">remove</span></button>
+                          <span className="w-5 text-center text-xs font-black text-navy-950">{children}</span>
+                          <button type="button" onClick={() => setChildren(Math.min(9, children + 1))} className="size-7 flex items-center justify-center rounded-lg bg-white shadow-sm text-navy-400 hover:text-primary transition-all"><span className="material-symbols-outlined text-sm">add</span></button>
+                        </div>
+                      </div>
+                      {/* Infants */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-black text-navy-950 uppercase tracking-tight">Infants</p>
+                          <p className="text-[10px] font-bold text-navy-300 uppercase tracking-widest">Age 0-1</p>
+                        </div>
+                        <div className="flex items-center gap-3 bg-navy-50 p-1.5 rounded-xl border border-navy-100">
+                          <button type="button" onClick={() => setInfants(Math.max(0, infants - 1))} className="size-7 flex items-center justify-center rounded-lg bg-white shadow-sm text-navy-400 hover:text-primary transition-all"><span className="material-symbols-outlined text-sm">remove</span></button>
+                          <span className="w-5 text-center text-xs font-black text-navy-950">{infants}</span>
+                          <button type="button" onClick={() => setInfants(Math.min(4, infants + 1))} className="size-7 flex items-center justify-center rounded-lg bg-white shadow-sm text-navy-400 hover:text-primary transition-all"><span className="material-symbols-outlined text-sm">add</span></button>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setShowPaxDropdown(false)} className="w-full py-3 bg-navy-950 text-white font-black uppercase text-[10px] tracking-[0.2em] rounded-xl shadow-lg hover:bg-black transition-all">Apply</button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Search Button */}

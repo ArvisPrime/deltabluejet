@@ -9,6 +9,7 @@ import type { CmsLandingPageDoc } from '../../types/firestore';
 import { useCurrency } from '../../hooks/useCurrency';
 import { toLocalDateString } from '../../utils/localDate';
 import LazyImage from '../../components/common/LazyImage';
+import AirportPicker, { useAirports } from '../../components/common/AirportPicker';
 
 const LandingHome: React.FC = () => {
    const navigate = useNavigate();
@@ -17,37 +18,25 @@ const LandingHome: React.FC = () => {
 
    // Navigation helpers (replace old callback props)
    const onBookingStart = () => navigate(ROUTES.FLIGHT_SEARCH);
-
-   /**
-    * Extract a 3-letter airport code from a string like "Banjul (BJL)" or just "BJL".
-    */
-   const extractCode = (input: string): string => {
-      const match = input.match(/\(([A-Z]{3})\)/);
-      if (match) return match[1];
-      const trimmed = input.trim().toUpperCase();
-      if (/^[A-Z]{3}$/.test(trimmed)) return trimmed;
-      return trimmed; // fallback — search will handle gracefully
-   };
+   const airports = useAirports();
 
    /**
     * Build search criteria from the landing page form and navigate to results.
     */
    const handleSearch = () => {
-      const originCode = extractCode(fromNode);
-      const destCode = extractCode(toNode);
-      if (!originCode || !destCode || originCode === destCode) {
+      if (!origin || !destination || origin === destination) {
          // Fallback: open the full search page if inputs are invalid
          navigate(ROUTES.FLIGHT_SEARCH);
          return;
       }
       const criteria: SearchCriteria = {
-         origin: originCode,
-         destination: destCode,
+         origin,
+         destination,
          departureDate,
          returnDate: tripType === 'round-trip' ? returnDate : undefined,
          tripType,
-         passengers: { adults, children, infants: 0 },
-         fareClass: cabinClass.toLowerCase(),
+         passengers: { adults, children, infants },
+         fareClass: 'economy',
       };
       setSearchCriteria(criteria);
       navigate(ROUTES.FLIGHT_RESULTS);
@@ -114,8 +103,8 @@ const LandingHome: React.FC = () => {
    };
    const statusData = cms?.statusWidget ?? { title: 'Global Sync Status', subtitle: 'All Systems Operational', visible: true };
    const onNavigateAccount = () => navigate(ROUTES.ACCOUNT_SETTINGS);
-   const [fromNode, setFromNode] = useState('Banjul (BJL)');
-   const [toNode, setToNode] = useState('Lagos (LOS)');
+   const [origin, setOrigin] = useState('');
+   const [destination, setDestination] = useState('');
    const [tripType, setTripType] = useState<'round-trip' | 'one-way'>('round-trip');
 
    // Default dates: tomorrow for departure, one week later for return
@@ -130,7 +119,7 @@ const LandingHome: React.FC = () => {
    const [returnDate, setReturnDate] = useState(defaultRet);
    const [adults, setAdults] = useState(1);
    const [children, setChildren] = useState(0);
-   const [cabinClass, setCabinClass] = useState('Economy');
+   const [infants, setInfants] = useState(0);
    const [showPaxDropdown, setShowPaxDropdown] = useState(false);
    const paxRef = useRef<HTMLDivElement>(null);
 
@@ -146,11 +135,12 @@ const LandingHome: React.FC = () => {
    }, []);
 
    const handleSwap = () => {
-      setFromNode(toNode);
-      setToNode(fromNode);
+      const tmp = origin;
+      setOrigin(destination);
+      setDestination(tmp);
    };
 
-   const totalPax = adults + children;
+   const totalPax = adults + children + infants;
 
    return (
       <div className="flex flex-col bg-white font-sans text-navy-950 overflow-x-hidden">
@@ -220,23 +210,11 @@ const LandingHome: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
-                     {/* Locations */}
+                     {/* Locations — Route-driven Airport Dropdowns */}
                      <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-2 items-center relative">
-                        <div className="space-y-3">
-                           <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest ml-2">From</label>
-                           <div className="relative group/field">
-                              <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-navy-300 group-focus-within/field:text-primary transition-colors">flight_takeoff</span>
-                              <input className="w-full h-16 pl-14 pr-4 bg-navy-50 border-none rounded-2xl text-navy-950 font-black uppercase tracking-tighter focus:ring-8 focus:ring-primary/5 transition-all shadow-inner" value={fromNode} onChange={(e) => setFromNode(e.target.value)} />
-                           </div>
-                        </div>
-                        <button onClick={handleSwap} className="hidden sm:flex size-11 items-center justify-center rounded-full bg-white border-2 border-navy-50 text-navy-300 hover:text-primary transition-all shadow-md -ml-5 -mr-5 z-10 hover:scale-110 active:rotate-180 duration-500"><span className="material-symbols-outlined text-xl">swap_horiz</span></button>
-                        <div className="space-y-3">
-                           <label className="text-[10px] font-black text-navy-400 uppercase tracking-widest ml-2">To</label>
-                           <div className="relative group/field">
-                              <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-navy-300 group-focus-within/field:text-primary transition-colors">flight_land</span>
-                              <input className="w-full h-16 pl-14 pr-4 bg-navy-50 border-none rounded-2xl text-navy-950 font-black uppercase tracking-tighter focus:ring-8 focus:ring-primary/5 transition-all shadow-inner" value={toNode} onChange={(e) => setToNode(e.target.value)} />
-                           </div>
-                        </div>
+                        <AirportPicker label="From" icon="flight_takeoff" value={origin} airports={airports} onChange={setOrigin} variant="hero" />
+                        <button onClick={handleSwap} className="hidden sm:flex size-11 items-center justify-center rounded-full bg-white border-2 border-navy-50 text-navy-300 hover:text-primary transition-all shadow-md -ml-5 -mr-5 z-10 hover:scale-110 active:rotate-180 duration-500 mt-6"><span className="material-symbols-outlined text-xl">swap_horiz</span></button>
+                        <AirportPicker label="To" icon="flight_land" value={destination} airports={airports} onChange={setDestination} variant="hero" />
                      </div>
 
                      {/* Dates */}
@@ -271,7 +249,7 @@ const LandingHome: React.FC = () => {
                               onClick={() => setShowPaxDropdown(!showPaxDropdown)}
                               className="w-full h-16 px-8 bg-navy-50 rounded-2xl border-none text-left flex items-center justify-between group/sel hover:shadow-md transition-all shadow-inner"
                            >
-                              <span className="text-sm font-black text-navy-950 uppercase tracking-tighter">{totalPax} {totalPax === 1 ? 'Adult' : 'Pax'}, {cabinClass}</span>
+                              <span className="text-sm font-black text-navy-950 uppercase tracking-tighter">{adults} Adult{adults !== 1 ? 's' : ''}{children > 0 ? `, ${children} Child${children !== 1 ? 'ren' : ''}` : ''}{infants > 0 ? `, ${infants} Infant${infants !== 1 ? 's' : ''}` : ''}</span>
                               <span className={`material-symbols-outlined text-navy-300 group-hover/sel:text-primary transition-transform ${showPaxDropdown ? 'rotate-180' : ''}`}>expand_more</span>
                            </button>
 
@@ -300,19 +278,16 @@ const LandingHome: React.FC = () => {
                                           <button onClick={() => setChildren(Math.min(9, children + 1))} className="size-8 flex items-center justify-center rounded-lg bg-white shadow-sm text-navy-400 hover:text-primary transition-all active:scale-90"><span className="material-symbols-outlined text-sm font-black">add</span></button>
                                        </div>
                                     </div>
-                                    <hr className="border-navy-50" />
-                                    <div className="space-y-4">
-                                       <p className="text-[10px] font-black text-navy-300 uppercase tracking-widest px-1">Cabin Class</p>
-                                       <div className="grid grid-cols-2 gap-2">
-                                          {['Economy', 'Premium', 'Business', 'Executive'].map(c => (
-                                             <button
-                                                key={c}
-                                                onClick={() => setCabinClass(c)}
-                                                className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${cabinClass === c ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-navy-50 text-navy-400 hover:bg-navy-100'}`}
-                                             >
-                                                {c}
-                                             </button>
-                                          ))}
+                                    {/* Infants */}
+                                    <div className="flex items-center justify-between">
+                                       <div className="space-y-0.5">
+                                          <p className="text-sm font-black text-navy-950 uppercase tracking-tight">Infants</p>
+                                          <p className="text-[8px] font-bold text-navy-300 uppercase tracking-widest">Age 0-1</p>
+                                       </div>
+                                       <div className="flex items-center gap-4 bg-navy-50 p-1.5 rounded-xl border border-navy-100 shadow-inner">
+                                          <button onClick={() => setInfants(Math.max(0, infants - 1))} className="size-8 flex items-center justify-center rounded-lg bg-white shadow-sm text-navy-400 hover:text-primary transition-all active:scale-90"><span className="material-symbols-outlined text-sm font-black">remove</span></button>
+                                          <span className="w-6 text-center text-xs font-black text-navy-950">{infants}</span>
+                                          <button onClick={() => setInfants(Math.min(4, infants + 1))} className="size-8 flex items-center justify-center rounded-lg bg-white shadow-sm text-navy-400 hover:text-primary transition-all active:scale-90"><span className="material-symbols-outlined text-sm font-black">add</span></button>
                                        </div>
                                     </div>
                                     <button onClick={() => setShowPaxDropdown(false)} className="w-full py-4 bg-navy-950 text-white font-black uppercase text-[10px] tracking-[0.2em] rounded-2xl shadow-xl hover:bg-black transition-all">Apply Selection</button>
